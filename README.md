@@ -1,6 +1,6 @@
 # Cascade-LLM：CPU常驻权重的矩阵级流式推理
 
-> Branch: `llama31-8b-matrix-streaming`
+> Active real-model branch: `real-llama31-8b-experiment`
 
 Cascade-LLM面向个人用户的单机、单GPU、单请求推理：完整模型权重保存在
 CPU内存，只把即将执行的权重矩阵异步传入GPU，在降低显存需求的同时尽量
@@ -11,7 +11,12 @@ CPU内存，只把即将执行的权重矩阵异步传入GPU，在降低显存�
 模型权重受Meta许可约束，仓库不包含checkpoint。运行真实生成前，需要用户
 自行接受模型许可并下载到本地。
 
-## 当前结果
+## 当前状态与结果口径
+
+**重要：下表是合成硬件校准，不是真实Llama推理结果。** 它使用真实模型
+配置中的矩阵形状和字节数，但权重内容是合成零Tensor；此前未下载Meta
+checkpoint，也未验证logits或文本生成。真实模型结果只能写入
+`real_results/`，且必须带checkpoint revision、运行命令和正确性收据。
 
 本机环境为Threadripper 3970X、125 GiB RAM、RTX 3080 Ti 12 GiB、
 PCIe Gen4 x16。已有8B测试使用精确Llama-3.1-8B Projection形状的BF16
@@ -28,13 +33,46 @@ PCIe Gen4 x16。已有8B测试使用精确Llama-3.1-8B Projection形状的BF16
 | 整层双slot | 832 MiB |
 | 流式权重buffer节省 | 608 MiB / 73.08% |
 | 相对普通全权重常驻GPU | 权重相关显存降低6.87倍 |
-| 预计相对单缓冲串行速度 | 1.020–1.030× |
+| 合成负载预计相对单缓冲串行速度 | 1.020–1.030× |
 
 默认Embedding、LM Head与所有Norm使用独立GPU常驻区。矩阵级双缓冲加上
 常驻区约占2.176 GiB，而普通BF16全权重常驻约14.958 GiB；这个比较不含
 随上下文长度变化的KV Cache、activation和workspace。
 
-## Llama-3.1-8B 运行时
+## 真实实验的持久化环境
+
+源码仓库、模型权重和下载缓存相互分离：
+
+```text
+/disk2/home/guest/lianghan/repos/Cascade-LLM   # Git源码和可提交收据
+/ssd/cascade-llm/models                       # 受限checkpoint，不进Git
+/ssd/cascade-llm/hf-cache                     # Hugging Face持久缓存
+/ssd/cascade-llm/uv-cache                     # Python包持久缓存
+```
+
+加载本地路径配置：
+
+```bash
+source scripts/activate_env.sh
+```
+
+检查GPU、Python、认证和checkpoint状态：
+
+```bash
+python scripts/check_real_environment.py
+```
+
+接受Meta许可并执行`huggingface-cli login`后，下载固定revision的真实权重：
+
+```bash
+python scripts/download_llama31_8b.py
+```
+
+下载脚本不会把Token或权重写入Git，只会在`real_results/`生成可提交的
+revision、文件大小和SHA-256收据。完整验收顺序见
+[`REAL_EXPERIMENT_PROTOCOL.md`](REAL_EXPERIMENT_PROTOCOL.md)。
+
+## Llama-3.1-8B 原型运行时
 
 `layer_streaming/` 现在包含面向单机单请求的Llama-3.1-8B运行时：
 
@@ -54,11 +92,11 @@ PCIe Gen4 x16。已有8B测试使用精确Llama-3.1-8B Projection形状的BF16
 输出包括整层/矩阵粒度的自动slot、两种CPU锁页模式、相对不同基线的显存
 比例，以及基于已保存8B实测数据的性能区间和限制。
 
-使用已经下载并授权的本地checkpoint进行贪心生成：
+下面是尚待真实checkpoint验证的原型入口，不应在完成logits对照前报告性能：
 
 ```bash
 .venv/bin/python tools/run_llama31.py \
-  --checkpoint /path/to/Meta-Llama-3.1-8B \
+  --checkpoint /ssd/cascade-llm/models/Llama-3.1-8B \
   --weight-store full_pinned \
   --granularity matrix \
   --prompt "The meaning of life is" \
@@ -69,7 +107,7 @@ PCIe Gen4 x16。已有8B测试使用精确Llama-3.1-8B Projection形状的BF16
 
 ```bash
 .venv/bin/python tools/run_llama31.py \
-  --checkpoint /path/to/Meta-Llama-3.1-8B \
+  --checkpoint /ssd/cascade-llm/models/Llama-3.1-8B \
   --weight-store pinned_staging \
   --granularity matrix
 ```

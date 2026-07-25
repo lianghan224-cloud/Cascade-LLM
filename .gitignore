@@ -15,6 +15,12 @@ models/
 # Local credentials and generated executables.
 .env
 .env.*
+!.env.example
 token
 token.txt
 h2d_driver_bench
+
+# Real experiment outputs: receipts/summaries are tracked, raw traces are not.
+real_results/raw/
+*.nsys-rep
+*.qdrep
