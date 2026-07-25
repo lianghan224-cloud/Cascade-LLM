@@ -1,0 +1,1063 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "Llama-3.2-1B CPU 常驻与 GPU 异步分层推理基线",
+    "description": "双 RTX 3080 Ti 上的 H2D、精确 projection 计算、双 slot 流水与 AirLLM 调度改进建议。",
+    "generatedAt": "2026-07-25T04:27:42.173327+00:00",
+    "charts": [
+      {
+        "id": "pipeline_speedup_chart",
+        "title": "16-stage 双 slot 流水加速比",
+        "subtitle": "speedup = matched sequential / overlap；BF16 exact-shape projection-only，2026-07-25",
+        "intent": "trend",
+        "question": "流水收益如何随 M=batch×tokens 改变，两张卡是否一致？",
+        "rationale": "M 是有语义顺序的离散校准点；双线同时展示收益形状与两卡复现性，比只列峰值更能揭示 copy/compute 交点。",
+        "comparisonContext": {
+          "baseline": "matched sequential copy-then-compute",
+          "grain": "M=batch×tokens; 16 decoder stages",
+          "unit": "speedup ×"
+        },
+        "type": "line",
+        "dataset": "pipeline_chart",
+        "sourceId": "pipeline_chart_sql",
+        "encodings": {
+          "x": {
+            "field": "M_label",
+            "type": "ordinal",
+            "label": "M = batch × tokens"
+          },
+          "y": {
+            "field": "speedup",
+            "type": "quantitative",
+            "label": "加速比",
+            "unit": "×"
+          },
+          "color": {
+            "field": "gpu",
+            "type": "nominal",
+            "label": "GPU"
+          },
+          "lineStyle": {
+            "field": "gpu",
+            "type": "nominal",
+            "label": "GPU"
+          },
+          "tooltip": [
+            {
+              "field": "M",
+              "type": "quantitative",
+              "label": "M"
+            },
+            {
+              "field": "gpu",
+              "type": "nominal",
+              "label": "GPU"
+            },
+            {
+              "field": "sequential_ms",
+              "type": "quantitative",
+              "label": "Serial ms"
+            },
+            {
+              "field": "overlap_ms",
+              "type": "quantitative",
+              "label": "Overlap ms"
+            }
+          ]
+        },
+        "valueFormat": "number",
+        "unit": "×",
+        "layout": "full",
+        "palette": {
+          "kind": "categorical",
+          "name": "two-GPU comparison"
+        },
+        "legend": {
+          "position": "bottom",
+          "sort": "spec"
+        },
+        "labels": {
+          "values": "endpoints"
+        },
+        "referenceLines": [
+          {
+            "axis": "y",
+            "value": 1.0,
+            "label": "无加速",
+            "color": "neutral",
+            "lineStyle": "dotted"
+          }
+        ],
+        "surface": {
+          "surface": "card",
+          "viewMode": "both",
+          "interactiveLegend": true
+        }
+      }
+    ],
+    "tables": [
+      {
+        "id": "pipeline_table",
+        "title": "两张卡的 16-stage 流水结果",
+        "subtitle": "同一 M、同一双 slot/event 图；时间为各 run total median。",
+        "dataset": "pipeline_curve",
+        "sourceId": "pipeline_table_sql",
+        "defaultSort": {
+          "field": "M",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "columns": [
+          {
+            "field": "M",
+            "label": "M",
+            "format": "number"
+          },
+          {
+            "field": "gpu0_sequential_ms",
+            "label": "GPU0 serial ms",
+            "format": "number"
+          },
+          {
+            "field": "gpu0_overlap_ms",
+            "label": "GPU0 overlap ms",
+            "format": "number"
+          },
+          {
+            "field": "gpu0_speedup",
+            "label": "GPU0 speedup ×",
+            "format": "number"
+          },
+          {
+            "field": "gpu1_speedup",
+            "label": "GPU1 speedup ×",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "h2d_table",
+        "title": "Pinned H2D 的自然权重分片",
+        "subtitle": "CUDA Driver API median；GB/s 为十进制单位。",
+        "dataset": "h2d_chunks",
+        "sourceId": "h2d_table_sql",
+        "defaultSort": {
+          "field": "size_bytes",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "columns": [
+          {
+            "field": "size_bytes",
+            "label": "Bytes",
+            "format": "number"
+          },
+          {
+            "field": "size",
+            "label": "分片",
+            "type": "text"
+          },
+          {
+            "field": "gpu0_event_us",
+            "label": "GPU0 event µs",
+            "format": "number"
+          },
+          {
+            "field": "gpu0_GBps",
+            "label": "GPU0 GB/s",
+            "format": "number"
+          },
+          {
+            "field": "gpu1_GBps",
+            "label": "GPU1 GB/s",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "compute_table",
+        "title": "GPU0 单层 projection 计算",
+        "subtitle": "精确 q/k/v/o 与 gate/up/down 形状；不含完整 attention。",
+        "dataset": "compute_gpu0",
+        "sourceId": "compute_table_sql",
+        "defaultSort": {
+          "field": "M",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "columns": [
+          {
+            "field": "M",
+            "label": "M",
+            "format": "number"
+          },
+          {
+            "field": "elapsed_ms",
+            "label": "计算 ms",
+            "format": "number"
+          },
+          {
+            "field": "effective_TFLOPs",
+            "label": "有效 TFLOP/s",
+            "format": "number"
+          },
+          {
+            "field": "nominal_weight_GBps",
+            "label": "Nominal weight/time GB/s",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "model_layout_table",
+        "title": "Llama-3.2-1B BF16 tensor 布局",
+        "subtitle": "Hub 元数据 revision 4e20de3；tied embedding/head 只计一次。",
+        "dataset": "model_layout",
+        "sourceId": "model_layout_sql",
+        "defaultSort": {
+          "field": "bytes",
+          "direction": "desc"
+        },
+        "density": "spacious",
+        "columns": [
+          {
+            "field": "component",
+            "label": "组成",
+            "type": "text"
+          },
+          {
+            "field": "bytes",
+            "label": "Bytes",
+            "format": "number"
+          },
+          {
+            "field": "MiB",
+            "label": "MiB",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "granularity_table",
+        "title": "按计算窗口选择预取粒度",
+        "subtitle": "可隐藏字节按 24 GB/s × GPU0 projection 时间估算。",
+        "dataset": "granularity",
+        "sourceId": "granularity_sql",
+        "defaultSort": {
+          "field": "M",
+          "direction": "asc"
+        },
+        "density": "spacious",
+        "columns": [
+          {
+            "field": "M",
+            "label": "M",
+            "format": "number"
+          },
+          {
+            "field": "compute_ms",
+            "label": "整层计算 ms",
+            "format": "number"
+          },
+          {
+            "field": "hideable_MiB_at_24_GBps",
+            "label": "窗口可隐藏 MiB",
+            "format": "number"
+          },
+          {
+            "field": "recommendation",
+            "label": "建议边界",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "pipeline_chart_sql",
+        "label": "Reviewed two-GPU pipeline chart selection",
+        "path": "queries/pipeline_chart.sql"
+      },
+      {
+        "id": "pipeline_table_sql",
+        "label": "Reviewed two-GPU pipeline table selection",
+        "path": "queries/pipeline_table.sql"
+      },
+      {
+        "id": "h2d_table_sql",
+        "label": "Reviewed CUDA Driver H2D table selection",
+        "path": "queries/h2d_table.sql"
+      },
+      {
+        "id": "compute_table_sql",
+        "label": "Reviewed GPU0 projection table selection",
+        "path": "queries/compute_gpu0.sql"
+      },
+      {
+        "id": "model_layout_sql",
+        "label": "Reviewed model-layout table selection",
+        "path": "queries/model_layout.sql"
+      },
+      {
+        "id": "granularity_sql",
+        "label": "Reviewed prefetch-granularity table selection",
+        "path": "queries/granularity.sql"
+      },
+      {
+        "id": "h2d_driver",
+        "label": "CUDA Driver API H2D raw results",
+        "path": "h2d_results_summary.json"
+      },
+      {
+        "id": "torch_pipeline",
+        "label": "Two-GPU projection and pipeline benchmark",
+        "path": "benchmarks/build_report_artifact.py"
+      },
+      {
+        "id": "torch_compute_gpu0",
+        "label": "GPU0 exact-shape projection benchmark",
+        "path": "results/torch_llama32_1b_gpu0.json"
+      },
+      {
+        "id": "pinned_arena",
+        "label": "Full-model pinned CPU arena probe",
+        "path": "results/pinned_arena_probe.json"
+      },
+      {
+        "id": "validation",
+        "label": "Benchmark QA receipt",
+        "path": "results/validation.json"
+      },
+      {
+        "id": "model_card",
+        "label": "Official Llama-3.2-1B model card",
+        "href": "https://huggingface.co/meta-llama/Llama-3.2-1B"
+      },
+      {
+        "id": "airllm_source",
+        "label": "AirLLM audited source revision",
+        "href": "https://github.com/lyogavin/airllm/tree/17677cb821016b36a0610c8e1f2befab030d1942"
+      },
+      {
+        "id": "pytorch_overlap_docs",
+        "label": "PyTorch pinned-memory and non-blocking copy guide",
+        "href": "https://docs.pytorch.org/tutorials/intermediate/pinmem_nonblock.html"
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# Llama-3.2-1B CPU 常驻与 GPU 异步分层推理基线"
+      },
+      {
+        "id": "technical_summary",
+        "type": "markdown",
+        "body": "## 技术摘要\n\n- **硬件路径可行。** 两张 RTX 3080 Ti 都有独立 DMA engine；精确 116.008 MiB layer 的 raw pinned H2D 约 5.0 ms。\n- **收益取决于 M。** M=1 的 16-stage 加速只有约 1.03×，M=2048 达约 1.71×；约 M=2.5k–2.7k 后整层 copy 可被计算覆盖。\n- **1B 首版应全量 pinned CPU 常驻。** 2.302 GiB arena 已成功分配；pageable H2D 会 host 阻塞，单线程 pageable→pinned staging 也更慢。\n- **结论是校准级、非端到端。** 官方权重受 manual gate 限制，本轮计算是精确形状 projection-only；真实 logits/token/s 待授权后验证。"
+      },
+      {
+        "id": "pipeline_finding",
+        "type": "markdown",
+        "sourceId": "torch_pipeline",
+        "body": "## 重叠在 copy/compute 接近平衡时最有效\n\n两张卡的曲线几乎重合：M=1 只有约 1.03×，M=512/1024 约 1.20×/1.37×，M=2048 约 1.71×。M=4096 时计算已经长于 H2D，流水仍完全隐藏 copy，但总时间转由 compute 决定，因此相对加速回落到约 1.59×。这说明粒度优化可以去掉气泡，但不能减少每 token 经过 PCIe 的总权重字节。"
+      },
+      {
+        "id": "pipeline_chart_block",
+        "type": "chart",
+        "chartId": "pipeline_speedup_chart"
+      },
+      {
+        "id": "pipeline_table_context",
+        "type": "markdown",
+        "sourceId": "torch_pipeline",
+        "body": "### 精确时间验证曲线不是计时假象\n\n串行与重叠模式复用同一组 persistent stream/event 和两个真实 device slot；copy 写入的 slot 就是随后 compute 读取的权重。表中保留绝对时间，便于检查加速比与填充/排空开销。"
+      },
+      {
+        "id": "pipeline_table_block",
+        "type": "table",
+        "tableId": "pipeline_table"
+      },
+      {
+        "id": "h2d_finding",
+        "type": "markdown",
+        "sourceId": "h2d_driver",
+        "body": "## 1–2 MiB 已接近满带宽，pageable 路径不能重叠\n\nGPU0/GPU1 的 116.008 MiB raw H2D 分别为 5.020/5.055 ms，约 24.23/24.07 GB/s；单次 host enqueue 约 1.8 µs。64 KiB 只有约 12 GB/s，而 1–2 MiB 已达到约 24.6–25.3 GB/s。因此最小调度片应为 1–2 MiB，并优先使用 2/8/32 MiB 等自然矩阵边界。"
+      },
+      {
+        "id": "h2d_table_block",
+        "type": "table",
+        "tableId": "h2d_table"
+      },
+      {
+        "id": "scope_definitions",
+        "type": "markdown",
+        "body": "## 范围、数据与指标定义\n\n**M** 是一次 decoder-layer 调用中的 `batch × tokens`。**Pipeline speedup** 是完全相同 16-stage 工作在 matched sequential 与 overlap 模式下的总时长之比。H2D GB/s 使用十进制字节；MiB/GiB 使用二进制单位。模型 tensor payload 为 2,471,628,800 B；单层含两个 norm 为 121,643,008 B。"
+      },
+      {
+        "id": "model_layout_context",
+        "type": "markdown",
+        "sourceId": "model_card",
+        "body": "### 1B 是可控的强制 out-of-core 实验\n\n模型本身能完整放入 12 GiB GPU，因此可以在同卡建立 full-resident reference，再强制启用 CPU streaming，直接比较每层输出、最终 logits、TTFT、token/s 与显存峰值。"
+      },
+      {
+        "id": "model_layout_block",
+        "type": "table",
+        "tableId": "model_layout_table"
+      },
+      {
+        "id": "compute_finding",
+        "type": "markdown",
+        "sourceId": "torch_compute_gpu0",
+        "body": "## Projection 计算约在 M≈2.6k 与整层 H2D 相交\n\nGPU0 单层 projection 在 M=1/512/2048/4096 时约为 0.212/1.286/4.035/7.733 ms。与约 5.0 ms 的整层 raw H2D比较，decode 小 M 明显 copy-bound；大 prefill 才适合整层双缓冲。"
+      },
+      {
+        "id": "compute_table_block",
+        "type": "table",
+        "tableId": "compute_table"
+      },
+      {
+        "id": "methodology",
+        "type": "markdown",
+        "sourceId": "validation",
+        "body": "## 方法与稳健性检查\n\n低层 H2D 直接 `dlopen(libcuda)`，由 CUDA Event 包围 DMA；host latency 只包围 API 调用。PyTorch 流水使用固定 stream/event、两个预分配 slot，完整 pipeline 末尾才同步。QA 脚本重算 SHA-256、exact-layer median、speedup 与 hidden-fraction 公式，并检查两卡一致性；65/65 项通过。当前结论评级为 **share with caveats**。"
+      },
+      {
+        "id": "airllm_gap",
+        "type": "markdown",
+        "sourceId": "airllm_source",
+        "body": "## AirLLM 的缺口在 H2D 与 allocator 热路径\n\n审查 revision `17677cb` 后确认：worker 预取只覆盖 disk→CPU；pre-hook 仍同步逐 tensor 搬 GPU，且下一层 CPU prefetch 在当前 H2D 后才提交。`pin_memory()` 返回值未写回，post-hook 每层还执行 `to(meta)`、GC、`malloc_trim` 与 `empty_cache`。首版更适合保留checkpoint/模型兼容思路，重写独立 runtime scheduler。"
+      },
+      {
+        "id": "scheduler_design",
+        "type": "markdown",
+        "sourceId": "torch_pipeline",
+        "body": "## 首版采用 pinned arena + 双 slot + ready/free event\n\n启动时解析 safetensors header，将全量 BF16 tensor 直接读入连续 pinned arena；GPU 常驻 tied embedding/head、norm、RoPE 与 KV cache。copy stream 写 slot B，记录 `ready[i]`；compute stream 等待 ready、使用 slot 后记录 `free[i]`；覆盖 slot 前只等待对应 free。热路径不做 `module.to()`、分配/释放、`empty_cache()` 或全局同步。"
+      },
+      {
+        "id": "granularity_context",
+        "type": "markdown",
+        "body": "### Autotuner 按计算窗口选择下一片\n\n用 `S_prefetch ≈ B_H2D × T_compute(window)` 选择当前计算窗口内可隐藏的下一批字节，并贴合 K/V 2 MiB、Q/O 8 MiB、MLP matrix 32 MiB 等边界。小 M 下分片只改善首片延迟，无法改变 PCIe 总吞吐上限。"
+      },
+      {
+        "id": "granularity_table_block",
+        "type": "table",
+        "tableId": "granularity_table"
+      },
+      {
+        "id": "limitations",
+        "type": "markdown",
+        "body": "## 限制与不确定性\n\n- 官方权重 manual-gated，本机无 token；未验证真实 logits 或生成速度。\n- projection-only 不含 RMSNorm、RoPE、QK-softmax-V、KV-cache 与 residual。\n- GPU clocks 未锁；matched sequential/overlap 比 tiny-M component slowdown 更可靠。\n- timing-enabled dependency event 对两种模式影响相同，但生产绝对开销会更低。\n- 全量 pinned 适合本机 1B；更大模型需评估 page-locked RAM 对系统的影响。"
+      },
+      {
+        "id": "next_steps",
+        "type": "markdown",
+        "body": "## 推荐实施顺序\n\n1. 本机接受模型 license，并通过环境变量或 `huggingface-cli login` 配置 token；checkpoint 放 `/ssd`。\n2. 实现 safetensors offset manifest 与 2.302 GiB pinned arena loader。\n3. 先完成整层双 slot runtime，并逐层对齐 full-resident reference。\n4. 再实现 Q/K/V/O/MLP projection 粒度 schedule 与 autotuner。\n5. 用 Nsight Systems 验证 copy engine/kernel overlap，并报告 TTFT、token/s、峰值 VRAM 与 logits 误差。"
+      },
+      {
+        "id": "further_questions",
+        "type": "markdown",
+        "body": "## 下一轮需要回答的问题\n\n- 真实 Llama decoder 的 attention/KV 工作会把整层交点移动多少？\n- batch-1 decode 是否应常驻更多未来层，而不是继续细切当前层？\n- projection 内部 tiling 的 kernel/launch 成本是否抵消更早开算的收益？\n- 扩展到大模型时，多线程 pageable→pinned staging 能否跑满本机 DRAM？"
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-07-25T04:27:42.173327+00:00",
+    "status": "ready",
+    "datasets": {
+      "headline_h2d": [
+        {
+          "raw_GBps": 24.232292,
+          "exact_layer_ms": 5.020031929,
+          "enqueue_us": 1.812988,
+          "decoder_h2d_tps_lower_bound": 12.450516268062033
+        }
+      ],
+      "headline_pipeline": [
+        {
+          "best_speedup": 1.7134349577612418,
+          "best_M": 2048
+        }
+      ],
+      "headline_arena": [
+        {
+          "model_GiB": 2.3018836975097656,
+          "allocation_s": 1.402547883,
+          "first_touch_GBps": 14.138481044187992
+        }
+      ],
+      "pipeline_curve": [
+        {
+          "M": 1,
+          "M_label": "1",
+          "gpu0_speedup": 1.0325866675790991,
+          "gpu1_speedup": 1.0313942952293864,
+          "gpu0_sequential_ms": 86.57100677490234,
+          "gpu0_overlap_ms": 83.83897399902344,
+          "gpu1_sequential_ms": 86.89561462402344,
+          "gpu1_overlap_ms": 84.25062561035156
+        },
+        {
+          "M": 8,
+          "M_label": "8",
+          "gpu0_speedup": 1.0392264623893614,
+          "gpu1_speedup": 1.0390991077271785,
+          "gpu0_sequential_ms": 86.45938873291016,
+          "gpu0_overlap_ms": 83.19590759277344,
+          "gpu1_sequential_ms": 86.91590118408203,
+          "gpu1_overlap_ms": 83.64543914794922
+        },
+        {
+          "M": 32,
+          "M_label": "32",
+          "gpu0_speedup": 1.040203406342381,
+          "gpu1_speedup": 1.0402465017341238,
+          "gpu0_sequential_ms": 85.04729461669922,
+          "gpu0_overlap_ms": 81.76025390625,
+          "gpu1_sequential_ms": 85.72723388671875,
+          "gpu1_overlap_ms": 82.4104995727539
+        },
+        {
+          "M": 128,
+          "M_label": "128",
+          "gpu0_speedup": 1.0588911355204143,
+          "gpu1_speedup": 1.0586729405019333,
+          "gpu0_sequential_ms": 86.55769348144531,
+          "gpu0_overlap_ms": 81.74371337890625,
+          "gpu1_sequential_ms": 87.2284164428711,
+          "gpu1_overlap_ms": 82.39411163330078
+        },
+        {
+          "M": 512,
+          "M_label": "512",
+          "gpu0_speedup": 1.2001373441958985,
+          "gpu1_speedup": 1.199892005550774,
+          "gpu0_sequential_ms": 98.96044921875,
+          "gpu0_overlap_ms": 82.45760345458984,
+          "gpu1_sequential_ms": 98.90704345703125,
+          "gpu1_overlap_ms": 82.4299545288086
+        },
+        {
+          "M": 1024,
+          "M_label": "1024",
+          "gpu0_speedup": 1.373244606084795,
+          "gpu1_speedup": 1.373431601337781,
+          "gpu0_sequential_ms": 114.45222473144531,
+          "gpu0_overlap_ms": 83.3443832397461,
+          "gpu1_sequential_ms": 114.4453125,
+          "gpu1_overlap_ms": 83.3280029296875
+        },
+        {
+          "M": 2048,
+          "M_label": "2048",
+          "gpu0_speedup": 1.7120386496246225,
+          "gpu1_speedup": 1.7134349577612418,
+          "gpu0_sequential_ms": 146.02342224121094,
+          "gpu0_overlap_ms": 85.29212951660156,
+          "gpu1_sequential_ms": 145.86880493164062,
+          "gpu1_overlap_ms": 85.13238525390625
+        },
+        {
+          "M": 4096,
+          "M_label": "4096",
+          "gpu0_speedup": 1.5874796523885917,
+          "gpu1_speedup": 1.5860417189177052,
+          "gpu0_sequential_ms": 205.65196228027344,
+          "gpu0_overlap_ms": 129.54620361328125,
+          "gpu1_sequential_ms": 205.43487548828125,
+          "gpu1_overlap_ms": 129.5267791748047
+        }
+      ],
+      "pipeline_chart": [
+        {
+          "M": 1,
+          "M_label": "1",
+          "gpu": "GPU0",
+          "speedup": 1.0325866675790991,
+          "sequential_ms": 86.57100677490234,
+          "overlap_ms": 83.83897399902344
+        },
+        {
+          "M": 1,
+          "M_label": "1",
+          "gpu": "GPU1",
+          "speedup": 1.0313942952293864,
+          "sequential_ms": 86.89561462402344,
+          "overlap_ms": 84.25062561035156
+        },
+        {
+          "M": 8,
+          "M_label": "8",
+          "gpu": "GPU0",
+          "speedup": 1.0392264623893614,
+          "sequential_ms": 86.45938873291016,
+          "overlap_ms": 83.19590759277344
+        },
+        {
+          "M": 8,
+          "M_label": "8",
+          "gpu": "GPU1",
+          "speedup": 1.0390991077271785,
+          "sequential_ms": 86.91590118408203,
+          "overlap_ms": 83.64543914794922
+        },
+        {
+          "M": 32,
+          "M_label": "32",
+          "gpu": "GPU0",
+          "speedup": 1.040203406342381,
+          "sequential_ms": 85.04729461669922,
+          "overlap_ms": 81.76025390625
+        },
+        {
+          "M": 32,
+          "M_label": "32",
+          "gpu": "GPU1",
+          "speedup": 1.0402465017341238,
+          "sequential_ms": 85.72723388671875,
+          "overlap_ms": 82.4104995727539
+        },
+        {
+          "M": 128,
+          "M_label": "128",
+          "gpu": "GPU0",
+          "speedup": 1.0588911355204143,
+          "sequential_ms": 86.55769348144531,
+          "overlap_ms": 81.74371337890625
+        },
+        {
+          "M": 128,
+          "M_label": "128",
+          "gpu": "GPU1",
+          "speedup": 1.0586729405019333,
+          "sequential_ms": 87.2284164428711,
+          "overlap_ms": 82.39411163330078
+        },
+        {
+          "M": 512,
+          "M_label": "512",
+          "gpu": "GPU0",
+          "speedup": 1.2001373441958985,
+          "sequential_ms": 98.96044921875,
+          "overlap_ms": 82.45760345458984
+        },
+        {
+          "M": 512,
+          "M_label": "512",
+          "gpu": "GPU1",
+          "speedup": 1.199892005550774,
+          "sequential_ms": 98.90704345703125,
+          "overlap_ms": 82.4299545288086
+        },
+        {
+          "M": 1024,
+          "M_label": "1024",
+          "gpu": "GPU0",
+          "speedup": 1.373244606084795,
+          "sequential_ms": 114.45222473144531,
+          "overlap_ms": 83.3443832397461
+        },
+        {
+          "M": 1024,
+          "M_label": "1024",
+          "gpu": "GPU1",
+          "speedup": 1.373431601337781,
+          "sequential_ms": 114.4453125,
+          "overlap_ms": 83.3280029296875
+        },
+        {
+          "M": 2048,
+          "M_label": "2048",
+          "gpu": "GPU0",
+          "speedup": 1.7120386496246225,
+          "sequential_ms": 146.02342224121094,
+          "overlap_ms": 85.29212951660156
+        },
+        {
+          "M": 2048,
+          "M_label": "2048",
+          "gpu": "GPU1",
+          "speedup": 1.7134349577612418,
+          "sequential_ms": 145.86880493164062,
+          "overlap_ms": 85.13238525390625
+        },
+        {
+          "M": 4096,
+          "M_label": "4096",
+          "gpu": "GPU0",
+          "speedup": 1.5874796523885917,
+          "sequential_ms": 205.65196228027344,
+          "overlap_ms": 129.54620361328125
+        },
+        {
+          "M": 4096,
+          "M_label": "4096",
+          "gpu": "GPU1",
+          "speedup": 1.5860417189177052,
+          "sequential_ms": 205.43487548828125,
+          "overlap_ms": 129.5267791748047
+        }
+      ],
+      "h2d_chunks": [
+        {
+          "size_bytes": 65536,
+          "size": "0.062 MiB",
+          "gpu0_event_us": 5.344,
+          "gpu0_GBps": 12.263473,
+          "gpu1_event_us": 5.376,
+          "gpu1_GBps": 12.190476
+        },
+        {
+          "size_bytes": 1048576,
+          "size": "1.000 MiB",
+          "gpu0_event_us": 42.592,
+          "gpu0_GBps": 24.619083,
+          "gpu1_event_us": 42.656001,
+          "gpu1_GBps": 24.582145
+        },
+        {
+          "size_bytes": 2097152,
+          "size": "2.000 MiB",
+          "gpu0_event_us": 82.815997,
+          "gpu0_GBps": 25.32303,
+          "gpu1_event_us": 82.719997,
+          "gpu1_GBps": 25.352419
+        },
+        {
+          "size_bytes": 8388608,
+          "size": "8.000 MiB",
+          "gpu0_event_us": 321.568012,
+          "gpu0_GBps": 26.086575,
+          "gpu1_event_us": 321.696013,
+          "gpu1_GBps": 26.076195
+        },
+        {
+          "size_bytes": 20971520,
+          "size": "20.000 MiB",
+          "gpu0_event_us": 799.328029,
+          "gpu0_GBps": 26.236438,
+          "gpu1_event_us": 799.74401,
+          "gpu1_GBps": 26.222791
+        },
+        {
+          "size_bytes": 33554432,
+          "size": "32.000 MiB",
+          "gpu0_event_us": 1277.439952,
+          "gpu0_GBps": 26.266935,
+          "gpu1_event_us": 1278.17595,
+          "gpu1_GBps": 26.25181
+        },
+        {
+          "size_bytes": 100663296,
+          "size": "96.000 MiB",
+          "gpu0_event_us": 4144.224167,
+          "gpu0_GBps": 24.290022,
+          "gpu1_event_us": 4196.928024,
+          "gpu1_GBps": 23.984995
+        },
+        {
+          "size_bytes": 121643008,
+          "size": "116.008 MiB",
+          "gpu0_event_us": 5020.031929,
+          "gpu0_GBps": 24.232292,
+          "gpu1_event_us": 5055.456161,
+          "gpu1_GBps": 24.065688
+        },
+        {
+          "size_bytes": 268435456,
+          "size": "256.000 MiB",
+          "gpu0_event_us": 11039.679527,
+          "gpu0_GBps": 24.318682,
+          "gpu1_event_us": 11062.080383,
+          "gpu1_GBps": 24.268239
+        }
+      ],
+      "compute_gpu0": [
+        {
+          "M": 1,
+          "elapsed_ms": 0.21196800470352173,
+          "effective_TFLOPs": 0.573835736058986,
+          "nominal_weight_GBps": 573.835736058986
+        },
+        {
+          "M": 128,
+          "elapsed_ms": 0.38288000226020813,
+          "effective_TFLOPs": 40.66354042021504,
+          "nominal_weight_GBps": 317.68390953293
+        },
+        {
+          "M": 512,
+          "elapsed_ms": 1.2861440181732178,
+          "effective_TFLOPs": 48.42150250051743,
+          "nominal_weight_GBps": 94.57324707132311
+        },
+        {
+          "M": 1024,
+          "elapsed_ms": 2.0746240615844727,
+          "effective_TFLOPs": 60.03692615464661,
+          "nominal_weight_GBps": 58.62981069789708
+        },
+        {
+          "M": 2048,
+          "elapsed_ms": 4.034992218017578,
+          "effective_TFLOPs": 61.73694760937821,
+          "nominal_weight_GBps": 30.144993949891706
+        },
+        {
+          "M": 4096,
+          "elapsed_ms": 7.733216047286987,
+          "effective_TFLOPs": 64.42548653619824,
+          "nominal_weight_GBps": 15.728878548876525
+        }
+      ],
+      "model_layout": [
+        {
+          "component": "tied embedding / lm_head",
+          "bytes": 525336576,
+          "MiB": 501.0
+        },
+        {
+          "component": "single decoder layer + norms",
+          "bytes": 121643008,
+          "MiB": 116.0078125
+        },
+        {
+          "component": "16 decoder layers",
+          "bytes": 1946288128,
+          "MiB": 1856.125
+        },
+        {
+          "component": "final norm",
+          "bytes": 4096,
+          "MiB": 0.00390625
+        },
+        {
+          "component": "all tensor payload",
+          "bytes": 2471628800,
+          "MiB": 2357.12890625
+        }
+      ],
+      "granularity": [
+        {
+          "M": 1,
+          "compute_ms": 0.21196800470352173,
+          "hideable_MiB_at_24_GBps": 4.851562607655069,
+          "recommendation": "2/8 MiB tensor；只能改善首片延迟，总体仍 H2D-bound"
+        },
+        {
+          "M": 512,
+          "compute_ms": 1.2861440181732178,
+          "hideable_MiB_at_24_GBps": 29.437500415951945,
+          "recommendation": "32 MiB MLP matrix"
+        },
+        {
+          "M": 2048,
+          "compute_ms": 4.034992218017578,
+          "hideable_MiB_at_24_GBps": 92.35364268533885,
+          "recommendation": "96 MiB MLP 或 116 MiB 整层"
+        },
+        {
+          "M": 4096,
+          "compute_ms": 7.733216047286987,
+          "hideable_MiB_at_24_GBps": 176.99926866043825,
+          "recommendation": "116 MiB 整层"
+        }
+      ]
+    },
+    "accessIssues": []
+  },
+  "sources": [
+    {
+      "id": "pipeline_chart_sql",
+      "label": "Reviewed two-GPU pipeline chart selection",
+      "path": "queries/pipeline_chart.sql",
+      "query": {
+        "engine": "SQLite-compatible snapshot selection",
+        "language": "sql",
+        "sql": "SELECT M, M_label, gpu, speedup, sequential_ms, overlap_ms FROM pipeline_chart ORDER BY M, gpu",
+        "description": "Selects all 16 reviewed GPU/M observations used by the native report chart.",
+        "executed_at": "2026-07-25T04:27:42.173327+00:00",
+        "tables_used": [
+          "pipeline_chart"
+        ],
+        "filters": [
+          "No interpolation; all eight M points per GPU"
+        ],
+        "metric_definitions": [
+          "speedup = matched sequential total ms / overlap total ms"
+        ]
+      }
+    },
+    {
+      "id": "pipeline_table_sql",
+      "label": "Reviewed two-GPU pipeline table selection",
+      "path": "queries/pipeline_table.sql",
+      "query": {
+        "engine": "SQLite-compatible snapshot selection",
+        "language": "sql",
+        "sql": "SELECT M, gpu0_sequential_ms, gpu0_overlap_ms, gpu0_speedup, gpu1_sequential_ms, gpu1_overlap_ms, gpu1_speedup FROM pipeline_curve ORDER BY M",
+        "description": "Selects the eight matched wide rows used for exact lookup.",
+        "executed_at": "2026-07-25T04:27:42.173327+00:00",
+        "tables_used": [
+          "pipeline_curve"
+        ]
+      }
+    },
+    {
+      "id": "h2d_table_sql",
+      "label": "Reviewed CUDA Driver H2D table selection",
+      "path": "queries/h2d_table.sql",
+      "query": {
+        "engine": "SQLite-compatible snapshot selection",
+        "language": "sql",
+        "sql": "SELECT size_bytes, size, gpu0_event_us, gpu0_GBps, gpu1_event_us, gpu1_GBps FROM h2d_chunks ORDER BY size_bytes",
+        "description": "Selects reconciled pinned async medians at natural Llama tensor boundaries.",
+        "executed_at": "2026-07-25T04:27:42.173327+00:00",
+        "tables_used": [
+          "h2d_chunks"
+        ]
+      }
+    },
+    {
+      "id": "compute_table_sql",
+      "label": "Reviewed GPU0 projection table selection",
+      "path": "queries/compute_gpu0.sql",
+      "query": {
+        "engine": "SQLite-compatible snapshot selection",
+        "language": "sql",
+        "sql": "SELECT M, elapsed_ms, effective_TFLOPs, nominal_weight_GBps FROM compute_gpu0 ORDER BY M",
+        "description": "Selects the reviewed exact-shape projection calibration.",
+        "executed_at": "2026-07-25T04:27:42.173327+00:00",
+        "tables_used": [
+          "compute_gpu0"
+        ]
+      }
+    },
+    {
+      "id": "model_layout_sql",
+      "label": "Reviewed model-layout table selection",
+      "path": "queries/model_layout.sql",
+      "query": {
+        "engine": "SQLite-compatible snapshot selection",
+        "language": "sql",
+        "sql": "SELECT component, bytes, MiB FROM model_layout ORDER BY bytes DESC",
+        "description": "Selects the reviewed BF16 tensor-layout components.",
+        "executed_at": "2026-07-25T04:27:42.173327+00:00",
+        "tables_used": [
+          "model_layout"
+        ]
+      }
+    },
+    {
+      "id": "granularity_sql",
+      "label": "Reviewed prefetch-granularity table selection",
+      "path": "queries/granularity.sql",
+      "query": {
+        "engine": "SQLite-compatible snapshot selection",
+        "language": "sql",
+        "sql": "SELECT M, compute_ms, hideable_MiB_at_24_GBps, recommendation FROM granularity ORDER BY M",
+        "description": "Selects the 24 GB/s compute-window calculation.",
+        "executed_at": "2026-07-25T04:27:42.173327+00:00",
+        "tables_used": [
+          "granularity"
+        ],
+        "metric_definitions": [
+          "hideable MiB = compute seconds × 24e9 / 2^20"
+        ]
+      }
+    },
+    {
+      "id": "h2d_driver",
+      "label": "CUDA Driver API H2D raw results",
+      "path": "h2d_results_summary.json",
+      "query": {
+        "engine": "CUDA Driver API",
+        "language": "C11",
+        "description": "Pinned/pageable H2D CUDA Event medians and batched tiny-copy enqueue fits on both RTX 3080 Ti GPUs.",
+        "executed_at": "2026-07-25T03:24:18Z",
+        "tables_used": [
+          "h2d_results_gpu0.json",
+          "h2d_results_gpu1.json"
+        ],
+        "metric_definitions": [
+          "GB/s = transferred bytes / CUDA Event elapsed seconds / 1e9",
+          "Host enqueue is wall time around one cuMemcpyHtoDAsync_v2 call"
+        ]
+      }
+    },
+    {
+      "id": "torch_pipeline",
+      "label": "Two-GPU projection and pipeline benchmark",
+      "path": "benchmarks/build_report_artifact.py",
+      "query": {
+        "engine": "Python",
+        "language": "python",
+        "description": "Joins matching M rows from the two saved PyTorch JSON files without interpolation.",
+        "executed_at": "2026-07-25T04:27:42.173327+00:00",
+        "tables_used": [
+          "results/torch_llama32_1b_gpu0.json",
+          "results/torch_llama32_1b_gpu1.json"
+        ],
+        "metric_definitions": [
+          "M = batch × tokens processed by one decoder-layer call",
+          "Pipeline speedup = matched sequential total ms / overlap total ms",
+          "Both modes use 16 stages, two preallocated device slots, and persistent streams"
+        ]
+      }
+    },
+    {
+      "id": "torch_compute_gpu0",
+      "label": "GPU0 exact-shape projection benchmark",
+      "path": "results/torch_llama32_1b_gpu0.json",
+      "query": {
+        "engine": "PyTorch CUDA Event",
+        "language": "python",
+        "description": "Exact Llama-3.2-1B q/k/v/o and gate/up/down BF16 projection shapes on GPU0.",
+        "executed_at": "2026-07-25T04:06:58.149434+00:00",
+        "metric_definitions": [
+          "Projection FLOPs = 2 × linear weight elements × M",
+          "The benchmark omits attention, RMSNorm, RoPE, KV-cache, and residual work"
+        ]
+      }
+    },
+    {
+      "id": "pinned_arena",
+      "label": "Full-model pinned CPU arena probe",
+      "path": "results/pinned_arena_probe.json",
+      "query": {
+        "engine": "CUDA Driver API",
+        "language": "python",
+        "description": "cuMemHostAlloc, libc memset first-touch, and cuMemFreeHost for the exact model tensor payload.",
+        "executed_at": "2026-07-25T04:02:20.554606+00:00"
+      }
+    },
+    {
+      "id": "validation",
+      "label": "Benchmark QA receipt",
+      "path": "results/validation.json",
+      "query": {
+        "engine": "Python",
+        "language": "python",
+        "description": "Reconciles raw hashes, exact-layer H2D medians, formulas, sample rows, hidden-fraction scope, and two-GPU agreement.",
+        "executed_at": "2026-07-25T04:27:42.141622+00:00"
+      }
+    },
+    {
+      "id": "model_card",
+      "label": "Official Llama-3.2-1B model card",
+      "href": "https://huggingface.co/meta-llama/Llama-3.2-1B"
+    },
+    {
+      "id": "airllm_source",
+      "label": "AirLLM audited source revision",
+      "href": "https://github.com/lyogavin/airllm/tree/17677cb821016b36a0610c8e1f2befab030d1942"
+    },
+    {
+      "id": "pytorch_overlap_docs",
+      "label": "PyTorch pinned-memory and non-blocking copy guide",
+      "href": "https://docs.pytorch.org/tutorials/intermediate/pinmem_nonblock.html"
+    }
+  ]
+}

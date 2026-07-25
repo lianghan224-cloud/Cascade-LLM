@@ -1,0 +1,8 @@
+# Python 3.8-compatible versions for this Ubuntu 20.04 host.
+torch==2.4.1
+transformers==4.45.2
+safetensors==0.4.5
+huggingface-hub==0.25.2
+accelerate==0.34.2
+numpy==1.24.4
+sentencepiece==0.2.0

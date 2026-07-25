@@ -1,0 +1,331 @@
+{
+  "generated_at": "2026-07-25T07:10:38.957326+00:00",
+  "benchmark": "M1_shard_component_accounting",
+  "assessment": "share_with_caveats",
+  "scope": {
+    "rows_M": 1,
+    "total_layers": 16,
+    "total_weight_bytes": 1946288128,
+    "compute": "synthetic BF16 decoder projection-linear-only"
+  },
+  "definitions": {
+    "h2d_total_ms": "sum of per-shard CUDA Event H2D durations in the matched sequential pipeline sample",
+    "compute_total_ms": "sum of per-shard CUDA Event projection compute durations",
+    "driver_h2d_call_total_us": "raw Driver API median host call multiplied by shard count",
+    "torch_copy_submission_total_us": "host time for stream context, begin/end Event records, and Tensor.copy_ calls, summed across shards",
+    "full_host_enqueue_us": "host wall time to enqueue the full pass; asynchronous and therefore not additive to the GPU critical path"
+  },
+  "source_files": [
+    {
+      "path": "results/shard_accounting_m1_gpu0.json",
+      "sha256": "16c0ac057857ffdec6d6e8a94154e35fc07d9cf80c9c7adca39e733e8296a682"
+    },
+    {
+      "path": "results/h2d_large_shards_gpu0.json",
+      "sha256": "dbf27d7cba8bac8717509176aa9b6487a9f943585a1d39654326009824c5c42b"
+    },
+    {
+      "path": "results/shard_accounting_m1_gpu1.json",
+      "sha256": "ce5613296a7fdcc70a5c30a4f653c2eafb1ec8fd7edf5ab3c4ab06bfc6bd27e5"
+    },
+    {
+      "path": "results/h2d_large_shards_gpu1.json",
+      "sha256": "afe988089062ddc901d5d2709154815338482d0e54264086c5de40227aac370b"
+    }
+  ],
+  "checks_passed": 32,
+  "checks_total": 32,
+  "failed_checks": [],
+  "rows": [
+    {
+      "layers_per_shard": 1,
+      "shard_count": 16,
+      "shard_bytes": 121643008,
+      "shard_MiB": 116.0078125,
+      "two_gpu_mean_of_medians": {
+        "h2d_total_ms": 81.47406458854675,
+        "h2d_GBps": 23.888541321743574,
+        "compute_total_ms": 2.9360799863934517,
+        "compute_TFLOPs": 0.6628610344361223,
+        "driver_h2d_call_total_us": 29.095952,
+        "torch_copy_call_total_us": 142.10225000000003,
+        "torch_copy_submission_total_us": 510.97624999999994,
+        "torch_compute_submission_total_us": 2446.639,
+        "full_host_enqueue_us": 3013.9195,
+        "serial_ms": 84.56772041320801,
+        "overlap_ms": 81.84061622619629,
+        "speedup": 1.0333221317523598,
+        "saved_by_overlap_ms": 2.7271041870117188
+      },
+      "derived_shares": {
+        "h2d_fraction_of_serial": 0.9634180061902428,
+        "compute_fraction_of_serial": 0.03471868429286509,
+        "driver_h2d_call_fraction_of_h2d": 0.0003571191905907463,
+        "torch_copy_submission_fraction_of_h2d": 0.006271643038560649
+      },
+      "per_gpu": {
+        "gpu0": {
+          "h2d_total_ms": 81.64363241195679,
+          "h2d_GBps": 23.83882331667257,
+          "compute_total_ms": 2.920335978269577,
+          "compute_TFLOPs": 0.6664154640019128,
+          "driver_h2d_call_total_us": 29.34424,
+          "torch_copy_call_total_us": 143.89350000000002,
+          "torch_copy_submission_total_us": 519.9179999999999,
+          "torch_compute_submission_total_us": 2492.7885,
+          "full_host_enqueue_us": 3072.351,
+          "serial_ms": 84.73190307617188,
+          "overlap_ms": 81.99930953979492,
+          "speedup": 1.0333245920205072
+        },
+        "gpu1": {
+          "h2d_total_ms": 81.30449676513672,
+          "h2d_GBps": 23.93825932681458,
+          "compute_total_ms": 2.9518239945173264,
+          "compute_TFLOPs": 0.659306604870332,
+          "driver_h2d_call_total_us": 28.847664,
+          "torch_copy_call_total_us": 140.311,
+          "torch_copy_submission_total_us": 502.0345,
+          "torch_compute_submission_total_us": 2400.4894999999997,
+          "full_host_enqueue_us": 2955.4880000000003,
+          "serial_ms": 84.40353775024414,
+          "overlap_ms": 81.68192291259766,
+          "speedup": 1.033319671484212
+        }
+      }
+    },
+    {
+      "layers_per_shard": 2,
+      "shard_count": 8,
+      "shard_bytes": 243286016,
+      "shard_MiB": 232.015625,
+      "two_gpu_mean_of_medians": {
+        "h2d_total_ms": 81.43715190887451,
+        "h2d_GBps": 23.89927759520215,
+        "compute_total_ms": 2.9055439978837967,
+        "compute_TFLOPs": 0.6698129003010052,
+        "driver_h2d_call_total_us": 14.628052,
+        "torch_copy_call_total_us": 73.96125,
+        "torch_copy_submission_total_us": 265.40725,
+        "torch_compute_submission_total_us": 2183.27775,
+        "full_host_enqueue_us": 2479.60375,
+        "serial_ms": 84.43570518493652,
+        "overlap_ms": 81.96513557434082,
+        "speedup": 1.0301416575620155,
+        "saved_by_overlap_ms": 2.470569610595703
+      },
+      "derived_shares": {
+        "h2d_fraction_of_serial": 0.9644871411982124,
+        "compute_fraction_of_serial": 0.034411319139455124,
+        "driver_h2d_call_fraction_of_h2d": 0.0001796238161222572,
+        "torch_copy_submission_fraction_of_h2d": 0.0032590438611726246
+      },
+      "per_gpu": {
+        "gpu0": {
+          "h2d_total_ms": 81.49470376968384,
+          "h2d_GBps": 23.88238790953213,
+          "compute_total_ms": 2.9132799953222275,
+          "compute_TFLOPs": 0.6680295265559404,
+          "driver_h2d_call_total_us": 14.832032,
+          "torch_copy_call_total_us": 74.39750000000001,
+          "torch_copy_submission_total_us": 267.524,
+          "torch_compute_submission_total_us": 2223.277,
+          "full_host_enqueue_us": 2524.154,
+          "serial_ms": 84.50200271606445,
+          "overlap_ms": 82.02324676513672,
+          "speedup": 1.0302201637789996
+        },
+        "gpu1": {
+          "h2d_total_ms": 81.37960004806519,
+          "h2d_GBps": 23.916167280872173,
+          "compute_total_ms": 2.897808000445366,
+          "compute_TFLOPs": 0.6715962740460699,
+          "driver_h2d_call_total_us": 14.424072,
+          "torch_copy_call_total_us": 73.525,
+          "torch_copy_submission_total_us": 263.2905,
+          "torch_compute_submission_total_us": 2143.2785,
+          "full_host_enqueue_us": 2435.0535,
+          "serial_ms": 84.3694076538086,
+          "overlap_ms": 81.90702438354492,
+          "speedup": 1.0300631513450311
+        }
+      }
+    },
+    {
+      "layers_per_shard": 4,
+      "shard_count": 4,
+      "shard_bytes": 486572032,
+      "shard_MiB": 464.03125,
+      "two_gpu_mean_of_medians": {
+        "h2d_total_ms": 81.30262470245361,
+        "h2d_GBps": 23.93882206575524,
+        "compute_total_ms": 2.9160720109939575,
+        "compute_TFLOPs": 0.6673901618520892,
+        "driver_h2d_call_total_us": 7.393922,
+        "torch_copy_call_total_us": 38.332499999999996,
+        "torch_copy_submission_total_us": 136.77775,
+        "torch_compute_submission_total_us": 2042.9115000000002,
+        "full_host_enqueue_us": 2197.3922500000003,
+        "serial_ms": 84.27331924438477,
+        "overlap_ms": 82.18726539611816,
+        "speedup": 1.0253818433952262,
+        "saved_by_overlap_ms": 2.0860538482666016
+      },
+      "derived_shares": {
+        "h2d_fraction_of_serial": 0.9647492875732542,
+        "compute_fraction_of_serial": 0.034602553182195434,
+        "driver_h2d_call_fraction_of_h2d": 9.094321403595301e-05,
+        "torch_copy_submission_fraction_of_h2d": 0.0016823288362530836
+      },
+      "per_gpu": {
+        "gpu0": {
+          "h2d_total_ms": 81.24617576599121,
+          "h2d_GBps": 23.955442944241266,
+          "compute_total_ms": 2.917840003967285,
+          "compute_TFLOPs": 0.666985528114591,
+          "driver_h2d_call_total_us": 7.491944,
+          "torch_copy_call_total_us": 38.498,
+          "torch_copy_submission_total_us": 137.5965,
+          "torch_compute_submission_total_us": 2079.9945000000002,
+          "full_host_enqueue_us": 2237.2830000000004,
+          "serial_ms": 84.22238540649414,
+          "overlap_ms": 82.1242904663086,
+          "speedup": 1.0255477999051485
+        },
+        "gpu1": {
+          "h2d_total_ms": 81.35907363891602,
+          "h2d_GBps": 23.922201187269213,
+          "compute_total_ms": 2.91430401802063,
+          "compute_TFLOPs": 0.6677947955895874,
+          "driver_h2d_call_total_us": 7.2959,
+          "torch_copy_call_total_us": 38.167,
+          "torch_copy_submission_total_us": 135.959,
+          "torch_compute_submission_total_us": 2005.8284999999998,
+          "full_host_enqueue_us": 2157.5015000000003,
+          "serial_ms": 84.32425308227539,
+          "overlap_ms": 82.25024032592773,
+          "speedup": 1.0252158868853039
+        }
+      }
+    },
+    {
+      "layers_per_shard": 8,
+      "shard_count": 2,
+      "shard_bytes": 973144064,
+      "shard_MiB": 928.0625,
+      "two_gpu_mean_of_medians": {
+        "h2d_total_ms": 81.37869548797607,
+        "h2d_GBps": 23.916528863673815,
+        "compute_total_ms": 2.901439994573593,
+        "compute_TFLOPs": 0.6707602956410954,
+        "driver_h2d_call_total_us": 4.128021,
+        "torch_copy_call_total_us": 19.827999999999996,
+        "torch_copy_submission_total_us": 71.28075,
+        "torch_compute_submission_total_us": 1967.723,
+        "full_host_enqueue_us": 2051.1814999999997,
+        "serial_ms": 84.32332038879395,
+        "overlap_ms": 82.91427993774414,
+        "speedup": 1.016994352763711,
+        "saved_by_overlap_ms": 1.4090404510498047
+      },
+      "derived_shares": {
+        "h2d_fraction_of_serial": 0.9650793530515528,
+        "compute_fraction_of_serial": 0.03440851215530617,
+        "driver_h2d_call_fraction_of_h2d": 5.072606503762311e-05,
+        "torch_copy_submission_fraction_of_h2d": 0.0008759141391069844
+      },
+      "per_gpu": {
+        "gpu0": {
+          "h2d_total_ms": 81.21587181091309,
+          "h2d_GBps": 23.964381402336613,
+          "compute_total_ms": 2.9091359972953796,
+          "compute_TFLOPs": 0.6689811194146097,
+          "driver_h2d_call_total_us": 4.128052,
+          "torch_copy_call_total_us": 19.912999999999997,
+          "torch_copy_submission_total_us": 71.025,
+          "torch_compute_submission_total_us": 2005.6475,
+          "full_host_enqueue_us": 2087.4624999999996,
+          "serial_ms": 84.16766357421875,
+          "overlap_ms": 82.74483108520508,
+          "speedup": 1.0171954244193033
+        },
+        "gpu1": {
+          "h2d_total_ms": 81.54151916503906,
+          "h2d_GBps": 23.868676325011016,
+          "compute_total_ms": 2.8937439918518066,
+          "compute_TFLOPs": 0.6725394718675811,
+          "driver_h2d_call_total_us": 4.12799,
+          "torch_copy_call_total_us": 19.743,
+          "torch_copy_submission_total_us": 71.53649999999999,
+          "torch_compute_submission_total_us": 1929.7984999999999,
+          "full_host_enqueue_us": 2014.9005,
+          "serial_ms": 84.47897720336914,
+          "overlap_ms": 83.0837287902832,
+          "speedup": 1.0167932811081188
+        }
+      }
+    },
+    {
+      "layers_per_shard": 16,
+      "shard_count": 1,
+      "shard_bytes": 1946288128,
+      "shard_MiB": 1856.125,
+      "two_gpu_mean_of_medians": {
+        "h2d_total_ms": 81.41697692871094,
+        "h2d_GBps": 23.905417222791208,
+        "compute_total_ms": 2.90558397769928,
+        "compute_TFLOPs": 0.669799273733068,
+        "driver_h2d_call_total_us": 2.128494,
+        "torch_copy_call_total_us": 10.51025,
+        "torch_copy_submission_total_us": 36.898,
+        "torch_compute_submission_total_us": 1927.2065,
+        "full_host_enqueue_us": 1971.9515000000001,
+        "serial_ms": 84.35112762451172,
+        "overlap_ms": 84.33480072021484,
+        "speedup": 1.0001930855508192,
+        "saved_by_overlap_ms": 0.016326904296875
+      },
+      "derived_shares": {
+        "h2d_fraction_of_serial": 0.9652150388686903,
+        "compute_fraction_of_serial": 0.03444629680154912,
+        "driver_h2d_call_fraction_of_h2d": 2.6143122482473386e-05,
+        "torch_copy_submission_fraction_of_h2d": 0.00045319786354027923
+      },
+      "per_gpu": {
+        "gpu0": {
+          "h2d_total_ms": 81.1647834777832,
+          "h2d_GBps": 23.979465534245488,
+          "compute_total_ms": 2.9035199880599976,
+          "compute_TFLOPs": 0.6702750675053335,
+          "driver_h2d_call_total_us": 2.164001,
+          "torch_copy_call_total_us": 10.5505,
+          "torch_copy_submission_total_us": 37.271,
+          "torch_compute_submission_total_us": 1958.8690000000001,
+          "full_host_enqueue_us": 2004.576,
+          "serial_ms": 84.0975341796875,
+          "overlap_ms": 84.09649658203125,
+          "speedup": 1.0000123381793347
+        },
+        "gpu1": {
+          "h2d_total_ms": 81.66917037963867,
+          "h2d_GBps": 23.83136891133693,
+          "compute_total_ms": 2.907647967338562,
+          "compute_TFLOPs": 0.6693234799608024,
+          "driver_h2d_call_total_us": 2.092987,
+          "torch_copy_call_total_us": 10.47,
+          "torch_copy_submission_total_us": 36.525000000000006,
+          "torch_compute_submission_total_us": 1895.5439999999999,
+          "full_host_enqueue_us": 1939.327,
+          "serial_ms": 84.60472106933594,
+          "overlap_ms": 84.57310485839844,
+          "speedup": 1.0003738329223035
+        }
+      }
+    }
+  ],
+  "caveats": [
+    "The compute scope excludes attention score/softmax, RoPE, RMSNorm, KV cache, residuals, embedding, and LM head.",
+    "Host enqueue work is asynchronous and mostly overlaps the much longer DMA timeline; it must not be blindly added to CUDA Event component times.",
+    "Two-GPU values are means of per-GPU medians, not pooled samples."
+  ]
+}

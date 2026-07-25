@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "generated_from": [
+    {
+      "path": "h2d_results_gpu0.json",
+      "sha256": "64a50342f9ed7aba483fd6f13d276cd08176ab9b80135c2134d984e15420b627"
+    },
+    {
+      "path": "h2d_results_gpu1.json",
+      "sha256": "1bb8c53c4e4c505f749567f74808b70dac68eb9a5c04c66cdebc90f5c2d9c238"
+    }
+  ],
+  "machine": {
+    "timestamp_utc": "2026-07-25",
+    "cpu": "AMD Ryzen Threadripper 3970X 32-Core Processor",
+    "logical_cpus": 64,
+    "numa_nodes": 1,
+    "kernel": "Linux 5.15.0-139-generic x86_64",
+    "nvidia_driver": "555.42.02",
+    "cuda_driver_api_version": 12050,
+    "gpu_count": 2,
+    "gpus": [
+      {
+        "ordinal": 0,
+        "name": "NVIDIA GeForce RTX 3080 Ti",
+        "pci_bdf": "0000:01:00.0",
+        "pcie_max": "Gen4 x16",
+        "async_engine_count": 2
+      },
+      {
+        "ordinal": 1,
+        "name": "NVIDIA GeForce RTX 3080 Ti",
+        "pci_bdf": "0000:48:00.0",
+        "pcie_max": "Gen4 x16",
+        "async_engine_count": 2
+      }
+    ]
+  },
+  "pinned_async_model_relevant_medians": {
+    "units": {
+      "size": "bytes",
+      "gpu_event": "microseconds",
+      "bandwidth": "decimal GB/s",
+      "host_call": "microseconds"
+    },
+    "gpu0": [
+      {"size": 2097152, "gpu_event": 82.815997, "bandwidth": 25.323030, "host_call": 1.792999},
+      {"size": 8388608, "gpu_event": 321.568012, "bandwidth": 26.086575, "host_call": 1.783997},
+      {"size": 20971520, "gpu_event": 799.328029, "bandwidth": 26.236438, "host_call": 1.773987},
+      {"size": 33554432, "gpu_event": 1277.439952, "bandwidth": 26.266935, "host_call": 1.804016},
+      {"size": 67108864, "gpu_event": 2702.528000, "bandwidth": 24.831885, "host_call": 1.803009},
+      {"size": 100663296, "gpu_event": 4144.224167, "bandwidth": 24.290022, "host_call": 1.824005},
+      {"size": 121634816, "gpu_event": 5017.568111, "bandwidth": 24.241787, "host_call": 1.804016},
+      {"size": 121643008, "gpu_event": 5020.031929, "bandwidth": 24.232292, "host_call": 1.812988},
+      {"size": 268435456, "gpu_event": 11039.679527, "bandwidth": 24.318682, "host_call": 1.853027}
+    ],
+    "gpu1": [
+      {"size": 2097152, "gpu_event": 82.719997, "bandwidth": 25.352419, "host_call": 1.772980},
+      {"size": 8388608, "gpu_event": 321.696013, "bandwidth": 26.076195, "host_call": 1.782990},
+      {"size": 20971520, "gpu_event": 799.744010, "bandwidth": 26.222791, "host_call": 1.792999},
+      {"size": 33554432, "gpu_event": 1278.175950, "bandwidth": 26.251810, "host_call": 1.772980},
+      {"size": 67108864, "gpu_event": 2797.120094, "bandwidth": 23.992128, "host_call": 1.803986},
+      {"size": 100663296, "gpu_event": 4196.928024, "bandwidth": 23.984995, "host_call": 1.794006},
+      {"size": 121634816, "gpu_event": 5055.136204, "bandwidth": 24.061630, "host_call": 1.824005},
+      {"size": 121643008, "gpu_event": 5055.456161, "bandwidth": 24.065688, "host_call": 1.842987},
+      {"size": 268435456, "gpu_event": 11062.080383, "bandwidth": 24.268239, "host_call": 1.833008}
+    ]
+  },
+  "size_116_mib_comparison": {
+    "size_bytes": 121634816,
+    "gpu0": {
+      "pageable_async": {"host_call_median_us": 9098.613007, "gpu_event_median_us": 9137.951851, "median_gbps": 13.310950},
+      "pinned_async": {"host_call_median_us": 1.804016, "gpu_event_median_us": 5017.568111, "median_gbps": 24.241787}
+    },
+    "gpu1": {
+      "pageable_async": {"host_call_median_us": 9151.270996, "gpu_event_median_us": 9184.096336, "median_gbps": 13.244070},
+      "pinned_async": {"host_call_median_us": 1.824005, "gpu_event_median_us": 5055.136204, "median_gbps": 24.061630}
+    }
+  },
+  "large_transfer_fit": {
+    "model": "gpu_event_us = alpha_us + slope_us_per_mib * size_mib",
+    "fit_sizes_bytes": [67108864, 100663296, 121634816, 268435456],
+    "gpu0": {
+      "pinned_async": {"alpha_us": -31.312528, "slope_us_per_mib": 43.288064, "bandwidth_gbps": 24.223213, "r2": 0.999935501},
+      "pageable_async": {"alpha_us": 21.132921, "slope_us_per_mib": 78.898251, "bandwidth_gbps": 13.290231, "r2": 0.999960516}
+    },
+    "gpu1": {
+      "pinned_async": {"alpha_us": 59.760852, "slope_us_per_mib": 42.992897, "bandwidth_gbps": 24.389517, "r2": 0.999990449},
+      "pageable_async": {"alpha_us": 111.356864, "slope_us_per_mib": 78.364715, "bandwidth_gbps": 13.380716, "r2": 0.999995028}
+    }
+  },
+  "batched_async_launch_fit": {
+    "model": "median_batch_us = intercept_us + per_copy_slope_us * copies",
+    "batch_copy_counts": [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024],
+    "gpu0": {
+      "zero_byte_host": {"intercept_us": 0.060425748, "per_copy_slope_us": 0.058666975, "r2": 0.999993472},
+      "zero_byte_gpu_event": {"intercept_us": 1.281141690, "per_copy_slope_us": 0.058835096, "r2": 0.999926245},
+      "one_byte_host": {"intercept_us": -4.618067133, "per_copy_slope_us": 2.130381888, "r2": 0.999926086},
+      "one_byte_gpu_event": {"intercept_us": -3.562048376, "per_copy_slope_us": 2.130766285, "r2": 0.999924960},
+      "four_kib_host": {"intercept_us": 1.972970733, "per_copy_slope_us": 1.834082706, "r2": 0.999971001},
+      "four_kib_gpu_event": {"intercept_us": 3.304660650, "per_copy_slope_us": 1.833864544, "r2": 0.999970614}
+    },
+    "gpu1": {
+      "zero_byte_host": {"intercept_us": 0.115826637, "per_copy_slope_us": 0.057146044, "r2": 0.999965265},
+      "zero_byte_gpu_event": {"intercept_us": 1.318568598, "per_copy_slope_us": 0.057305201, "r2": 0.999866154},
+      "one_byte_host": {"intercept_us": -4.686150460, "per_copy_slope_us": 2.099167900, "r2": 0.999925015},
+      "one_byte_gpu_event": {"intercept_us": -3.594719538, "per_copy_slope_us": 2.099442045, "r2": 0.999924205},
+      "four_kib_host": {"intercept_us": 0.315167519, "per_copy_slope_us": 1.820252158, "r2": 0.999925179},
+      "four_kib_gpu_event": {"intercept_us": 1.708778707, "per_copy_slope_us": 1.819976303, "r2": 0.999924693}
+    },
+    "interpretation": {
+      "zero_byte": "The driver optimizes a zero-byte copy as a no-op; its slope is API validation/loop cost, not a DMA launch.",
+      "one_byte_and_four_kib": "The approximately 1.82-2.13 us slopes include steady-state Driver API submission plus serialized tiny-copy command cost. Use the standalone host-call median of approximately 1.8 us for one isolated enqueue."
+    }
+  }
+}

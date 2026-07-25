@@ -1,0 +1,341 @@
+{
+  "generated_at": "2026-07-25T14:51:05.409138+00:00",
+  "scope": "machine calibration and synthetic exact-shape projection/overlap benchmark",
+  "assessment": "share_with_caveats",
+  "checks_passed": 65,
+  "checks_total": 65,
+  "checks": [
+    {
+      "name": "gpu0_raw_sha256",
+      "passed": true,
+      "detail": "raw result matches h2d_results_summary.json"
+    },
+    {
+      "name": "gpu0_exact_layer_h2d_reconciliation",
+      "passed": true,
+      "detail": "raw and compact exact-layer medians agree"
+    },
+    {
+      "name": "gpu1_raw_sha256",
+      "passed": true,
+      "detail": "raw result matches h2d_results_summary.json"
+    },
+    {
+      "name": "gpu1_exact_layer_h2d_reconciliation",
+      "passed": true,
+      "detail": "raw and compact exact-layer medians agree"
+    },
+    {
+      "name": "gpu0_model_shape",
+      "passed": true,
+      "detail": "exact layer payload is 121,643,008 bytes"
+    },
+    {
+      "name": "gpu0_pipeline_rows",
+      "passed": true,
+      "detail": "all requested M values are present in order"
+    },
+    {
+      "name": "gpu0_M1_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu0_M1_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu0_M8_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu0_M8_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu0_M32_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu0_M32_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu0_M128_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu0_M128_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu0_M512_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu0_M512_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu0_M1024_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu0_M1024_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu0_M2048_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu0_M2048_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu0_M4096_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu0_M4096_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu0_M1_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu0_M8_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu0_M32_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu0_M128_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu0_M512_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu0_M1024_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu0_M2048_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu0_M4096_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu1_model_shape",
+      "passed": true,
+      "detail": "exact layer payload is 121,643,008 bytes"
+    },
+    {
+      "name": "gpu1_pipeline_rows",
+      "passed": true,
+      "detail": "all requested M values are present in order"
+    },
+    {
+      "name": "gpu1_M1_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu1_M1_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu1_M8_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu1_M8_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu1_M32_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu1_M32_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu1_M128_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu1_M128_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu1_M512_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu1_M512_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu1_M1024_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu1_M1024_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu1_M2048_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu1_M2048_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu1_M4096_pipeline_speedup",
+      "passed": true,
+      "detail": "saved speedup equals sequential_ms / overlap_ms"
+    },
+    {
+      "name": "gpu1_M4096_pipeline_direction",
+      "passed": true,
+      "detail": "overlap is faster than the matched sequential baseline"
+    },
+    {
+      "name": "gpu1_M1_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu1_M8_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu1_M32_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu1_M128_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu1_M512_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu1_M1024_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu1_M2048_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "gpu1_M4096_hidden_scope",
+      "passed": true,
+      "detail": "hidden fraction uses common start-to-finish spans"
+    },
+    {
+      "name": "M1_two_gpu_reproducibility",
+      "passed": true,
+      "detail": "pipeline speedups differ by 0.116%"
+    },
+    {
+      "name": "M8_two_gpu_reproducibility",
+      "passed": true,
+      "detail": "pipeline speedups differ by 0.012%"
+    },
+    {
+      "name": "M32_two_gpu_reproducibility",
+      "passed": true,
+      "detail": "pipeline speedups differ by 0.004%"
+    },
+    {
+      "name": "M128_two_gpu_reproducibility",
+      "passed": true,
+      "detail": "pipeline speedups differ by 0.021%"
+    },
+    {
+      "name": "M512_two_gpu_reproducibility",
+      "passed": true,
+      "detail": "pipeline speedups differ by 0.020%"
+    },
+    {
+      "name": "M1024_two_gpu_reproducibility",
+      "passed": true,
+      "detail": "pipeline speedups differ by 0.014%"
+    },
+    {
+      "name": "M2048_two_gpu_reproducibility",
+      "passed": true,
+      "detail": "pipeline speedups differ by 0.082%"
+    },
+    {
+      "name": "M4096_two_gpu_reproducibility",
+      "passed": true,
+      "detail": "pipeline speedups differ by 0.091%"
+    },
+    {
+      "name": "full_pinned_arena",
+      "passed": true,
+      "detail": "full 2,471,628,800-byte tensor payload was allocated with CUDA Driver API"
+    }
+  ],
+  "blockers": [],
+  "required_caveats": [
+    "The official model weights are manual-gated and were not available on this host.",
+    "GPU compute is exact-shape BF16 projection-only, not a full decoder or end-to-end generation benchmark.",
+    "GPU clocks were not administratively locked; matched sequential/overlap comparisons are more reliable than tiny-M component slowdown.",
+    "Pipeline CUDA timing events add equal instrumentation to both modes; production absolute overhead will differ."
+  ]
+}

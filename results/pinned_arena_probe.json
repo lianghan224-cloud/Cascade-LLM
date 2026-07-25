@@ -1,0 +1,34 @@
+{
+  "timestamp_utc": "2026-07-25T04:02:20.554606+00:00",
+  "hostname": "csu01",
+  "cuda_driver_api_version": 12050,
+  "device_index": 0,
+  "requested_bytes": 2471628800,
+  "requested_gib": 2.3018836975097656,
+  "model_id": "meta-llama/Llama-3.2-1B",
+  "memory_before": {
+    "MemTotal": 134907813888,
+    "MemAvailable": 129656602624,
+    "SwapTotal": 32767995904,
+    "SwapFree": 32767995904
+  },
+  "allocation_seconds": 1.402547883,
+  "allocation_api": "cuMemHostAlloc",
+  "first_touch_seconds": 0.174815724,
+  "first_touch_GBps": 14.138481044187992,
+  "memory_while_allocated": {
+    "MemTotal": 134907813888,
+    "MemAvailable": 127135789056,
+    "SwapTotal": 32767995904,
+    "SwapFree": 32767995904
+  },
+  "free_seconds": 0.595591186,
+  "memory_after_free": {
+    "MemTotal": 134907813888,
+    "MemAvailable": 129735548928,
+    "SwapTotal": 32767995904,
+    "SwapFree": 32767995904
+  },
+  "status": "ok",
+  "note": "Allocation/free use the CUDA Driver API directly; first touch uses one libc memset call. This probes feasibility, not aggregate CPU DRAM bandwidth."
+}

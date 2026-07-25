@@ -1,0 +1,20 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Gated/local model files must not be committed.
+*.safetensors
+*.bin
+*.gguf
+checkpoints/
+models/
+
+# Local credentials and generated executables.
+.env
+.env.*
+token
+token.txt
+h2d_driver_bench

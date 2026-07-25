@@ -1,1 +1,332 @@
-# Cascade-LLM
+# Cascade-LLM：CPU常驻权重的矩阵级流式推理
+
+> Branch: `llama31-8b-matrix-streaming`
+
+Cascade-LLM面向个人用户的单机、单GPU、单请求推理：完整模型权重保存在
+CPU内存，只把即将执行的权重矩阵异步传入GPU，在降低显存需求的同时尽量
+让H2D与当前矩阵计算重叠。本分支以
+`meta-llama/Llama-3.1-8B` BF16为第一版目标，思路来源于AirLLM，但运行时
+不使用逐层hook、`module.to("meta")`和热路径动态分配。
+
+模型权重受Meta许可约束，仓库不包含checkpoint。运行真实生成前，需要用户
+自行接受模型许可并下载到本地。
+
+## 当前结果
+
+本机环境为Threadripper 3970X、125 GiB RAM、RTX 3080 Ti 12 GiB、
+PCIe Gen4 x16。已有8B测试使用精确Llama-3.1-8B Projection形状的BF16
+合成权重；真实checkpoint端到端logits仍待授权权重和CUDA环境复测。
+
+| 指标 | 结果 |
+|---|---:|
+| Pinned H2D有效吞吐 | 约23.6–24.1 GB/s |
+| 8B Decoder BF16每Token传输量 | 13.000 GiB |
+| M=1 Decoder H2D | 591.42 ms |
+| M=1 Projection计算 | 18.61 ms |
+| 整层串行 / 双缓冲 | 610.31 / 592.11 ms |
+| 默认矩阵级双slot | 224 MiB |
+| 整层双slot | 832 MiB |
+| 流式权重buffer节省 | 608 MiB / 73.08% |
+| 相对普通全权重常驻GPU | 权重相关显存降低6.87倍 |
+| 预计相对单缓冲串行速度 | 1.020–1.030× |
+
+默认Embedding、LM Head与所有Norm使用独立GPU常驻区。矩阵级双缓冲加上
+常驻区约占2.176 GiB，而普通BF16全权重常驻约14.958 GiB；这个比较不含
+随上下文长度变化的KV Cache、activation和workspace。
+
+## Llama-3.1-8B 运行时
+
+`layer_streaming/` 现在包含面向单机单请求的Llama-3.1-8B运行时：
+
+- 默认按单个Projection矩阵进行H2D；
+- 根据最大矩阵自动分配两个GPU weight slot；
+- `full_pinned`完整锁页CPU权重模式；
+- `pinned_staging` pageable主存加两个pinned staging slot模式；
+- Embedding、LM Head和Norm使用独立GPU常驻区；
+- Copy/Compute两个CUDA Stream及ready/free Event流水。
+
+查看静态计划和基线对比：
+
+```bash
+.venv/bin/python benchmarks/report_llama31_matrix_runtime.py
+```
+
+输出包括整层/矩阵粒度的自动slot、两种CPU锁页模式、相对不同基线的显存
+比例，以及基于已保存8B实测数据的性能区间和限制。
+
+使用已经下载并授权的本地checkpoint进行贪心生成：
+
+```bash
+.venv/bin/python tools/run_llama31.py \
+  --checkpoint /path/to/Meta-Llama-3.1-8B \
+  --weight-store full_pinned \
+  --granularity matrix \
+  --prompt "The meaning of life is" \
+  --max-new-tokens 8
+```
+
+兼容模式：
+
+```bash
+.venv/bin/python tools/run_llama31.py \
+  --checkpoint /path/to/Meta-Llama-3.1-8B \
+  --weight-store pinned_staging \
+  --granularity matrix
+```
+
+运行单元测试：
+
+```bash
+.venv/bin/python -m unittest discover -s tests -v
+```
+
+实现范围、显存节省和性能口径见
+[`IMPLEMENTATION_REPORT.md`](IMPLEMENTATION_REPORT.md)。
+
+本目录包含 Llama-3.2-1B“CPU 权重常驻、GPU 双 slot、H2D 与计算重叠”
+的本机校准工具和原始结果。主要交付是自包含的
+[report.html](report.html)；更详细的代码/方法笔记见
+[TECHNICAL_NOTES.md](TECHNICAL_NOTES.md)。
+
+这个目录给“CPU 常驻权重、分片异步搬运、GPU 计算与下一片 H2D
+重叠”的调度器提供第一组本机基线。基准程序不需要 CUDA Toolkit、
+CUDA 头文件、PyTorch 或 CUDA Runtime；它只在运行时
+`dlopen("libcuda.so.1")` 并调用 CUDA Driver API。
+
+## 文件
+
+- `h2d_driver_bench.c`：独立 C11 基准程序。
+- `h2d_results_gpu0.json`、`h2d_results_gpu1.json`：两张卡的完整原始结果，
+  每个点均含 warmup 次数、样本数、p10/median/p90。
+- `h2d_results_summary.json`：本机、关键模型尺寸、线性拟合与原始文件
+  SHA-256 的紧凑摘要。
+- `benchmarks/torch_llama32_1b_bench.py`：精确 Llama projection 形状、
+  copy/compute 四组对照和 16-stage 双 slot 流水。
+- `benchmarks/large_shard_pipeline_bench.py`：固定 16 层总工作量，比较
+  1/2/4/8 层组成一个连续分片时的双 slot 流水。
+- `benchmarks/validate_large_shards.py`：重算大分片结果、跨卡一致性、
+  单调趋势与相对吞吐。
+- `benchmarks/summarize_shard_accounting.py`：汇总 M=1 时不同分片数量的
+  H2D、GPU计算、Driver/PyTorch提交和端到端时间。
+- `benchmarks/llama31_8b_m1_bench.py`、`summarize_llama31_8b.py`：
+  Llama-3.1-8B 精确层形状的 M=1、8 GiB Arena 双卡基准与校验汇总。
+- `benchmarks/pinned_arena_probe.py`：用 CUDA Driver API 分配并触碰一个
+  与完整 BF16 checkpoint 相同大小的 pinned CPU arena。
+- `benchmarks/validate_results.py`：重算 SHA、H2D median、流水公式、
+  hidden-fraction 口径与两卡一致性。
+- `benchmarks/build_report_artifact.py`：从已保存 JSON 生成规范化
+  `artifact.json` 和报告 source notes。
+- `results/torch_llama32_1b_gpu{0,1}.json`：两卡 PyTorch/流水原始结果。
+- `results/h2d_large_shards_gpu{0,1}.json`：116.008 MiB 至
+  1856.125 MiB 的 pinned async Driver H2D 原始结果。
+- `results/large_shard_pipeline_gpu{0,1}.json`：两卡多层分组流水结果。
+- `results/large_shards_summary.json`：大分片两卡均值、SHA-256 和
+  221 项 QA receipt。
+- `results/shard_accounting_m1_gpu{0,1}.json`、
+  `results/shard_accounting_m1_summary.json`：单Token点的组件时间账本。
+- `results/llama31_8b_m1_gpu{0,1}.json`、
+  `results/llama31_8b_m1_summary.json`：8B 双卡组件与流水结果。
+- `results/h2d_llama31_8b_shards_gpu{0,1}.json`：8B 精确层倍数的
+  Driver API pinned H2D 原始结果。
+- `results/pinned_arena_probe.json`：2.302 GiB 全量 pinned arena 结果。
+- `results/validation.json`：65 项结果 QA receipt。
+- `report.html`：自包含、离线可读的最终技术报告。
+
+## 构建和复现
+
+```bash
+cc -O2 -std=c11 -Wall -Wextra -Werror -pedantic \
+  h2d_driver_bench.c -o h2d_driver_bench -ldl -lm
+
+./h2d_driver_bench --device 0 --output h2d_results_gpu0.json
+./h2d_driver_bench --device 1 --output h2d_results_gpu1.json
+
+./h2d_driver_bench --device 0 --large-shards \
+  --output results/h2d_large_shards_gpu0.json
+./h2d_driver_bench --device 1 --large-shards \
+  --output results/h2d_large_shards_gpu1.json
+
+jq empty h2d_results_gpu0.json h2d_results_gpu1.json \
+  h2d_results_summary.json
+```
+
+Python 基准使用本目录隔离环境：
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-bench.txt
+
+.venv/bin/python benchmarks/pinned_arena_probe.py \
+  --output results/pinned_arena_probe.json
+
+.venv/bin/python benchmarks/torch_llama32_1b_bench.py \
+  --device 0 --warmup 5 --repetitions 30 --pipeline-stages 16 \
+  --output results/torch_llama32_1b_gpu0.json
+
+.venv/bin/python benchmarks/large_shard_pipeline_bench.py \
+  --device 0 --group-layers 1,2,4,8 --rows 1,512,2048,4096 \
+  --warmup 3 --repetitions 7 \
+  --output results/large_shard_pipeline_gpu0.json
+
+# 第二张卡反向测试顺序，用于检查 DVFS/温度/顺序偏差。
+.venv/bin/python benchmarks/large_shard_pipeline_bench.py \
+  --device 1 --group-layers 8,4,2,1 --rows 1,512,2048,4096 \
+  --warmup 3 --repetitions 7 \
+  --output results/large_shard_pipeline_gpu1.json
+
+.venv/bin/python benchmarks/validate_large_shards.py
+.venv/bin/python benchmarks/validate_results.py
+.venv/bin/python benchmarks/build_report_artifact.py
+
+node /path/to/data-analytics/skills/build-report/scripts/deliver_portable_artifact.mjs \
+  --input artifact.json --output report.html
+```
+
+不传 `--output` 时 JSON 写到 stdout，进度写到 stderr。两张 GPU 应当串行
+测试；并行测试会让两张卡争用 CPU 内存和 PCIe 路径，所得结果不是单卡
+isolated baseline。
+
+## 测量方法
+
+每次传输用一对 CUDA Event 包围，并用
+`cuEventElapsedTime` 取得 GPU timeline 时间。host latency 只包围一次
+`cuMemcpyHtoD[_Async]` 函数调用：
+
+- sync API 的 host latency 包含阻塞等待；
+- pinned async 的 host latency 是 enqueue 返回时间；
+- async GPU Event 时间包含实际 stream 中的 copy。
+
+pageable 源用 4 KiB 对齐的普通 `posix_memalign`；pinned 源用
+`cuMemHostAlloc`。两个 256 MiB host buffer 都先完整 `memset`，排除首次
+缺页。各点先 warmup，再记录 10–200 个样本。百分位使用排序后的
+`round(p * (n - 1))` 下标。GB/s 是十进制 GB/s。
+
+必测尺寸为 0 B、1 B、4 KiB、64 KiB、1/4/16/64/116/256 MiB。为
+Llama-3.2-1B 另加 2/8/20/32/96 MiB 和 121,643,008 B：
+
+- K/V projection 各 2 MiB；
+- Q/O projection 各 8 MiB；
+- attention 权重合计 20 MiB；
+- MLP 单矩阵 32 MiB，gate + up 64 MiB，MLP 合计 96 MiB；
+- 矩阵合计 116 MiB；若把两个 4 KiB BF16 norm 算入，则整层为
+  121,643,008 B。
+
+“单次启动开销”另用 pinned async 批量测试：每批 1、2、4、…、1024
+次 copy，对 batch median 拟合
+`T_batch = intercept + copies * per_copy_slope`。0 B、1 B 和 4 KiB
+分别拟合 host enqueue 与 GPU Event 总时间。
+
+## 本机环境
+
+- CPU：AMD Ryzen Threadripper 3970X，32 核/64 线程，单 NUMA node。
+- GPU：2 × NVIDIA GeForce RTX 3080 Ti 12 GiB。
+- GPU0 / GPU1：`0000:01:00.0` / `0000:48:00.0`，最大 PCIe Gen4 x16。
+- 驱动：555.42.02；CUDA Driver API version 12050。
+- Linux：5.15.0-139-generic x86_64。
+- 两卡均报告 2 个 async engines，支持 concurrent kernels。
+- `nvidia-smi topo -m` 显示 GPU0 与 GPU1 之间为 `SYS`。
+
+系统 `ulimit -l` 只有 64 KiB，但本机 NVIDIA 驱动仍成功完成了
+`cuMemHostAlloc(256 MiB)`；不要据此假设其他机器也一定能成功。
+
+## 结果
+
+以下都是 pinned `cuMemcpyHtoDAsync_v2` 的 median。完整 p10/p90 见原始
+JSON。
+
+| 分片 | GPU0 event | GPU0 GB/s | GPU1 event | GPU1 GB/s |
+|---:|---:|---:|---:|---:|
+| 4 KiB | 2.944 µs | 1.391 | 2.976 µs | 1.376 |
+| 64 KiB | 5.344 µs | 12.263 | 5.376 µs | 12.190 |
+| 1 MiB | 42.592 µs | 24.619 | 42.656 µs | 24.582 |
+| 2 MiB | 82.816 µs | 25.323 | 82.720 µs | 25.352 |
+| 8 MiB | 321.568 µs | 26.087 | 321.696 µs | 26.076 |
+| 20 MiB | 799.328 µs | 26.236 | 799.744 µs | 26.223 |
+| 32 MiB | 1.277 ms | 26.267 | 1.278 ms | 26.252 |
+| 64 MiB | 2.703 ms | 24.832 | 2.797 ms | 23.992 |
+| 96 MiB | 4.144 ms | 24.290 | 4.197 ms | 23.985 |
+| 116 MiB | 5.018 ms | 24.242 | 5.055 ms | 24.062 |
+| 116 MiB + 8 KiB | 5.020 ms | 24.232 | 5.055 ms | 24.066 |
+| 256 MiB | 11.040 ms | 24.319 | 11.062 ms | 24.268 |
+
+116 MiB pinned async 的稳定性：
+
+| GPU | event p10 / median / p90 | GB/s p10 / median / p90 | host enqueue median |
+|---:|---:|---:|---:|
+| 0 | 5015.840 / 5017.568 / 5027.424 µs | 24.194 / 24.242 / 24.250 | 1.804 µs |
+| 1 | 5050.528 / 5055.136 / 5059.168 µs | 24.042 / 24.062 / 24.084 | 1.824 µs |
+
+大分片用 64/96/116/256 MiB 拟合 `T = alpha + size / B`：
+
+| GPU / memory | alpha | B | R² |
+|---|---:|---:|---:|
+| GPU0 pinned async | -31.313 µs | 24.223 GB/s | 0.999936 |
+| GPU1 pinned async | 59.761 µs | 24.390 GB/s | 0.999990 |
+| GPU0 pageable async | 21.133 µs | 13.290 GB/s | 0.999961 |
+| GPU1 pageable async | 111.357 µs | 13.381 GB/s | 0.999995 |
+
+GPU0 的负 intercept 不是“负启动开销”；它说明 32–64 MiB 附近存在
+cache/传输分段效应，单一直线不应被外推到小尺寸。规划大分片时使用约
+24.0 GB/s 的保守值更可靠。
+
+pageable async 在当前驱动上返回成功，但并不是真的 non-blocking：
+
+| GPU | 116 MiB memory | host call median | event median | median GB/s |
+|---:|---|---:|---:|---:|
+| 0 | pageable async | 9098.613 µs | 9137.952 µs | 13.311 |
+| 0 | pinned async | 1.804 µs | 5017.568 µs | 24.242 |
+| 1 | pageable async | 9151.271 µs | 9184.096 µs | 13.244 |
+| 1 | pinned async | 1.824 µs | 5055.136 µs | 24.062 |
+
+因此调度器必须让权重驻留在真正 page-locked 的 CPU buffer 中。不能把
+“pageable + Async 后缀”当作可重叠路径，而且这种接受 pageable 指针的
+行为是驱动相关的。
+
+批量启动拟合：
+
+| GPU | copy size | host slope | GPU Event slope | GPU Event intercept | R² (GPU) |
+|---:|---:|---:|---:|---:|---:|
+| 0 | 0 B | 0.0587 µs | 0.0588 µs | 1.281 µs | 0.999926 |
+| 1 | 0 B | 0.0571 µs | 0.0573 µs | 1.319 µs | 0.999866 |
+| 0 | 1 B | 2.1304 µs | 2.1308 µs | -3.562 µs | 0.999925 |
+| 1 | 1 B | 2.0992 µs | 2.0994 µs | -3.595 µs | 0.999924 |
+| 0 | 4 KiB | 1.8341 µs | 1.8339 µs | 3.305 µs | 0.999971 |
+| 1 | 4 KiB | 1.8203 µs | 1.8200 µs | 1.709 µs | 0.999925 |
+
+0 B 被驱动优化成 no-op，其约 0.058 µs slope 只是参数检查/循环成本，
+不是 DMA 启动成本。1 B 与 4 KiB 的约 1.82–2.13 µs slope 包含连续提交
+和串行 tiny-copy command 成本；单独一次 pinned async 的实测 host call
+median 约 1.8 µs。负 intercept 同样只是全区间最小二乘结果，不能赋予
+物理含义。
+
+## 对异步分层调度器的直接结论
+
+1. CPU 权重必须预先进入 pinned pool。若模型最初由普通 pageable 内存
+   载入，应由 CPU worker 提前拷入复用的 pinned staging slot，不能在
+   compute 临界路径中临时锁页。
+2. 使用至少两个 device weight slot：copy stream 把分片 `i+1` 搬入
+   slot B 的同时，compute stream 用 slot A 执行分片 `i`。ready event
+   从 copy stream 传给 compute stream；slot-reuse event 反向约束下一次
+   覆盖。不要逐层 `cuStreamSynchronize`。
+3. 64 KiB 只有约 12 GB/s，1 MiB 已达约 24.6 GB/s。建议调度粒度至少
+   1–2 MiB；Llama 的 2 MiB K/V 矩阵已经足够接近饱和。更大的自然矩阵
+   边界可减少 event/allocator/bookkeeping 数量。
+4. 对 116 MiB 整层，下一层预取窗口约 5.0 ms；若当前层 GPU compute
+   少于这个值，双缓冲仍会露出 H2D 尾巴。此时需要把调度粒度拆到
+   projection/MLP 矩阵，并尽早发出后续分片，或用更深的 lookahead。
+5. 双缓冲最少额外占用“两片权重 + activation/KV/cache/workspace”显存。
+   实际 slot 大小应由显存预算和 `T_copy(chunk) ≈ T_compute(chunk)`
+   共同决定，而不是固定为一整个 decoder layer。
+
+本基准只测 isolated H2D。真实 overlap 还会受到 GPU DRAM 带宽竞争、
+kernel occupancy、stream priority、功耗/时钟状态和 CPU staging worker
+的影响；下一步必须用真实 Llama kernel 做“copy-only、compute-only、
+overlap”三组 Nsight/CUDA Event 测量，并报告 overlap hidden fraction：
+
+```text
+hidden_fraction =
+  (T_copy_only + T_compute_only - T_overlap) /
+  min(T_copy_only, T_compute_only)
+```
+
+该值为 1 才表示较短的一侧被完全隐藏。

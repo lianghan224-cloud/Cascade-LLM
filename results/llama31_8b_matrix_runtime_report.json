@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "model": "meta-llama/Llama-3.1-8B",
+  "workload": "BF16 M=1 decoder projections; embedding/lm_head excluded from timing",
+  "status": "modeled_from_measured_baseline",
+  "baseline_source": "results/llama31_8b_m1_summary.json",
+  "baseline": {
+    "granularity": "transformer_layer",
+    "transfer_units": 32,
+    "two_slot_bytes": 872415232,
+    "resident_bytes": 2101878784,
+    "total_weight_gpu_bytes": 2974294016,
+    "serial_ms": 610.3121948242188,
+    "overlap_ms": 592.10791015625,
+    "speedup_vs_serial": 1.0307448766613587
+  },
+  "matrix_runtime": {
+    "granularity": "projection_matrix",
+    "transfer_units": 224,
+    "max_matrix_bytes": 117440512,
+    "two_slot_bytes": 234881024,
+    "resident_bytes": 2101878784,
+    "total_weight_gpu_bytes": 2336759808,
+    "full_pinned_cpu_bytes": 16060522496,
+    "pinned_staging_cpu_bytes": 234881024,
+    "pinned_staging_total_cpu_bytes": 16295403520
+  },
+  "memory_improvement": {
+    "saved_bytes": 637534208,
+    "stream_buffer_reduction_fraction": 0.7307692307692308,
+    "total_weight_gpu_reduction_fraction": 0.21434807876102047
+  },
+  "performance_estimate": {
+    "h2d_payload_unchanged_bytes": 13958643712,
+    "extra_copy_submissions": 192,
+    "raw_driver_extra_ms": 0.35298931200000006,
+    "framework_submission_extra_ms": 6.147606000000001,
+    "optimistic_matrix_overlap_ms": 592.46089946825,
+    "conservative_matrix_overlap_ms": 598.25551615625,
+    "optimistic_speedup_vs_serial": 1.0301307569360119,
+    "conservative_speedup_vs_serial": 1.0201530589227694,
+    "optimistic_ratio_vs_layer_overlap": 0.999404198129671,
+    "conservative_ratio_vs_layer_overlap": 0.9897241131356416,
+    "pinned_staging": {
+      "measured_single_thread_memcpy_GBps": 14.8,
+      "single_thread_staging_ms_per_token": 943.1516021621622,
+      "aggregate_memcpy_GBps_needed_to_avoid_throttling_h2d": 23.57449287971256,
+      "default_cpu_workers": 2,
+      "assessment": "requires measurement; one measured CPU worker is insufficient, two workers can only preserve full-pinned speed if aggregate staging exceeds the required rate"
+    }
+  },
+  "caveats": [
+    "Performance values are projections from saved measurements, not a new GPU run.",
+    "The baseline uses exact synthetic projection shapes and excludes embedding/lm_head.",
+    "Matrix transfers may have size-dependent bandwidth and require a new CUDA measurement.",
+    "Pinned-staging also adds pageable-to-pinned CPU memcpy, which is not included in the latency estimate.",
+    "The framework submission projection does not include every extra Python callback and compute-stream event."
+  ]
+}
