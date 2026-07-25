@@ -10,6 +10,8 @@
 - revision：下载时解析为不可变commit SHA
 - 本地目录：`/ssd/cascade-llm/models/Llama-3.1-8B`
 - 收据：`real_results/llama31_8b_checkpoint.json`
+- 可选镜像：`AI-ModelScope/Meta-Llama-3.1-8B`，必须固定commit并逐文件
+  校验SHA-256，且根目录BF16 safetensor大小须与官方仓库清单一致
 
 checkpoint、Token和Hugging Face缓存禁止提交Git。
 
@@ -32,6 +34,8 @@ python scripts/check_real_environment.py
 
 ```bash
 python scripts/download_llama31_8b.py
+# 或使用固定revision、逐文件校验的ModelScope镜像：
+python scripts/download_llama31_8b_modelscope.py
 ```
 
 下载后必须验证：

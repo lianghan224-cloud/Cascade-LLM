@@ -71,6 +71,13 @@ python scripts/check_real_environment.py
 python scripts/download_llama31_8b.py
 ```
 
+网络受限时，也可以从ModelScope的同模型BF16镜像下载。镜像下载器固定
+ModelScope commit，并按公开manifest逐文件验证大小和SHA-256：
+
+```bash
+python scripts/download_llama31_8b_modelscope.py
+```
+
 下载脚本不会把Token或权重写入Git，只会在`real_results/`生成可提交的
 revision、文件大小和SHA-256收据。完整验收顺序见
 [`REAL_EXPERIMENT_PROTOCOL.md`](REAL_EXPERIMENT_PROTOCOL.md)。
