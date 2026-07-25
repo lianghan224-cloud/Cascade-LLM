@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -176,16 +177,34 @@ def parse_args():
         type=Path,
         default=Path("real_results/llama31_8b_checkpoint.json"),
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=4,
+        help="number of files to download concurrently",
+    )
     return parser.parse_args()
+
+
+def download_entry(local_dir, entry):
+    name, size, digest = entry
+    with requests.Session() as session:
+        session.headers["User-Agent"] = "Cascade-LLM/real-experiment"
+        download_one(session, local_dir / name, size, digest)
 
 
 def main():
     args = parse_args()
+    if args.workers < 1:
+        raise SystemExit("--workers must be at least 1")
     args.local_dir.mkdir(parents=True, exist_ok=True)
-    with requests.Session() as session:
-        session.headers["User-Agent"] = "Cascade-LLM/real-experiment"
-        for name, size, digest in FILES:
-            download_one(session, args.local_dir / name, size, digest)
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        list(
+            executor.map(
+                lambda entry: download_entry(args.local_dir, entry),
+                FILES,
+            )
+        )
 
     receipt = {
         "schema_version": 1,
