@@ -56,6 +56,9 @@ PCIe Gen4 x16。已有8B测试使用精确Llama-3.1-8B Projection形状的BF16
 source scripts/activate_env.sh
 ```
 
+该配置默认使用阿里云PyPI镜像安装Python依赖，并把包缓存持久化到
+`/ssd/cascade-llm/uv-cache`；模型权重仍从Hugging Face官方受限仓库下载。
+
 检查GPU、Python、认证和checkpoint状态：
 
 ```bash

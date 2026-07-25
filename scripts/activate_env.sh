@@ -18,6 +18,8 @@ export CASCADE_LLAMA31_8B="${CASCADE_LLAMA31_8B:-${CASCADE_MODEL_ROOT}/Llama-3.1
 export HF_HOME="${HF_HOME:-${CASCADE_STORAGE_ROOT}/hf-cache}"
 export HF_HUB_CACHE="${HF_HUB_CACHE:-${HF_HOME}/hub}"
 export UV_CACHE_DIR="${UV_CACHE_DIR:-${CASCADE_STORAGE_ROOT}/uv-cache}"
+export UV_DEFAULT_INDEX="${UV_DEFAULT_INDEX:-https://mirrors.aliyun.com/pypi/simple}"
+export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
 export TMPDIR="${TMPDIR:-${CASCADE_STORAGE_ROOT}/tmp}"
 
 mkdir -p \
@@ -35,3 +37,4 @@ fi
 printf 'CASCADE_ROOT=%s\n' "${CASCADE_ROOT}"
 printf 'CASCADE_LLAMA31_8B=%s\n' "${CASCADE_LLAMA31_8B}"
 printf 'HF_HOME=%s\n' "${HF_HOME}"
+printf 'UV_DEFAULT_INDEX=%s\n' "${UV_DEFAULT_INDEX}"
