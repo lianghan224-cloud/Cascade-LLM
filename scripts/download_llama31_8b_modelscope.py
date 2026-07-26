@@ -111,7 +111,10 @@ def download_one(session, target, expected_size, expected_sha256):
                 response.raise_for_status()
                 append = offset > 0 and response.status_code == 206
                 if offset > 0 and not append:
-                    offset = 0
+                    raise RuntimeError(
+                        "server ignored Range request for existing partial; "
+                        "refusing to overwrite {} bytes".format(offset)
+                    )
                 mode = "ab" if append else "wb"
                 downloaded = offset
                 next_report = downloaded + 256 * 1024 * 1024
