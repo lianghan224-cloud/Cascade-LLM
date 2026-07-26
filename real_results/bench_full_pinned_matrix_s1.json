@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "checkpoint": "/ssd/cascade-llm/models/Llama-3.1-8B",
+  "prompt": "The meaning of life is",
+  "prompt_tokens": 6,
+  "weight_store": "full_pinned",
+  "granularity": "matrix",
+  "slots": 1,
+  "load_seconds": 1.6332979560247622,
+  "resident_load_seconds": 0.08868982398416847,
+  "prefill_wall_ms": 751.3859400060028,
+  "prefill_gpu_ms": 751.3405151367188,
+  "warmup_decode": 1,
+  "decode_repeats": 7,
+  "decode_wall_ms": [
+    605.7986820233054,
+    605.7569209951907,
+    605.5750559899025,
+    605.7724609854631,
+    605.6866080034524,
+    605.6530119967647,
+    605.7154109585099
+  ],
+  "decode_gpu_ms": [
+    605.77978515625,
+    605.7393798828125,
+    605.5582885742188,
+    605.7557373046875,
+    605.6696166992188,
+    605.6354370117188,
+    605.697265625
+  ],
+  "decode_wall_distribution_ms": {
+    "count": 7,
+    "mean": 605.7083072789412,
+    "median": 605.7154109585099,
+    "p10": 605.6218295940198,
+    "p90": 605.7829494006,
+    "min": 605.5750559899025,
+    "max": 605.7986820233054
+  },
+  "decode_gpu_distribution_ms": {
+    "count": 7,
+    "mean": 605.6907871791294,
+    "median": 605.697265625,
+    "p10": 605.6045776367188,
+    "p90": 605.7653564453125,
+    "min": 605.5582885742188,
+    "max": 605.77978515625
+  },
+  "profile_repeats": 3,
+  "profile_total_wall_ms": [
+    608.6017719935626,
+    608.4154279669747,
+    608.4094649995677
+  ],
+  "profile_total_gpu_ms": [
+    608.58349609375,
+    608.3982543945312,
+    608.3923950195312
+  ],
+  "profiles": [
+    {
+      "wall_ms": 606.0821569990367,
+      "host_submit_ms": 325.6587029900402,
+      "source_wait_ms": 0.7487429538741708,
+      "gpu_pipeline_ms": 606.065673828125,
+      "h2d_event_sum_ms": 580.4335044622421,
+      "compute_event_sum_ms": 22.35049602482468,
+      "h2d_bytes": 13958643712,
+      "h2d_effective_gbps": 24.048652609970116
+    },
+    {
+      "wall_ms": 605.9239869937301,
+      "host_submit_ms": 325.5130850011483,
+      "source_wait_ms": 0.7506829570047557,
+      "gpu_pipeline_ms": 605.9069213867188,
+      "h2d_event_sum_ms": 580.2893120348454,
+      "compute_event_sum_ms": 22.34553605876863,
+      "h2d_bytes": 13958643712,
+      "h2d_effective_gbps": 24.054628307822096
+    },
+    {
+      "wall_ms": 605.906903045252,
+      "host_submit_ms": 325.5692810053006,
+      "source_wait_ms": 0.7709673955105245,
+      "gpu_pipeline_ms": 605.8905639648438,
+      "h2d_event_sum_ms": 580.2703035473824,
+      "compute_event_sum_ms": 22.363456163555384,
+      "h2d_bytes": 13958643712,
+      "h2d_effective_gbps": 24.055416289040195
+    }
+  ],
+  "runtime": {
+    "transfer_units": 224,
+    "slot_bytes": 117440512,
+    "two_slot_bytes": 234881024,
+    "device_slot_count": 1,
+    "device_slots_bytes": 117440512,
+    "resident_bytes": 2101878784,
+    "weight_gpu_bytes": 2219319296
+  },
+  "cpu_pinned_bytes": 16060522496,
+  "before_load": {
+    "rss_bytes": 481087488,
+    "vms_bytes": 10377846784,
+    "read_bytes": 0,
+    "write_bytes": 0
+  },
+  "after_load": {
+    "rss_bytes": 17730588672,
+    "vms_bytes": 35136053248,
+    "read_bytes": 0,
+    "write_bytes": 0
+  },
+  "after_runtime_init": {
+    "rss_bytes": 17918623744,
+    "vms_bytes": 37659729920,
+    "read_bytes": 0,
+    "write_bytes": 0
+  },
+  "measured_decode_io_delta": {
+    "read_bytes": 0,
+    "write_bytes": 0
+  },
+  "cuda_peak_allocated_bytes": 2241887744,
+  "generated_token_ids": [
+    [
+      311,
+      1505,
+      701,
+      8352,
+      13,
+      578,
+      7580,
+      315,
+      2324,
+      374,
+      311,
+      3041
+    ]
+  ],
+  "generated_text": " to find your gift. The purpose of life is to give",
+  "torch_version": "2.4.1+cu121",
+  "transformers_version": "4.45.2",
+  "cuda_visible_devices": "0"
+}

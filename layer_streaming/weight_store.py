@@ -4,6 +4,8 @@ import json
 from concurrent.futures import Future, ThreadPoolExecutor
 from enum import Enum
 from pathlib import Path
+import threading
+import time
 
 import torch
 
@@ -172,6 +174,12 @@ class BaseWeightStore:
         self.arena = None
         self._loaded = False
 
+    def reset_profile(self):
+        return None
+
+    def profile_stats(self):
+        return {}
+
 
 class FullPinnedWeightStore(BaseWeightStore):
     """All checkpoint weights remain in page-locked CPU memory."""
@@ -211,6 +219,8 @@ class PinnedStagingWeightStore(BaseWeightStore):
         self.staging_slots = None
         self.worker_count = worker_count
         self._executor = None
+        self._profile_lock = threading.Lock()
+        self._stage_durations_ms = []
         super().__init__(
             plan,
             pin_full_arena=False,
@@ -246,11 +256,15 @@ class PinnedStagingWeightStore(BaseWeightStore):
         return arena
 
     def _stage(self, unit, slot_index, reuse_event):
+        started = time.perf_counter()
         if reuse_event is not None:
             reuse_event.synchronize()
         source = self.unit_source(unit)
         target = self.staging_slots[slot_index][: unit.elements]
         target.copy_(source)
+        duration_ms = (time.perf_counter() - started) * 1000.0
+        with self._profile_lock:
+            self._stage_durations_ms.append(duration_ms)
         return target
 
     def prepare_unit(self, unit, slot_index, reuse_event=None):
@@ -269,6 +283,19 @@ class PinnedStagingWeightStore(BaseWeightStore):
             self._executor = None
         self.staging_slots = None
         super().close()
+
+    def reset_profile(self):
+        with self._profile_lock:
+            self._stage_durations_ms = []
+
+    def profile_stats(self):
+        with self._profile_lock:
+            durations = list(self._stage_durations_ms)
+        return {
+            "staging_copy_count": len(durations),
+            "staging_event_sum_ms": sum(durations),
+            "staging_event_max_ms": max(durations) if durations else 0.0,
+        }
 
 
 def create_weight_store(

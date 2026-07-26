@@ -11,33 +11,81 @@ CPU内存，只把即将执行的权重矩阵异步传入GPU，在降低显存�
 模型权重受Meta许可约束，仓库不包含checkpoint。运行真实生成前，需要用户
 自行接受模型许可并下载到本地。
 
-## 当前状态与结果口径
+## 真实 Llama-3.1-8B 实验结果
 
-**重要：下表是合成硬件校准，不是真实Llama推理结果。** 它使用真实模型
-配置中的矩阵形状和字节数，但权重内容是合成零Tensor；此前未下载Meta
-checkpoint，也未验证logits或文本生成。真实模型结果只能写入
-`real_results/`，且必须带checkpoint revision、运行命令和正确性收据。
+真实实验使用ModelScope
+`LLM-Research/Meta-Llama-3.1-8B` revision
+`39ef6178f1f193f3636d4f6150d6966dc05fa366`。4个safetensors包含291个
+BF16 Tensor、8,030,261,248个参数，参数payload为14.958 GiB。运行时从
+CPU全量权重执行真实RMSNorm、RoPE、GQA Attention/SDPA、MLP和残差计算，
+不是合成GEMM。
 
 本机环境为Threadripper 3970X、125 GiB RAM、RTX 3080 Ti 12 GiB、
-PCIe Gen4 x16。已有8B测试使用精确Llama-3.1-8B Projection形状的BF16
-合成权重；真实checkpoint端到端logits仍待授权权重和CUDA环境复测。
+PCIe Gen4 x16。测试口径为batch=1、6-token prompt、1次decode warmup、
+每配置7次无细粒度profiling的单Token wall-time样本；P10/P90由这7次
+样本计算。另运行3次CUDA Event profile诊断H2D和计算，但不把重叠流上的
+event总和当成严格wall-time分解。
 
-| 指标 | 结果 |
-|---|---:|
-| Pinned H2D有效吞吐 | 约23.6–24.1 GB/s |
-| 8B Decoder BF16每Token传输量 | 13.000 GiB |
-| M=1 Decoder H2D | 591.42 ms |
-| M=1 Projection计算 | 18.61 ms |
-| 整层串行 / 双缓冲 | 610.31 / 592.11 ms |
-| 默认矩阵级双slot | 224 MiB |
-| 整层双slot | 832 MiB |
-| 流式权重buffer节省 | 608 MiB / 73.08% |
-| 相对普通全权重常驻GPU | 权重相关显存降低6.87倍 |
-| 合成负载预计相对单缓冲串行速度 | 1.020–1.030× |
+| CPU权重模式 | 粒度 | GPU slot | 中位ms/token | P10–P90 ms | token/s | 权重显存 |
+|---|---|---:|---:|---:|---:|---:|
+| full_pinned | 层 | 1 | 603.385 | 603.341–603.481 | 1.657 | 2.364 GiB |
+| full_pinned | 矩阵 | 1 | 605.715 | 605.622–605.783 | 1.651 | 2.067 GiB |
+| full_pinned | 层 | 2 | **582.235** | 582.205–582.371 | **1.718** | 2.770 GiB |
+| full_pinned | 矩阵 | 2 | 583.031 | 582.978–583.110 | 1.715 | **2.176 GiB** |
+| pinned_staging | 层 | 2 | 1129.806 | 1125.983–1130.434 | 0.885 | 2.770 GiB |
+| pinned_staging | 矩阵 | 2 | 1231.850 | 1229.532–1233.287 | 0.812 | 2.176 GiB |
 
-默认Embedding、LM Head与所有Norm使用独立GPU常驻区。矩阵级双缓冲加上
-常驻区约占2.176 GiB，而普通BF16全权重常驻约14.958 GiB；这个比较不含
-随上下文长度变化的KV Cache、activation和workspace。
+结论：
+
+- 推荐默认配置是`full_pinned + matrix + 2 slots`。它比最快的层粒度
+  双缓冲只慢0.137%，但少用608 MiB权重显存。
+- 该配置的计划权重显存为2.176 GiB，相对完整BF16参数载荷缩减
+  **6.873倍**，即节省85.45%；实际CUDA peak allocated为2.197 GiB。
+- 相同矩阵粒度下，双缓冲相对单缓冲只加速**1.039倍**。每Token传输
+  13,958,643,712 bytes，H2D约24.0 GB/s；主配置H2D/Compute Event
+  中位总和分别为581.238/24.636 ms，系统明显受H2D限制。
+- `full_pinned`完整锁页14.958 GiB CPU权重；`pinned_staging`矩阵双slot
+  只锁页224 MiB，但延迟慢至2.113倍。因此前者适合专用推理机，后者是
+  锁页内存受限时的兼容模式。
+- decode测量窗口的进程磁盘读取增量在所有8组测试中均为0，SSD不在热
+  路径；GPU1复测主配置与GPU0的中位延迟只差0.222%。
+- 与Transformers CPU参考连续比较8个greedy token，token ID 8/8一致，
+  最低完整词表logit cosine为0.999739。
+
+普通full-GPU基线无法在本机运行：仅14.958 GiB参数payload就已经超过
+11.668 GiB物理显存，还未包含KV Cache、activation和workspace。因此本
+报告只给出相对普通基线的权重显存倍数，不虚构full-GPU速度倍数。
+
+详细方法、原始数据、图表、限制和后续实验见自包含报告
+[real_results/report.html](real_results/report.html)；机器可读汇总和
+10项QA收据见
+[real_results/real_llama31_summary.json](real_results/real_llama31_summary.json)。
+
+### 真实基准复现
+
+```bash
+source scripts/activate_env.sh
+
+CUDA_VISIBLE_DEVICES=0 .venv/bin/python \
+  benchmarks/real_llama31_benchmark.py \
+  --checkpoint /ssd/cascade-llm/models/Llama-3.1-8B \
+  --weight-store full_pinned \
+  --granularity matrix \
+  --slots 2 \
+  --warmup-decode 1 \
+  --decode-repeats 7 \
+  --profile-repeats 3 \
+  --output real_results/bench_full_pinned_matrix_s2.json
+
+.venv/bin/python benchmarks/summarize_real_llama31.py
+.venv/bin/python benchmarks/build_real_llama31_artifact.py
+```
+
+## 历史合成硬件校准
+
+`results/`和仓库根目录的旧H2D数据是开发真实运行时之前的合成硬件校准，
+不能与`real_results/`的端到端真实模型结果混淆。它们仍用于估算固定H2D
+提交开销和检查两张GPU的一致性；真实结论一律以上一节为准。
 
 ## 真实实验的持久化环境
 
@@ -102,7 +150,7 @@ revision、文件大小和SHA-256收据。完整验收顺序见
 输出包括整层/矩阵粒度的自动slot、两种CPU锁页模式、相对不同基线的显存
 比例，以及基于已保存8B实测数据的性能区间和限制。
 
-下面是尚待真实checkpoint验证的原型入口，不应在完成logits对照前报告性能：
+真实checkpoint生成入口：
 
 ```bash
 .venv/bin/python tools/run_llama31.py \
