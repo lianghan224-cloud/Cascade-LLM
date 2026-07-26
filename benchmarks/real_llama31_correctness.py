@@ -22,6 +22,7 @@ from layer_streaming import (  # noqa: E402
     DoubleBufferRuntime,
     Llama31DecodeExecutor,
     ResidentDeviceArena,
+    VocabStreamingRuntime,
     build_llama31_8b_plan,
     create_weight_store,
 )
@@ -46,9 +47,15 @@ def parse_args():
     )
     parser.add_argument(
         "--granularity",
-        choices=("matrix", "layer"),
+        choices=("matrix", "matrix_group", "layer"),
         default="matrix",
     )
+    parser.add_argument(
+        "--vocab-mode",
+        choices=("resident", "streamed"),
+        default="resident",
+    )
+    parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--logits-output", type=Path, required=True)
     return parser.parse_args()
@@ -128,6 +135,7 @@ def run_streaming(args, config, input_ids):
     plan = build_llama31_8b_plan(
         args.granularity,
         tie_word_embeddings=bool(config.tie_word_embeddings),
+        stream_vocab=(args.vocab_mode == "streamed"),
     )
     store = create_weight_store(plan, args.weight_store)
     load_started = time.perf_counter()
@@ -140,7 +148,20 @@ def run_streaming(args, config, input_ids):
     torch.cuda.reset_peak_memory_stats(device)
     resident = ResidentDeviceArena(plan, store, device)
     runtime = DoubleBufferRuntime(plan, store, resident, device)
-    executor = Llama31DecodeExecutor(config, resident)
+    vocab_runtime = None
+    if plan.vocab is not None:
+        vocab_runtime = VocabStreamingRuntime(
+            plan,
+            store,
+            runtime,
+        )
+    executor = Llama31DecodeExecutor(
+        config,
+        resident,
+        vocab_runtime=vocab_runtime,
+        top_k=args.top_k,
+        return_full_logits=True,
+    )
 
     generated = []
     logits_rows = []
@@ -155,7 +176,7 @@ def run_streaming(args, config, input_ids):
             torch.cuda.synchronize(device)
             latencies.append((time.perf_counter() - started) * 1000.0)
             logits = state.logits[:, -1, :].float().cpu()
-            next_token = logits.argmax(dim=-1, keepdim=True)
+            next_token = state.topk_indices[..., 0]
             generated.append(next_token)
             logits_rows.append(logits)
             current = next_token.to(device)
@@ -166,6 +187,12 @@ def run_streaming(args, config, input_ids):
         "generated": generated,
         "logits": logits_rows,
         "runtime": runtime.stats.as_dict(),
+        "vocab_mode": args.vocab_mode,
+        "vocab_extra_pinned_cpu_bytes": (
+            vocab_runtime.extra_pinned_cpu_bytes
+            if vocab_runtime is not None
+            else 0
+        ),
         "cpu_pinned_bytes": store.pinned_cpu_bytes,
         "cuda_peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
     }

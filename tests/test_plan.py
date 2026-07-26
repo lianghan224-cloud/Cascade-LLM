@@ -25,6 +25,17 @@ class Llama31PlanTest(unittest.TestCase):
         self.assertEqual(plan.slot_bytes, 416 * MIB)
         self.assertEqual(plan.two_slot_bytes, 832 * MIB)
 
+    def test_matrix_group_uses_four_whole_matrix_groups_per_layer(self):
+        plan = build_llama31_8b_plan("matrix_group")
+        self.assertEqual(plan.granularity, Granularity.MATRIX_GROUP)
+        self.assertEqual(len(plan.units), 32 * 4)
+        self.assertEqual(
+            [unit.operation for unit in plan.units[:4]],
+            ["qkv", "o_proj", "gate_up", "down_proj"],
+        )
+        self.assertEqual(plan.slot_bytes, 224 * MIB)
+        self.assertEqual(plan.two_slot_bytes, 448 * MIB)
+
     def test_separate_embedding_and_head_are_resident(self):
         plan = build_llama31_8b_plan("matrix")
         resident_keys = {item.tensor.key for item in plan.resident}
@@ -60,6 +71,28 @@ class Llama31PlanTest(unittest.TestCase):
             1.0 - matrix.two_slot_bytes / layer.two_slot_bytes,
             0.7307692307692308,
         )
+
+    def test_streamed_vocab_is_cpu_only_and_uses_128_mib_chunks(self):
+        plan = build_llama31_8b_plan(
+            "matrix",
+            stream_vocab=True,
+        )
+        resident_keys = {item.tensor.key for item in plan.resident}
+        host_only_keys = {item.tensor.key for item in plan.host_only}
+        self.assertNotIn("model.embed_tokens.weight", resident_keys)
+        self.assertNotIn("lm_head.weight", resident_keys)
+        self.assertEqual(
+            host_only_keys,
+            {"model.embed_tokens.weight", "lm_head.weight"},
+        )
+        self.assertEqual(plan.resident_bytes, 532480)
+        self.assertEqual(plan.vocab.chunk_bytes, 128 * MIB)
+        self.assertEqual(plan.vocab.chunk_rows, 16384)
+        self.assertEqual(plan.vocab.chunk_count, 8)
+        self.assertEqual(plan.slot_bytes, 128 * MIB)
+        self.assertEqual(plan.two_slot_bytes, 256 * MIB)
+        self.assertEqual(plan.host_arena_bytes, 16060522496)
+        self.assertEqual(plan.aliases, {})
 
 
 if __name__ == "__main__":

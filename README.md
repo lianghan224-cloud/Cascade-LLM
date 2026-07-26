@@ -1,6 +1,6 @@
 # Cascade-LLM：CPU常驻权重的矩阵级流式推理
 
-> Active real-model branch: `real-llama31-8b-experiment`
+> Active vocabulary-streaming branch: `feature/vocab-streaming-128m-topk`
 
 Cascade-LLM面向个人用户的单机、单GPU、单请求推理：完整模型权重保存在
 CPU内存，只把即将执行的权重矩阵异步传入GPU，在降低显存需求的同时尽量
@@ -10,6 +10,69 @@ CPU内存，只把即将执行的权重矩阵异步传入GPU，在降低显存�
 
 模型权重受Meta许可约束，仓库不包含checkpoint。运行真实生成前，需要用户
 自行接受模型许可并下载到本地。
+
+## CPU词表流式化版本
+
+本分支在上一版真实运行时上增加以下功能：
+
+- Transformer按QKV、O、Gate/Up、Down四个完整矩阵组调度；
+- Embedding按Token ID从CPU `[V,H]` 连续行布局中提取，只传所需行；
+- LM Head沿词表维度切成约128 MiB连续行块；
+- 每块用标准`F.linear`计算部分logits，并用`torch.topk`在线归并全局
+  Top-k；
+- 不切单矩阵内部Tile，不开发自定义CUDA算子。
+
+Llama-3.1-8B配置为`tie_word_embeddings=false`，所以Embedding和LM Head
+共享布局及调度代码，但保持checkpoint中的两份独立数值权重。128 MiB在
+4096维BF16布局下对应16,384行，完整128,256词表共8块，最后一块13,568行。
+
+RTX 3080 Ti GPU0真实结果：
+
+| 配置 | 中位ms/token | token/s | CUDA peak allocated |
+|---|---:|---:|---:|
+| 上一版本：matrix、词表常驻 | 582.340 | 1.717 | 2.197 GiB |
+| matrix_group、词表常驻 | 581.660 | 1.719 | 2.416 GiB |
+| matrix_group、词表流式 | 624.162 | 1.602 | **0.448 GiB** |
+
+新版本相对上一版本将CUDA peak allocated降低**4.90倍**，节省79.60%、
+1.749 GiB，同时保留93.30%吞吐。LM Head每Token新增传输1.051 GB：
+8次H2D累计43.702 ms，分块GEMV和在线Top-10累计2.184 ms，流水总计
+44.057 ms。Embedding在单Token decode只传8 KiB。
+
+连续8个greedy token全部匹配CPU参考，完整`[8,128256]`logits最低cosine
+为0.999739，8步argmax全部匹配。详细结果见
+[`real_results/vocab_streaming_report.md`](real_results/vocab_streaming_report.md)。
+
+运行：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 .venv/bin/python tools/run_llama31.py \
+  --checkpoint /ssd/cascade-llm/models/Llama-3.1-8B \
+  --weight-store full_pinned \
+  --granularity matrix_group \
+  --vocab-mode streamed \
+  --top-k 10 \
+  --max-new-tokens 8
+```
+
+重新运行正式基准：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 .venv/bin/python \
+  benchmarks/real_llama31_benchmark.py \
+  --checkpoint /ssd/cascade-llm/models/Llama-3.1-8B \
+  --weight-store full_pinned \
+  --granularity matrix_group \
+  --vocab-mode streamed \
+  --top-k 10 \
+  --slots 2 \
+  --warmup-decode 1 \
+  --decode-repeats 7 \
+  --profile-repeats 3 \
+  --output real_results/bench_full_pinned_matrix_group_vocab_streamed_s2.json
+
+.venv/bin/python benchmarks/summarize_vocab_streaming.py
+```
 
 ## 真实 Llama-3.1-8B 实验结果
 

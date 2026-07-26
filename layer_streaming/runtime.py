@@ -31,7 +31,7 @@ class RuntimeStats:
 
 
 class ResidentDeviceArena:
-    """GPU allocation for embedding, LM head, norms, and aliases."""
+    """GPU allocation for the plan's selected resident tensors and aliases."""
 
     def __init__(self, plan, store, device):
         if not isinstance(plan, ModelPlan):

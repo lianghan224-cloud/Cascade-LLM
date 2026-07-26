@@ -16,6 +16,7 @@ class Granularity(str, Enum):
     """Smallest independently transferred model unit."""
 
     MATRIX = "matrix"
+    MATRIX_GROUP = "matrix_group"
     LAYER = "layer"
 
 
@@ -71,6 +72,28 @@ class ResidentPlacement:
 
 
 @dataclass(frozen=True)
+class HostPlacement:
+    """CPU-only tensor placement inside the shared packed host arena."""
+
+    tensor: TensorSpec
+    host_offset_elements: int
+
+
+@dataclass(frozen=True)
+class VocabPlan:
+    """Row-contiguous CPU vocabulary layout shared by lookup and projection."""
+
+    embedding_key: str
+    lm_head_key: str
+    vocab_size: int
+    hidden_size: int
+    chunk_rows: int
+    chunk_elements: int
+    chunk_bytes: int
+    chunk_count: int
+
+
+@dataclass(frozen=True)
 class ModelPlan:
     model_id: str
     granularity: Granularity
@@ -83,6 +106,8 @@ class ModelPlan:
     slot_elements: int
     dtype_bytes: int = BF16_BYTES
     slot_count: int = 2
+    host_only: Tuple[HostPlacement, ...] = ()
+    vocab: Optional[VocabPlan] = None
 
     @property
     def slot_bytes(self):
@@ -112,6 +137,9 @@ class ModelPlan:
         for placement in self.resident:
             if placement.tensor.key == key:
                 return placement.host_offset_elements
+        for placement in self.host_only:
+            if placement.tensor.key == key:
+                return placement.host_offset_elements
         alias = self.aliases.get(key)
         if alias is not None:
             return self.tensor_host_offset(alias)
@@ -131,6 +159,19 @@ class ModelPlan:
             "resident_bytes": self.resident_bytes,
             "host_arena_bytes": self.host_arena_bytes,
             "aliases": dict(self.aliases),
+            "vocab": (
+                {
+                    "embedding_key": self.vocab.embedding_key,
+                    "lm_head_key": self.vocab.lm_head_key,
+                    "vocab_size": self.vocab.vocab_size,
+                    "hidden_size": self.vocab.hidden_size,
+                    "chunk_rows": self.vocab.chunk_rows,
+                    "chunk_bytes": self.vocab.chunk_bytes,
+                    "chunk_count": self.vocab.chunk_count,
+                }
+                if self.vocab is not None
+                else None
+            ),
             "units": [
                 {
                     "unit_id": unit.unit_id,
@@ -160,6 +201,17 @@ class ModelPlan:
                     ),
                 }
                 for placement in self.resident
+            ],
+            "host_only": [
+                {
+                    "key": placement.tensor.key,
+                    "shape": list(placement.tensor.shape),
+                    "bytes": placement.tensor.nbytes,
+                    "host_offset_bytes": (
+                        placement.host_offset_elements * self.dtype_bytes
+                    ),
+                }
+                for placement in self.host_only
             ],
         }
 
@@ -194,6 +246,8 @@ def _place_unit(
 def build_llama31_8b_plan(
     granularity=Granularity.MATRIX,
     tie_word_embeddings=False,
+    stream_vocab=False,
+    vocab_chunk_bytes=128 * MIB,
 ):
     """Build a packed BF16 plan for the official Llama-3.1-8B geometry.
 
@@ -233,17 +287,21 @@ def build_llama31_8b_plan(
     embedding = add(
         "model.embed_tokens.weight",
         (vocab, hidden),
-        resident=True,
+        resident=not stream_vocab,
     )
     if tie_word_embeddings:
         add(
             "lm_head.weight",
             (vocab, hidden),
-            resident=True,
+            resident=not stream_vocab,
             alias_of=embedding.key,
         )
     else:
-        add("lm_head.weight", (vocab, hidden), resident=True)
+        add(
+            "lm_head.weight",
+            (vocab, hidden),
+            resident=not stream_vocab,
+        )
 
     layer_projections = []
     layer_norms = []
@@ -292,7 +350,7 @@ def build_llama31_8b_plan(
                 host_cursor,
             )
             units.append(unit)
-        else:
+        elif granularity == Granularity.MATRIX:
             for matrix in matrices:
                 operation = matrix.key.rsplit(".", 2)[-2]
                 unit, host_cursor = _place_unit(
@@ -303,13 +361,46 @@ def build_llama31_8b_plan(
                     host_cursor,
                 )
                 units.append(unit)
+        else:
+            matrix_groups = (
+                ("qkv", matrices[0:3]),
+                ("o_proj", matrices[3:4]),
+                ("gate_up", matrices[4:6]),
+                ("down_proj", matrices[6:7]),
+            )
+            for operation, group in matrix_groups:
+                unit, host_cursor = _place_unit(
+                    "layer_{:02d}.{}".format(layer_index, operation),
+                    layer_index,
+                    operation,
+                    group,
+                    host_cursor,
+                )
+                units.append(unit)
 
     alignment_elements = ALIGNMENT_BYTES // BF16_BYTES
-    resident_specs = [embedding]
-    if not tie_word_embeddings:
-        resident_specs.append(specs["lm_head.weight"])
+    resident_specs = []
+    host_only_specs = []
+    if stream_vocab:
+        host_only_specs.append(embedding)
+        if not tie_word_embeddings:
+            host_only_specs.append(specs["lm_head.weight"])
+    else:
+        resident_specs.append(embedding)
+        if not tie_word_embeddings:
+            resident_specs.append(specs["lm_head.weight"])
     resident_specs.extend(layer_norms)
     resident_specs.append(final_norm)
+    host_only = []
+    for tensor in host_only_specs:
+        host_cursor = _align(host_cursor, alignment_elements)
+        host_only.append(
+            HostPlacement(
+                tensor=tensor,
+                host_offset_elements=host_cursor,
+            )
+        )
+        host_cursor += tensor.numel
     resident = []
     device_cursor = 0
     for tensor in resident_specs:
@@ -328,7 +419,29 @@ def build_llama31_8b_plan(
     aliases = {}
     if tie_word_embeddings:
         aliases["lm_head.weight"] = embedding.key
+    vocab_plan = None
+    if stream_vocab:
+        row_bytes = hidden * BF16_BYTES
+        requested_chunk_bytes = int(vocab_chunk_bytes)
+        if requested_chunk_bytes < row_bytes:
+            raise ValueError("vocab chunk must hold at least one row")
+        chunk_rows = requested_chunk_bytes // row_bytes
+        chunk_elements = chunk_rows * hidden
+        chunk_bytes = chunk_elements * BF16_BYTES
+        chunk_count = (vocab + chunk_rows - 1) // chunk_rows
+        vocab_plan = VocabPlan(
+            embedding_key=embedding.key,
+            lm_head_key="lm_head.weight",
+            vocab_size=vocab,
+            hidden_size=hidden,
+            chunk_rows=chunk_rows,
+            chunk_elements=chunk_elements,
+            chunk_bytes=chunk_bytes,
+            chunk_count=chunk_count,
+        )
     slot_elements = max(unit.elements for unit in units)
+    if vocab_plan is not None:
+        slot_elements = max(slot_elements, vocab_plan.chunk_elements)
     return ModelPlan(
         model_id="meta-llama/Llama-3.1-8B",
         granularity=granularity,
@@ -339,4 +452,6 @@ def build_llama31_8b_plan(
         host_arena_elements=_align(host_cursor, alignment_elements),
         resident_arena_elements=_align(device_cursor, alignment_elements),
         slot_elements=slot_elements,
+        host_only=tuple(host_only),
+        vocab=vocab_plan,
     )

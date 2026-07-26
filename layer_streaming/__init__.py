@@ -7,12 +7,15 @@ from .llama31 import (
 )
 from .plan import (
     Granularity,
+    HostPlacement,
     ModelPlan,
     TensorSpec,
     TransferUnit,
+    VocabPlan,
     build_llama31_8b_plan,
 )
 from .runtime import DoubleBufferRuntime, ResidentDeviceArena
+from .vocab import VocabStreamingRuntime, merge_topk
 from .weight_store import (
     FullPinnedWeightStore,
     PinnedStagingWeightStore,
@@ -24,6 +27,7 @@ __all__ = [
     "DoubleBufferRuntime",
     "FullPinnedWeightStore",
     "Granularity",
+    "HostPlacement",
     "LLAMA31_8B_MODEL_ID",
     "Llama31DecodeExecutor",
     "ModelPlan",
@@ -32,7 +36,10 @@ __all__ = [
     "SimpleKVCache",
     "TensorSpec",
     "TransferUnit",
+    "VocabPlan",
+    "VocabStreamingRuntime",
     "WeightStoreMode",
     "build_llama31_8b_plan",
     "create_weight_store",
+    "merge_topk",
 ]

@@ -60,6 +60,8 @@ class DecodeState:
     position_ids: torch.Tensor
     layer_values: dict = field(default_factory=dict)
     logits: object = None
+    topk_values: object = None
+    topk_indices: object = None
 
 
 class Llama31DecodeExecutor:
@@ -69,7 +71,15 @@ class Llama31DecodeExecutor:
     multi-token initial prefill and subsequent one-token decode calls.
     """
 
-    def __init__(self, config, resident, kv_cache=None):
+    def __init__(
+        self,
+        config,
+        resident,
+        kv_cache=None,
+        vocab_runtime=None,
+        top_k=10,
+        return_full_logits=False,
+    ):
         try:
             from transformers.models.llama.modeling_llama import (
                 LlamaRotaryEmbedding,
@@ -99,6 +109,11 @@ class Llama31DecodeExecutor:
                 )
         self.config = config
         self.resident = resident
+        self.vocab_runtime = vocab_runtime
+        self.top_k = int(top_k)
+        self.return_full_logits = bool(return_full_logits)
+        if self.top_k < 1:
+            raise ValueError("top_k must be positive")
         self.kv_cache = kv_cache or SimpleKVCache(
             config.num_hidden_layers
         )
@@ -106,7 +121,7 @@ class Llama31DecodeExecutor:
         self.kv_groups = (
             config.num_attention_heads // config.num_key_value_heads
         )
-        device = resident["model.embed_tokens.weight"].device
+        device = resident.device
         self.rotary = LlamaRotaryEmbedding(config=config, device=device)
         self._apply_rotary_pos_emb = apply_rotary_pos_emb
 
@@ -126,10 +141,13 @@ class Llama31DecodeExecutor:
                 dtype=torch.long,
                 device=input_ids.device,
             ).unsqueeze(0)
-        hidden = F.embedding(
-            input_ids,
-            self.resident["model.embed_tokens.weight"],
-        )
+        if self.vocab_runtime is None:
+            hidden = F.embedding(
+                input_ids,
+                self.resident["model.embed_tokens.weight"],
+            )
+        else:
+            hidden = self.vocab_runtime.embedding(input_ids)
         return DecodeState(
             hidden_states=hidden,
             position_ids=position_ids,
@@ -275,6 +293,26 @@ class Llama31DecodeExecutor:
                     state,
                 )
             return state
+        if unit.operation == "qkv":
+            for operation in ("q_proj", "k_proj", "v_proj"):
+                key = self._matrix_key(unit.layer_index, operation)
+                state = self._execute_matrix(
+                    unit.layer_index,
+                    operation,
+                    weights[key],
+                    state,
+                )
+            return state
+        if unit.operation == "gate_up":
+            for operation in ("gate_proj", "up_proj"):
+                key = self._matrix_key(unit.layer_index, operation)
+                state = self._execute_matrix(
+                    unit.layer_index,
+                    operation,
+                    weights[key],
+                    state,
+                )
+            return state
         key = self._matrix_key(unit.layer_index, unit.operation)
         return self._execute_matrix(
             unit.layer_index,
@@ -289,8 +327,23 @@ class Llama31DecodeExecutor:
             self.resident["model.norm.weight"],
             self.config.rms_norm_eps,
         )
-        state.logits = F.linear(
-            normalized,
-            self.resident["lm_head.weight"],
-        ).float()
+        if self.vocab_runtime is None:
+            state.logits = F.linear(
+                normalized,
+                self.resident["lm_head.weight"],
+            ).float()
+            state.topk_values, state.topk_indices = torch.topk(
+                state.logits[:, -1:, :],
+                k=min(self.top_k, self.config.vocab_size),
+                dim=-1,
+            )
+        else:
+            result = self.vocab_runtime.lm_head_topk(
+                normalized[:, -1:, :],
+                top_k=self.top_k,
+                return_full_logits=self.return_full_logits,
+            )
+            state.topk_values = result["values"]
+            state.topk_indices = result["indices"]
+            state.logits = result["logits"]
         return state

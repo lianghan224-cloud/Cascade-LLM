@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "scope": {
+    "model": "Meta-Llama-3.1-8B BF16",
+    "gpu": "NVIDIA GeForce RTX 3080 Ti",
+    "prompt_tokens": 6,
+    "warmup_decode": 1,
+    "decode_repeats": 7,
+    "weight_store": "full_pinned",
+    "transformer_granularity": "matrix_group",
+    "vocab_mode": "streamed",
+    "top_k": 10
+  },
+  "layout": {
+    "vocab_size": 128256,
+    "hidden_size": 4096,
+    "embedding_and_lm_head_tied": false,
+    "shared_cpu_layout_and_scheduler": true,
+    "lm_head_chunk_bytes": 134217728,
+    "lm_head_chunk_rows": 16384,
+    "lm_head_chunk_count": 8,
+    "last_chunk_rows": 13568,
+    "transformer_groups_per_layer": 4,
+    "transformer_transfer_units": 128
+  },
+  "results": {
+    "previous_matrix_resident": {
+      "decode_median_ms": 582.3398409993388,
+      "tokens_per_second": 1.717210346254045,
+      "cuda_peak_allocated_bytes": 2359328256
+    },
+    "matrix_group_resident_vocab": {
+      "decode_median_ms": 581.6603339626454,
+      "tokens_per_second": 1.7192164251382847,
+      "cuda_peak_allocated_bytes": 2594209280
+    },
+    "matrix_group_streamed_vocab": {
+      "decode_median_ms": 624.1619790089317,
+      "decode_p10_ms": 624.0762677742168,
+      "decode_p90_ms": 624.210484395735,
+      "tokens_per_second": 1.6021482141347962,
+      "prefill_ms": 746.8719020253047,
+      "cuda_peak_allocated_bytes": 481369088,
+      "cuda_peak_reserved_bytes": 497025024,
+      "planned_weight_gpu_bytes": 470294528
+    }
+  },
+  "ratios": {
+    "latency_increase_vs_previous_pct": 7.181740809253756,
+    "throughput_retained_vs_previous_pct": 93.29947362766318,
+    "peak_reduction_vs_previous_pct": 79.5971973473453,
+    "previous_peak_over_streamed_peak": 4.901287421264574,
+    "peak_bytes_saved_vs_previous": 1877959168,
+    "vocab_streaming_latency_increase_vs_group_resident_pct": 7.306952625897267,
+    "matrix_group_latency_change_vs_previous_pct": -0.11668565137623599
+  },
+  "profiles": {
+    "transformer": {
+      "wall_ms": 580.4004870005883,
+      "host_submit_ms": 292.0684190467,
+      "source_wait_ms": 0.46916567953303456,
+      "gpu_pipeline_ms": 580.385009765625,
+      "h2d_event_sum_ms": 579.4313558340073,
+      "compute_event_sum_ms": 23.932928144931793,
+      "h2d_bytes": 13958643712,
+      "h2d_effective_gbps": 24.090245671825198
+    },
+    "vocab": {
+      "wall_ms": 44.057273014914244,
+      "pipeline_ms": 44.010398864746094,
+      "h2d_event_sum_ms": 43.701887130737305,
+      "compute_event_sum_ms": 2.1841919869184494,
+      "h2d_bytes": 1050673152,
+      "h2d_effective_gbps": 24.041825673496355,
+      "chunk_count": 8,
+      "chunk_rows": 16384,
+      "requested_top_k": 10
+    },
+    "total_streamed_weight_bytes": 15009316864,
+    "embedding_decode_bytes": 8192
+  },
+  "correctness": {
+    "schema_version": 1,
+    "shape": [
+      8,
+      128256
+    ],
+    "max_abs_error": 0.265625,
+    "mean_abs_error": 0.03319314494729042,
+    "rmse": 0.04319107532501221,
+    "cosine_similarity_per_step": [
+      0.9999865889549255,
+      0.9999505877494812,
+      0.9999015927314758,
+      0.9999148845672607,
+      0.9997388124465942,
+      0.9999151229858398,
+      0.9999032020568848,
+      0.999916136264801
+    ],
+    "argmax_match_per_step": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "top10_overlap_per_step": [
+      10,
+      10,
+      10,
+      10,
+      9,
+      10,
+      10,
+      10
+    ],
+    "reference_generated_token_ids": [
+      [
+        311,
+        1505,
+        701,
+        8352,
+        13,
+        578,
+        7580,
+        315
+      ]
+    ],
+    "candidate_generated_token_ids": [
+      [
+        311,
+        1505,
+        701,
+        8352,
+        13,
+        578,
+        7580,
+        315
+      ]
+    ],
+    "generated_tokens_exact_match": true
+  },
+  "source_files": [
+    "real_results/airllm/bench_cascade_full_pinned_matrix_s2_gpu0_rerun.json",
+    "real_results/bench_full_pinned_matrix_group_vocab_resident_s2.json",
+    "real_results/bench_full_pinned_matrix_group_vocab_streamed_s2.json",
+    "real_results/correctness_comparison_vocab_streamed_matrix_group_8token.json"
+  ]
+}

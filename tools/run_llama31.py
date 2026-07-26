@@ -18,6 +18,7 @@ from layer_streaming import (  # noqa: E402
     DoubleBufferRuntime,
     Llama31DecodeExecutor,
     ResidentDeviceArena,
+    VocabStreamingRuntime,
     build_llama31_8b_plan,
     create_weight_store,
 )
@@ -35,9 +36,15 @@ def parse_args():
     )
     parser.add_argument(
         "--granularity",
-        choices=("matrix", "layer"),
-        default="matrix",
+        choices=("matrix", "matrix_group", "layer"),
+        default="matrix_group",
     )
+    parser.add_argument(
+        "--vocab-mode",
+        choices=("resident", "streamed"),
+        default="streamed",
+    )
+    parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
@@ -61,6 +68,7 @@ def main():
     plan = build_llama31_8b_plan(
         args.granularity,
         tie_word_embeddings=bool(config.tie_word_embeddings),
+        stream_vocab=(args.vocab_mode == "streamed"),
     )
     store = create_weight_store(plan, args.weight_store)
     load_started = time.perf_counter()
@@ -71,7 +79,19 @@ def main():
     torch.cuda.set_device(device)
     resident = ResidentDeviceArena(plan, store, device)
     runtime = DoubleBufferRuntime(plan, store, resident, device)
-    executor = Llama31DecodeExecutor(config, resident)
+    vocab_runtime = None
+    if plan.vocab is not None:
+        vocab_runtime = VocabStreamingRuntime(
+            plan,
+            store,
+            runtime,
+        )
+    executor = Llama31DecodeExecutor(
+        config,
+        resident,
+        vocab_runtime=vocab_runtime,
+        top_k=args.top_k,
+    )
     encoded = tokenizer(
         args.prompt,
         return_tensors="pt",
@@ -85,7 +105,7 @@ def main():
         state = executor.begin(input_ids)
         state = runtime.run(executor, state)
         state = executor.finish(state)
-        next_token = state.logits[:, -1].argmax(dim=-1, keepdim=True)
+        next_token = state.topk_indices[..., 0]
         generated.append(next_token)
 
         for _ in range(args.max_new_tokens - 1):
@@ -93,10 +113,7 @@ def main():
             state = executor.begin(next_token)
             state = runtime.run(executor, state)
             state = executor.finish(state)
-            next_token = state.logits[:, -1].argmax(
-                dim=-1,
-                keepdim=True,
-            )
+            next_token = state.topk_indices[..., 0]
             torch.cuda.synchronize(device)
             token_latencies.append(
                 (time.perf_counter() - started) * 1000.0
@@ -110,6 +127,8 @@ def main():
         "checkpoint": str(args.checkpoint),
         "weight_store": args.weight_store,
         "granularity": args.granularity,
+        "vocab_mode": args.vocab_mode,
+        "top_k": args.top_k,
         "prompt_tokens": int(input_ids.numel()),
         "generated_tokens": args.max_new_tokens,
         "generated_text": text,
@@ -117,6 +136,11 @@ def main():
         "decode_token_latencies_ms": token_latencies,
         "runtime": runtime.stats.as_dict(),
         "cpu_pinned_bytes": store.pinned_cpu_bytes,
+        "vocab_extra_pinned_cpu_bytes": (
+            vocab_runtime.extra_pinned_cpu_bytes
+            if vocab_runtime is not None
+            else 0
+        ),
         "plan": {
             "host_arena_bytes": plan.host_arena_bytes,
             "stream_bytes_per_token": plan.stream_bytes_per_token,

@@ -22,6 +22,7 @@ from layer_streaming import (  # noqa: E402
     DoubleBufferRuntime,
     Llama31DecodeExecutor,
     ResidentDeviceArena,
+    VocabStreamingRuntime,
     build_llama31_8b_plan,
     create_weight_store,
 )
@@ -38,9 +39,15 @@ def parse_args():
     )
     parser.add_argument(
         "--granularity",
-        choices=("matrix", "layer"),
+        choices=("matrix", "matrix_group", "layer"),
         required=True,
     )
+    parser.add_argument(
+        "--vocab-mode",
+        choices=("resident", "streamed"),
+        default="resident",
+    )
+    parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--slots", type=int, choices=(1, 2), required=True)
     parser.add_argument("--warmup-decode", type=int, default=1)
     parser.add_argument("--decode-repeats", type=int, default=7)
@@ -119,6 +126,7 @@ def main():
     plan = build_llama31_8b_plan(
         args.granularity,
         tie_word_embeddings=bool(config.tie_word_embeddings),
+        stream_vocab=(args.vocab_mode == "streamed"),
     )
 
     before_load = process_snapshot()
@@ -143,7 +151,20 @@ def main():
         slot_count=args.slots,
         profile=False,
     )
-    executor = Llama31DecodeExecutor(config, resident)
+    vocab_runtime = None
+    if plan.vocab is not None:
+        vocab_runtime = VocabStreamingRuntime(
+            plan,
+            store,
+            runtime,
+            profile=False,
+        )
+    executor = Llama31DecodeExecutor(
+        config,
+        resident,
+        vocab_runtime=vocab_runtime,
+        top_k=args.top_k,
+    )
     after_runtime_init = process_snapshot()
 
     generated = []
@@ -161,10 +182,7 @@ def main():
         total_end.synchronize()
         wall_ms = (time.perf_counter() - wall_started) * 1000.0
         gpu_ms = total_start.elapsed_time(total_end)
-        next_token = state.logits[:, -1].argmax(
-            dim=-1,
-            keepdim=True,
-        )
+        next_token = state.topk_indices[..., 0]
         generated.append(next_token.detach().cpu())
         return next_token, wall_ms, gpu_ms
 
@@ -184,12 +202,17 @@ def main():
         measured_io_end = process_snapshot()
 
         runtime.profile = True
+        if vocab_runtime is not None:
+            vocab_runtime.profile = True
         profiles = []
+        vocab_profiles = []
         profile_total_wall_ms = []
         profile_total_gpu_ms = []
         for _ in range(args.profile_repeats):
             current, wall_ms, gpu_ms = step(current)
             profiles.append(dict(runtime.last_profile))
+            if vocab_runtime is not None:
+                vocab_profiles.append(dict(vocab_runtime.last_profile))
             profile_total_wall_ms.append(wall_ms)
             profile_total_gpu_ms.append(gpu_ms)
 
@@ -201,6 +224,8 @@ def main():
         "prompt_tokens": int(encoded.input_ids.numel()),
         "weight_store": args.weight_store,
         "granularity": args.granularity,
+        "vocab_mode": args.vocab_mode,
+        "top_k": args.top_k,
         "slots": args.slots,
         "load_seconds": load_seconds,
         "resident_load_seconds": resident_load_seconds,
@@ -216,8 +241,14 @@ def main():
         "profile_total_wall_ms": profile_total_wall_ms,
         "profile_total_gpu_ms": profile_total_gpu_ms,
         "profiles": profiles,
+        "vocab_profiles": vocab_profiles,
         "runtime": runtime.stats.as_dict(),
         "cpu_pinned_bytes": store.pinned_cpu_bytes,
+        "vocab_extra_pinned_cpu_bytes": (
+            vocab_runtime.extra_pinned_cpu_bytes
+            if vocab_runtime is not None
+            else 0
+        ),
         "cpu_arena_is_pinned": bool(store.arena.is_pinned()),
         "staging_slots_are_pinned": [
             bool(slot.is_pinned())
