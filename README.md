@@ -81,6 +81,36 @@ CUDA_VISIBLE_DEVICES=0 .venv/bin/python \
 .venv/bin/python benchmarks/build_real_llama31_artifact.py
 ```
 
+### AirLLM公平对照环境
+
+AirLLM使用独立Python 3.11环境，避免其`transformers>=4.49`依赖修改
+Cascade的真实实验环境。安装脚本主动清除大小写代理变量、忽略用户pip
+配置、固定AirLLM源码commit，并复用现有Llama-3.1-8B权重：
+
+```bash
+cd /disk2/home/guest/lianghan/repos/Cascade-LLM
+bash scripts/install_airllm_no_proxy.sh
+```
+
+默认持久化位置：
+
+```text
+/ssd/cascade-llm/third_party/airllm   # 固定commit的源码
+/ssd/cascade-llm/venvs/airllm        # 独立虚拟环境
+/ssd/cascade-llm/python              # uv管理的Python 3.11
+real_results/airllm/install_receipt.json
+```
+
+安装完成后激活：
+
+```bash
+source scripts/activate_airllm_env.sh
+```
+
+安装步骤不拆分模型也不启动正式推理。冷缓存/热缓存性能和峰值显存对照应
+使用后续统一benchmark脚本，不能把AirLLM初始化拆分时间计入单Token
+decode口径。
+
 ## 历史合成硬件校准
 
 `results/`和仓库根目录的旧H2D数据是开发真实运行时之前的合成硬件校准，
