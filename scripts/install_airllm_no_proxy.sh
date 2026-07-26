@@ -16,6 +16,8 @@ AIRLLM_PYTHON_ROOT="${AIRLLM_PYTHON_ROOT:-${AIRLLM_STORAGE_ROOT}/python}"
 AIRLLM_UV_CACHE="${AIRLLM_UV_CACHE:-${AIRLLM_STORAGE_ROOT}/uv-cache-airllm}"
 AIRLLM_MODEL_PATH="${AIRLLM_MODEL_PATH:-${AIRLLM_STORAGE_ROOT}/models/Llama-3.1-8B}"
 AIRLLM_INSTALL_RECEIPT="${AIRLLM_INSTALL_RECEIPT:-${CASCADE_ROOT}/real_results/airllm/install_receipt.json}"
+AIRLLM_PYPI_INDEX="${AIRLLM_PYPI_INDEX:-https://pypi.org/simple}"
+AIRLLM_TORCH_INDEX="${AIRLLM_TORCH_INDEX:-https://download.pytorch.org/whl/cu121}"
 
 # Clear both conventional and lowercase proxy variables. Git commands below
 # also override configured HTTP proxies for this invocation.
@@ -60,6 +62,8 @@ printf '  source commit: %s\n' "${AIRLLM_COMMIT}"
 printf '  source checkout: %s\n' "${AIRLLM_CHECKOUT}"
 printf '  virtual environment: %s\n' "${AIRLLM_VENV}"
 printf '  model checkpoint: %s\n' "${AIRLLM_MODEL_PATH}"
+printf '  Python package index: %s\n' "${AIRLLM_PYPI_INDEX}"
+printf '  PyTorch package index: %s\n' "${AIRLLM_TORCH_INDEX}"
 
 GIT_DIRECT=(git -c http.proxy= -c https.proxy=)
 "${GIT_DIRECT[@]}" ls-remote https://github.com/lyogavin/airllm.git "${AIRLLM_COMMIT}" >/dev/null
@@ -130,8 +134,8 @@ fi
 # wheel.
 uv pip install \
     --python "${AIRLLM_VENV}/bin/python" \
-    --index-url https://pypi.org/simple \
-    --extra-index-url https://download.pytorch.org/whl/cu121 \
+    --index-url "${AIRLLM_PYPI_INDEX}" \
+    --extra-index-url "${AIRLLM_TORCH_INDEX}" \
     --index-strategy unsafe-best-match \
     "torch==2.4.1+cu121"
 
@@ -140,7 +144,7 @@ uv pip install \
 # change into the comparison environment.
 uv pip install \
     --python "${AIRLLM_VENV}/bin/python" \
-    --index-url https://pypi.org/simple \
+    --index-url "${AIRLLM_PYPI_INDEX}" \
     "numpy<2" \
     "transformers>=4.49,<5" \
     "accelerate>=1,<2" \
@@ -153,7 +157,7 @@ uv pip install \
 
 uv pip install \
     --python "${AIRLLM_VENV}/bin/python" \
-    --index-url https://pypi.org/simple \
+    --index-url "${AIRLLM_PYPI_INDEX}" \
     --no-deps \
     --editable "${AIRLLM_CHECKOUT}/air_llm"
 

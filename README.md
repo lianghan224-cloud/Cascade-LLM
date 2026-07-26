@@ -107,6 +107,20 @@ real_results/airllm/install_receipt.json
 source scripts/activate_airllm_env.sh
 ```
 
+如果官方PyTorch CDN过慢，可以中断当前AirLLM安装并切换到阿里云PyPI和
+PyTorch CUDA 12.1镜像。默认保留已完成的uv缓存，只删除未完成临时文件：
+
+```bash
+bash scripts/restart_airllm_cn_mirror.sh --reuse-cache
+```
+
+如确认不需要已有包缓存，可只清理AirLLM虚拟环境和包缓存后重新下载；该
+命令不会删除模型权重和AirLLM源码：
+
+```bash
+bash scripts/restart_airllm_cn_mirror.sh --clean
+```
+
 安装步骤不拆分模型也不启动正式推理。冷缓存/热缓存性能和峰值显存对照应
 使用后续统一benchmark脚本，不能把AirLLM初始化拆分时间计入单Token
 decode口径。
