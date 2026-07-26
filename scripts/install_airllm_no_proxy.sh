@@ -67,7 +67,6 @@ GIT_DIRECT=(git -c http.proxy= -c https.proxy=)
 if [[ ! -e "${AIRLLM_CHECKOUT}" ]]; then
     GIT_LFS_SKIP_SMUDGE=1 "${GIT_DIRECT[@]}" clone \
         --filter=blob:none \
-        --no-checkout \
         https://github.com/lyogavin/airllm.git \
         "${AIRLLM_CHECKOUT}"
 elif [[ ! -d "${AIRLLM_CHECKOUT}/.git" ]]; then
@@ -76,7 +75,39 @@ elif [[ ! -d "${AIRLLM_CHECKOUT}/.git" ]]; then
     exit 1
 fi
 
-if [[ -n "$("${GIT_DIRECT[@]}" -C "${AIRLLM_CHECKOUT}" status --porcelain)" ]]; then
+# Version 1 of this installer used `git clone --no-checkout`. Such a new
+# checkout has a valid HEAD and index but an empty worktree, which Git reports
+# as every tracked file being deleted. Recover exactly that installer-created
+# state without accepting or overwriting a checkout that contains user files.
+CHECKOUT_STATUS="$("${GIT_DIRECT[@]}" -C "${AIRLLM_CHECKOUT}" status --porcelain)"
+CHECKOUT_TOP_ENTRY="$(
+    find "${AIRLLM_CHECKOUT}" \
+        -mindepth 1 \
+        -maxdepth 1 \
+        ! -name .git \
+        -print \
+        -quit
+)"
+if [[ -n "${CHECKOUT_STATUS}" && -z "${CHECKOUT_TOP_ENTRY}" ]] \
+    && printf '%s\n' "${CHECKOUT_STATUS}" | awk '
+        substr($0, 1, 2) != "D " && substr($0, 1, 2) != " D" {
+            bad = 1
+        }
+        END {
+            exit bad
+        }
+    '
+then
+    printf 'Recovering the empty worktree created by installer version 1.\n'
+    "${GIT_DIRECT[@]}" -C "${AIRLLM_CHECKOUT}" restore \
+        --source=HEAD \
+        --staged \
+        --worktree \
+        :/
+    CHECKOUT_STATUS="$("${GIT_DIRECT[@]}" -C "${AIRLLM_CHECKOUT}" status --porcelain)"
+fi
+
+if [[ -n "${CHECKOUT_STATUS}" ]]; then
     printf 'ERROR: AirLLM checkout has local modifications; refusing to overwrite them.\n' >&2
     exit 1
 fi
