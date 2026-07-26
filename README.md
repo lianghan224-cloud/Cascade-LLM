@@ -1,66 +1,306 @@
-# Cascade-LLM：CPU常驻权重的矩阵级流式推理
+# Cascade-LLM
 
-> Active vocabulary-streaming branch: `feature/vocab-streaming-128m-topk`
+面向个人用户单机单卡场景的 CPU 常驻权重流式推理运行时。
 
-Cascade-LLM面向个人用户的单机、单GPU、单请求推理：完整模型权重保存在
-CPU内存，只把即将执行的权重矩阵异步传入GPU，在降低显存需求的同时尽量
-让H2D与当前矩阵计算重叠。本分支以
-`meta-llama/Llama-3.1-8B` BF16为第一版目标，思路来源于AirLLM，但运行时
-不使用逐层hook、`module.to("meta")`和热路径动态分配。
+Cascade-LLM 将完整 Llama-3.1-8B BF16 权重保存在 CPU 内存，只把当前
+计算需要的矩阵组异步传入 GPU。Embedding 按 Token ID 查行，LM Head
+沿词表方向分块并在线归并全局 Top-k，从而在消费级显卡上同时降低显存和
+逐 Token 延迟。
 
-模型权重受Meta许可约束，仓库不包含checkpoint。运行真实生成前，需要用户
-自行接受模型许可并下载到本地。
+> 当前发布分支：`llama-3.1-8b`
+>
+> 状态：研究原型；已在真实 Llama-3.1-8B 权重和 RTX 3080 Ti 上验证。
 
-## CPU词表流式化版本
+## 实测摘要
 
-本分支在上一版真实运行时上增加以下功能：
+统一测试条件：
 
-- Transformer按QKV、O、Gate/Up、Down四个完整矩阵组调度；
-- Embedding按Token ID从CPU `[V,H]` 连续行布局中提取，只传所需行；
-- LM Head沿词表维度切成约128 MiB连续行块；
-- 每块用标准`F.linear`计算部分logits，并用`torch.topk`在线归并全局
-  Top-k；
-- 不切单矩阵内部Tile，不开发自定义CUDA算子。
+- 模型：Meta-Llama-3.1-8B，BF16，8,030,261,248 参数；
+- GPU：NVIDIA RTX 3080 Ti 12 GB，PCIe Gen4 x16；
+- CPU：AMD Threadripper 3970X，125 GiB RAM；
+- batch=1，6-token prompt，1 次 decode 预热，7 次稳态 decode；
+- 单卡运行，KV Cache 保存在 GPU；
+- 显存指标为 `torch.cuda.max_memory_allocated`。
 
-Llama-3.1-8B配置为`tie_word_embeddings=false`，所以Embedding和LM Head
-共享布局及调度代码，但保持checkpoint中的两份独立数值权重。128 MiB在
-4096维BF16布局下对应16,384行，完整128,256词表共8块，最后一块13,568行。
-
-RTX 3080 Ti GPU0真实结果：
-
-| 配置 | 中位ms/token | token/s | CUDA peak allocated |
+| 实现 | 中位延迟 | 速度 | CUDA 峰值显存 |
 |---|---:|---:|---:|
-| 上一版本：matrix、词表常驻 | 582.340 | 1.717 | 2.197 GiB |
-| matrix_group、词表常驻 | 581.660 | 1.719 | 2.416 GiB |
-| matrix_group、词表流式 | 624.162 | 1.602 | **0.448 GiB** |
+| AirLLM 3.0.1，BF16，热分层文件 | 6555.016 ms/token | 0.153 token/s | 0.989 GiB |
+| Cascade 上一版，词表常驻 GPU | 582.340 ms/token | 1.717 token/s | 2.197 GiB |
+| **Cascade 当前版，词表流式化** | **624.162 ms/token** | **1.602 token/s** | **0.448 GiB** |
 
-新版本相对上一版本将CUDA peak allocated降低**4.90倍**，节省79.60%、
-1.749 GiB，同时保留93.30%吞吐。LM Head每Token新增传输1.051 GB：
-8次H2D累计43.702 ms，分块GEMV和在线Top-10累计2.184 ms，流水总计
-44.057 ms。Embedding在单Token decode只传8 KiB。
+当前版本相对 AirLLM：
 
-连续8个greedy token全部匹配CPU参考，完整`[8,128256]`logits最低cosine
-为0.999739，8步argmax全部匹配。详细结果见
-[`real_results/vocab_streaming_report.md`](real_results/vocab_streaming_report.md)。
+- 逐 Token 速度提升 **10.50 倍**；
+- CUDA 峰值显存降低 **54.65%**，少用约 553 MiB；
+- Prefill 从 7381.899 ms 降至 746.872 ms；
+- H2D 有效吞吐从 11.137 GB/s 提高到约 24.04 GB/s。
 
-运行：
+当前版本相对 Cascade 上一版：
+
+- CUDA 峰值显存从 2.197 GiB 降至 0.448 GiB，降低 **4.90 倍**；
+- 节省 79.60% / 1.749 GiB；
+- 保留 93.30% 吞吐，延迟增加 7.18%。
+
+详细原始数据见：
+
+- [`real_results/vocab_streaming_report.md`](real_results/vocab_streaming_report.md)
+- [`real_results/vocab_streaming_summary.json`](real_results/vocab_streaming_summary.json)
+- [`real_results/airllm/comparison_report.md`](real_results/airllm/comparison_report.md)
+
+## 架构
+
+```text
+               CPU DRAM
+    ┌────────────────────────────────┐
+    │ 完整 BF16 权重 Arena           │
+    │                                │
+    │ Embedding [V,H]：按 Token 查行 │
+    │ Transformer：按矩阵组连续布局  │
+    │ LM Head [V,H]：按词表行分块    │
+    └───────────────┬────────────────┘
+                    │ H2D
+                    ▼
+                 GPU VRAM
+    ┌────────────────────────────────┐
+    │ Slot A：当前矩阵组             │
+    │ Slot B：下一矩阵组预取         │
+    │ Norm：小型常驻区               │
+    │ KV Cache：随上下文增长         │
+    └────────────────────────────────┘
+
+       Copy Stream ∥ Compute Stream
+```
+
+### Transformer 矩阵组
+
+每个 Decoder Layer 分成四个完整矩阵组：
+
+| 顺序 | 矩阵组 | BF16 权重大小 |
+|---:|---|---:|
+| 1 | Q + K + V | 48 MiB |
+| 2 | Attention O | 32 MiB |
+| 3 | MLP Gate + Up | 224 MiB |
+| 4 | MLP Down | 112 MiB |
+
+最大矩阵组为 224 MiB，因此运行时预分配两个 224 MiB GPU Slot。当前版本
+不切单个矩阵内部 Tile，也不使用自定义 CUDA 算子；组内计算仍调用标准
+PyTorch `F.linear`、SDPA、RMSNorm 和逐元素算子。
+
+### Embedding 按行传输
+
+Embedding 权重保持 CPU 行连续布局。Prefill 只收集输入 Token 对应的行，
+单 Token decode 只传：
+
+```text
+1 × 4096 × BF16 = 8 KiB
+```
+
+因此不需要在 GPU 上完整保存约 0.979 GiB Embedding。
+
+### LM Head 词表分块
+
+Llama-3.1-8B 的 LM Head 为 `[128256, 4096]`。运行时沿词表方向切成
+约 128 MiB 的连续行块：
+
+```text
+每个完整块：16,384 行
+分块数量：8
+最后一块：13,568 行
+```
+
+每块完成 H2D 后调用标准 `F.linear` 计算局部 logits，再使用
+`torch.topk` 将局部 Top-k 与当前全局候选归并。该过程不进行近似词表
+裁剪，连续 8 个 greedy Token 已与 CPU 参考完全一致。
+
+Llama-3.1-8B 的 `tie_word_embeddings=false`，因此 Embedding 和
+LM Head 共享布局和调度代码，但保留 checkpoint 中两份不同的数值权重。
+
+## 与 AirLLM 的架构区别
+
+| 项目 | AirLLM | Cascade-LLM |
+|---|---|---|
+| CPU 权重 | 按层文件映射/page cache | 连续 CPU Arena |
+| H2D 来源 | 实测为 pageable Tensor | full-pinned 或 pinned staging |
+| GPU 权重分配 | Hook 动态安装、转 meta、释放 | 启动时预分配双 Slot |
+| Transformer 粒度 | 完整层/模块 | 完整矩阵组 |
+| Embedding | 完整模块装载 | 只传所需行 |
+| LM Head | 完整模块装载 | 128 MiB 词表块 |
+| 计算/传输重叠 | 主要预取下一层到 CPU | CUDA Copy/Compute 双流 |
+| 模型通用性 | 较强 | 当前专门适配 Llama-3.1-8B |
+| 锁页内存要求 | 较低 | full_pinned 约 14.958 GiB |
+
+Cascade-LLM 选择模型专用执行器和更强的 CPU 内存约束，换取更低的 GPU
+显存、更高 H2D 吞吐和稳定的单请求延迟。
+
+## 支持范围
+
+当前已支持：
+
+- Llama-3.1-8B BF16 safetensors；
+- batch=1、无 Padding 的 Prefill；
+- 单 Token 自回归 Decode；
+- GQA、RoPE、SDPA、RMSNorm 和 SwiGLU MLP；
+- GPU 常驻 KV Cache；
+- `full_pinned` 与 `pinned_staging` 两种 CPU 权重模式；
+- `matrix`、`matrix_group` 和 `layer` 三种 Transformer 粒度；
+- Embedding 按行提取；
+- LM Head 词表分块和在线 Top-k；
+- 单卡 CUDA 执行。
+
+当前不支持或尚未优化：
+
+- 多请求连续批处理和动态 Batch；
+- Tensor Parallel / Pipeline Parallel；
+- 单矩阵内部 Tile 流水；
+- 自定义或融合 CUDA Kernel；
+- INT8/INT4 权重传输；
+- 分页、量化或 CPU Offload KV Cache；
+- 通用 Hugging Face 模型自动适配；
+- Windows 和 macOS。
+
+## 环境要求
+
+已验证环境：
+
+- Ubuntu 20.04；
+- Python 3.8；
+- PyTorch 2.4.1 + CUDA 12.1；
+- Transformers 4.45.2；
+- 支持 BF16 的 NVIDIA GPU；
+- 推荐至少 32 GiB 系统内存；
+- `full_pinned` 需要能够锁定约 14.958 GiB CPU 内存；
+- 模型目录和缓存建议保留至少 30 GiB SSD 空间。
+
+12 GB 显卡不是硬性下限；短上下文权重峰值约 0.448 GiB，但实际需求还包括
+CUDA Context、activation、workspace 和随上下文增长的 KV Cache。
+
+Llama-3.1-8B BF16 KV Cache 约为 128 KiB/Token：
+
+| 上下文长度 | KV Cache 估算 |
+|---:|---:|
+| 2K | 256 MiB |
+| 4K | 512 MiB |
+| 8K | 1 GiB |
+| 32K | 4 GiB |
+
+## 快速开始
+
+### 1. 克隆发布分支
+
+```bash
+git clone --branch llama-3.1-8b \
+  https://github.com/lianghan224-cloud/Cascade-LLM.git
+cd Cascade-LLM
+```
+
+### 2. 创建 Python 环境
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install --upgrade pip
+
+# CUDA 12.1 PyTorch
+.venv/bin/pip install \
+  torch==2.4.1 \
+  --index-url https://download.pytorch.org/whl/cu121
+
+.venv/bin/pip install -r requirements-bench.txt
+```
+
+验证 CUDA：
+
+```bash
+.venv/bin/python -c \
+  "import torch; print(torch.__version__, torch.cuda.is_available())"
+```
+
+### 3. 配置持久化目录
+
+```bash
+cp .env.example .env.local
+```
+
+默认模型目录为：
+
+```text
+/ssd/cascade-llm/models/Llama-3.1-8B
+```
+
+如需修改，请编辑 `.env.local`。该文件被 Git 忽略，不要在其中保存
+Hugging Face Token 或其他凭据。
+
+加载环境变量：
+
+```bash
+source scripts/activate_env.sh
+```
+
+### 4. 获取模型权重
+
+模型权重不包含在本仓库中。请遵守 Meta Llama 3.1 License 和
+Acceptable Use Policy。
+
+通过 Hugging Face 官方受限仓库：
+
+```bash
+huggingface-cli login
+.venv/bin/python scripts/download_llama31_8b.py
+```
+
+网络受限时，可使用固定 revision、逐文件 SHA-256 校验的 ModelScope
+下载器：
+
+```bash
+.venv/bin/python scripts/download_llama31_8b_modelscope.py
+```
+
+下载器支持断点续传，不会把模型或访问凭据提交到 Git。
+
+### 5. 检查环境
+
+```bash
+source scripts/activate_env.sh
+.venv/bin/python scripts/check_real_environment.py
+```
+
+### 6. 运行生成
+
+推荐的高性能配置：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 .venv/bin/python tools/run_llama31.py \
-  --checkpoint /ssd/cascade-llm/models/Llama-3.1-8B \
+  --checkpoint "${CASCADE_LLAMA31_8B}" \
   --weight-store full_pinned \
+  --granularity matrix_group \
+  --vocab-mode streamed \
+  --top-k 10 \
+  --prompt "The meaning of life is" \
+  --max-new-tokens 8
+```
+
+锁页内存不足时：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 .venv/bin/python tools/run_llama31.py \
+  --checkpoint "${CASCADE_LLAMA31_8B}" \
+  --weight-store pinned_staging \
   --granularity matrix_group \
   --vocab-mode streamed \
   --top-k 10 \
   --max-new-tokens 8
 ```
 
-重新运行正式基准：
+`pinned_staging` 减少锁页内存，但增加 CPU pageable→pinned 拷贝，速度会
+明显低于 `full_pinned`。
+
+## 复现实验
+
+正式 7 次稳态 Decode 基准：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 .venv/bin/python \
   benchmarks/real_llama31_benchmark.py \
-  --checkpoint /ssd/cascade-llm/models/Llama-3.1-8B \
+  --checkpoint "${CASCADE_LLAMA31_8B}" \
   --weight-store full_pinned \
   --granularity matrix_group \
   --vocab-mode streamed \
@@ -70,509 +310,102 @@ CUDA_VISIBLE_DEVICES=0 .venv/bin/python \
   --decode-repeats 7 \
   --profile-repeats 3 \
   --output real_results/bench_full_pinned_matrix_group_vocab_streamed_s2.json
+```
 
+重新生成汇总：
+
+```bash
 .venv/bin/python benchmarks/summarize_vocab_streaming.py
 ```
 
-## 真实 Llama-3.1-8B 实验结果
-
-真实实验使用ModelScope
-`LLM-Research/Meta-Llama-3.1-8B` revision
-`39ef6178f1f193f3636d4f6150d6966dc05fa366`。4个safetensors包含291个
-BF16 Tensor、8,030,261,248个参数，参数payload为14.958 GiB。运行时从
-CPU全量权重执行真实RMSNorm、RoPE、GQA Attention/SDPA、MLP和残差计算，
-不是合成GEMM。
-
-本机环境为Threadripper 3970X、125 GiB RAM、RTX 3080 Ti 12 GiB、
-PCIe Gen4 x16。测试口径为batch=1、6-token prompt、1次decode warmup、
-每配置7次无细粒度profiling的单Token wall-time样本；P10/P90由这7次
-样本计算。另运行3次CUDA Event profile诊断H2D和计算，但不把重叠流上的
-event总和当成严格wall-time分解。
-
-| CPU权重模式 | 粒度 | GPU slot | 中位ms/token | P10–P90 ms | token/s | 权重显存 |
-|---|---|---:|---:|---:|---:|---:|
-| full_pinned | 层 | 1 | 603.385 | 603.341–603.481 | 1.657 | 2.364 GiB |
-| full_pinned | 矩阵 | 1 | 605.715 | 605.622–605.783 | 1.651 | 2.067 GiB |
-| full_pinned | 层 | 2 | **582.235** | 582.205–582.371 | **1.718** | 2.770 GiB |
-| full_pinned | 矩阵 | 2 | 583.031 | 582.978–583.110 | 1.715 | **2.176 GiB** |
-| pinned_staging | 层 | 2 | 1129.806 | 1125.983–1130.434 | 0.885 | 2.770 GiB |
-| pinned_staging | 矩阵 | 2 | 1231.850 | 1229.532–1233.287 | 0.812 | 2.176 GiB |
-
-结论：
-
-- 推荐默认配置是`full_pinned + matrix + 2 slots`。它比最快的层粒度
-  双缓冲只慢0.137%，但少用608 MiB权重显存。
-- 该配置的计划权重显存为2.176 GiB，相对完整BF16参数载荷缩减
-  **6.873倍**，即节省85.45%；实际CUDA peak allocated为2.197 GiB。
-- 相同矩阵粒度下，双缓冲相对单缓冲只加速**1.039倍**。每Token传输
-  13,958,643,712 bytes，H2D约24.0 GB/s；主配置H2D/Compute Event
-  中位总和分别为581.238/24.636 ms，系统明显受H2D限制。
-- `full_pinned`完整锁页14.958 GiB CPU权重；`pinned_staging`矩阵双slot
-  只锁页224 MiB，但延迟慢至2.113倍。因此前者适合专用推理机，后者是
-  锁页内存受限时的兼容模式。
-- decode测量窗口的进程磁盘读取增量在所有8组测试中均为0，SSD不在热
-  路径；GPU1复测主配置与GPU0的中位延迟只差0.222%。
-- 与Transformers CPU参考连续比较8个greedy token，token ID 8/8一致，
-  最低完整词表logit cosine为0.999739。
-
-普通full-GPU基线无法在本机运行：仅14.958 GiB参数payload就已经超过
-11.668 GiB物理显存，还未包含KV Cache、activation和workspace。因此本
-报告只给出相对普通基线的权重显存倍数，不虚构full-GPU速度倍数。
-
-详细方法、原始数据、图表、限制和后续实验见自包含报告
-[real_results/report.html](real_results/report.html)；机器可读汇总和
-10项QA收据见
-[real_results/real_llama31_summary.json](real_results/real_llama31_summary.json)。
-
-### 真实基准复现
-
-```bash
-source scripts/activate_env.sh
-
-CUDA_VISIBLE_DEVICES=0 .venv/bin/python \
-  benchmarks/real_llama31_benchmark.py \
-  --checkpoint /ssd/cascade-llm/models/Llama-3.1-8B \
-  --weight-store full_pinned \
-  --granularity matrix \
-  --slots 2 \
-  --warmup-decode 1 \
-  --decode-repeats 7 \
-  --profile-repeats 3 \
-  --output real_results/bench_full_pinned_matrix_s2.json
-
-.venv/bin/python benchmarks/summarize_real_llama31.py
-.venv/bin/python benchmarks/build_real_llama31_artifact.py
-```
-
-### AirLLM公平对照环境
-
-AirLLM使用独立Python 3.11环境，避免其`transformers>=4.49`依赖修改
-Cascade的真实实验环境。安装脚本主动清除大小写代理变量、忽略用户pip
-配置、固定AirLLM源码commit，并复用现有Llama-3.1-8B权重：
-
-```bash
-cd /disk2/home/guest/lianghan/repos/Cascade-LLM
-bash scripts/install_airllm_no_proxy.sh
-```
-
-默认持久化位置：
-
-```text
-/ssd/cascade-llm/third_party/airllm   # 固定commit的源码
-/ssd/cascade-llm/venvs/airllm        # 独立虚拟环境
-/ssd/cascade-llm/python              # uv管理的Python 3.11
-real_results/airllm/install_receipt.json
-```
-
-安装完成后激活：
-
-```bash
-source scripts/activate_airllm_env.sh
-```
-
-如果官方PyTorch CDN过慢，可以中断当前AirLLM安装并切换到阿里云PyPI和
-PyTorch CUDA 12.1镜像。默认保留已完成的uv缓存，只删除未完成临时文件：
-
-```bash
-bash scripts/restart_airllm_cn_mirror.sh --reuse-cache
-```
-
-如确认不需要已有包缓存，可只清理AirLLM虚拟环境和包缓存后重新下载；该
-命令不会删除模型权重和AirLLM源码：
-
-```bash
-bash scripts/restart_airllm_cn_mirror.sh --clean
-```
-
-安装步骤不拆分模型也不启动正式推理。冷缓存/热缓存性能和峰值显存对照应
-使用后续统一benchmark脚本，不能把AirLLM初始化拆分时间计入单Token
-decode口径。
-
-### AirLLM 8B 单卡真实对比
-
-在GPU0上使用同一Llama-3.1-8B BF16 checkpoint、同一6-token prompt、
-batch=1、1次decode warmup和7次稳态decode进行对比。AirLLM为3.0.1、
-默认预取且不压缩；Cascade为`full_pinned + matrix + 2 slots`。
-
-| 指标 | AirLLM 3.0.1 | Cascade |
-|---|---:|---:|
-| 稳态中位延迟 | 6555.016 ms/token | 582.340 ms/token |
-| 稳态速度 | 0.153 token/s | 1.717 token/s |
-| P10–P90 | 6534.794–6568.603 ms | 582.281–582.413 ms |
-| Prefill | 7381.899 ms | 727.397 ms |
-| CUDA peak allocated | 0.989 GiB | 2.197 GiB |
-| CUDA peak reserved | 1.002 GiB | 2.223 GiB |
-
-Cascade在该口径下是AirLLM的**11.26倍**速度，但CUDA peak allocated是
-AirLLM的2.22倍，多用约1.209 GiB。AirLLM逐token传输全部35个单元；
-诊断得到权重读取/映射累计4988.721 ms，H2D/参数安装累计1442.096 ms，
-有效H2D吞吐11.137 GB/s，进入H2D的pinned权重实测为0 B。Cascade把
-Embedding、LM Head和Norm常驻，只传输Transformer矩阵，H2D累计
-580.558 ms、有效吞吐24.044 GB/s。
-
-两者在测量窗口的物理磁盘读取均为0 B，前8个greedy token完全一致。
-AirLLM的低显存来自逐层流式加载所有模块；Cascade多用显存换取常驻输出层、
-预分配双slot和全量CPU锁页权重。完整报告见
-[`real_results/airllm/comparison_report.md`](real_results/airllm/comparison_report.md)。
-
-复现AirLLM：
-
-```bash
-CUDA_VISIBLE_DEVICES=0 \
-  /ssd/cascade-llm/venvs/airllm/bin/python \
-  benchmarks/airllm_llama31_8b_benchmark.py \
-  --checkpoint /ssd/cascade-llm/models/Llama-3.1-8B \
-  --layer-shards-root /ssd/cascade-llm/airllm-layer-shards/llama31-8b \
-  --warmup-decode 1 \
-  --decode-repeats 7 \
-  --profile-repeats 1 \
-  --output real_results/airllm/bench_airllm_bf16_prefetch_gpu0.json
-
-.venv/bin/python benchmarks/summarize_airllm_comparison.py
-```
-
-## 历史合成硬件校准
-
-`results/`和仓库根目录的旧H2D数据是开发真实运行时之前的合成硬件校准，
-不能与`real_results/`的端到端真实模型结果混淆。它们仍用于估算固定H2D
-提交开销和检查两张GPU的一致性；真实结论一律以上一节为准。
-
-## 真实实验的持久化环境
-
-源码仓库、模型权重和下载缓存相互分离：
-
-```text
-/disk2/home/guest/lianghan/repos/Cascade-LLM   # Git源码和可提交收据
-/ssd/cascade-llm/models                       # 受限checkpoint，不进Git
-/ssd/cascade-llm/hf-cache                     # Hugging Face持久缓存
-/ssd/cascade-llm/uv-cache                     # Python包持久缓存
-```
-
-加载本地路径配置：
-
-```bash
-source scripts/activate_env.sh
-```
-
-该配置默认使用阿里云PyPI镜像安装Python依赖，并把包缓存持久化到
-`/ssd/cascade-llm/uv-cache`；模型权重仍从Hugging Face官方受限仓库下载。
-
-检查GPU、Python、认证和checkpoint状态：
-
-```bash
-python scripts/check_real_environment.py
-```
-
-接受Meta许可并执行`huggingface-cli login`后，下载固定revision的真实权重：
-
-```bash
-python scripts/download_llama31_8b.py
-```
-
-网络受限时，也可以从ModelScope的同模型BF16镜像下载。镜像下载器固定
-ModelScope commit，并按公开manifest逐文件验证大小和SHA-256：
-
-```bash
-python scripts/download_llama31_8b_modelscope.py
-```
-
-下载脚本不会把Token或权重写入Git，只会在`real_results/`生成可提交的
-revision、文件大小和SHA-256收据。完整验收顺序见
-[`REAL_EXPERIMENT_PROTOCOL.md`](REAL_EXPERIMENT_PROTOCOL.md)。
-
-## Llama-3.1-8B 原型运行时
-
-`layer_streaming/` 现在包含面向单机单请求的Llama-3.1-8B运行时：
-
-- 默认按单个Projection矩阵进行H2D；
-- 根据最大矩阵自动分配两个GPU weight slot；
-- `full_pinned`完整锁页CPU权重模式；
-- `pinned_staging` pageable主存加两个pinned staging slot模式；
-- Embedding、LM Head和Norm使用独立GPU常驻区；
-- Copy/Compute两个CUDA Stream及ready/free Event流水。
-
-查看静态计划和基线对比：
-
-```bash
-.venv/bin/python benchmarks/report_llama31_matrix_runtime.py
-```
-
-输出包括整层/矩阵粒度的自动slot、两种CPU锁页模式、相对不同基线的显存
-比例，以及基于已保存8B实测数据的性能区间和限制。
-
-真实checkpoint生成入口：
-
-```bash
-.venv/bin/python tools/run_llama31.py \
-  --checkpoint /ssd/cascade-llm/models/Llama-3.1-8B \
-  --weight-store full_pinned \
-  --granularity matrix \
-  --prompt "The meaning of life is" \
-  --max-new-tokens 8
-```
-
-兼容模式：
-
-```bash
-.venv/bin/python tools/run_llama31.py \
-  --checkpoint /ssd/cascade-llm/models/Llama-3.1-8B \
-  --weight-store pinned_staging \
-  --granularity matrix
-```
-
-运行单元测试：
+运行测试：
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-实现范围、显存节省和性能口径见
-[`IMPLEMENTATION_REPORT.md`](IMPLEMENTATION_REPORT.md)。
+当前分支应通过 11 项单元测试。
 
-本目录包含 Llama-3.2-1B“CPU 权重常驻、GPU 双 slot、H2D 与计算重叠”
-的本机校准工具和原始结果。主要交付是自包含的
-[report.html](report.html)；更详细的代码/方法笔记见
-[TECHNICAL_NOTES.md](TECHNICAL_NOTES.md)。
+真实模型实验的证据标准见
+[`REAL_EXPERIMENT_PROTOCOL.md`](REAL_EXPERIMENT_PROTOCOL.md)。
 
-这个目录给“CPU 常驻权重、分片异步搬运、GPU 计算与下一片 H2D
-重叠”的调度器提供第一组本机基线。基准程序不需要 CUDA Toolkit、
-CUDA 头文件、PyTorch 或 CUDA Runtime；它只在运行时
-`dlopen("libcuda.so.1")` 并调用 CUDA Driver API。
+## 正确性
 
-## 文件
+当前版本与 Transformers CPU 参考连续比较 8 个 greedy Token：
 
-- `h2d_driver_bench.c`：独立 C11 基准程序。
-- `h2d_results_gpu0.json`、`h2d_results_gpu1.json`：两张卡的完整原始结果，
-  每个点均含 warmup 次数、样本数、p10/median/p90。
-- `h2d_results_summary.json`：本机、关键模型尺寸、线性拟合与原始文件
-  SHA-256 的紧凑摘要。
-- `benchmarks/torch_llama32_1b_bench.py`：精确 Llama projection 形状、
-  copy/compute 四组对照和 16-stage 双 slot 流水。
-- `benchmarks/large_shard_pipeline_bench.py`：固定 16 层总工作量，比较
-  1/2/4/8 层组成一个连续分片时的双 slot 流水。
-- `benchmarks/validate_large_shards.py`：重算大分片结果、跨卡一致性、
-  单调趋势与相对吞吐。
-- `benchmarks/summarize_shard_accounting.py`：汇总 M=1 时不同分片数量的
-  H2D、GPU计算、Driver/PyTorch提交和端到端时间。
-- `benchmarks/llama31_8b_m1_bench.py`、`summarize_llama31_8b.py`：
-  Llama-3.1-8B 精确层形状的 M=1、8 GiB Arena 双卡基准与校验汇总。
-- `benchmarks/pinned_arena_probe.py`：用 CUDA Driver API 分配并触碰一个
-  与完整 BF16 checkpoint 相同大小的 pinned CPU arena。
-- `benchmarks/validate_results.py`：重算 SHA、H2D median、流水公式、
-  hidden-fraction 口径与两卡一致性。
-- `benchmarks/build_report_artifact.py`：从已保存 JSON 生成规范化
-  `artifact.json` 和报告 source notes。
-- `results/torch_llama32_1b_gpu{0,1}.json`：两卡 PyTorch/流水原始结果。
-- `results/h2d_large_shards_gpu{0,1}.json`：116.008 MiB 至
-  1856.125 MiB 的 pinned async Driver H2D 原始结果。
-- `results/large_shard_pipeline_gpu{0,1}.json`：两卡多层分组流水结果。
-- `results/large_shards_summary.json`：大分片两卡均值、SHA-256 和
-  221 项 QA receipt。
-- `results/shard_accounting_m1_gpu{0,1}.json`、
-  `results/shard_accounting_m1_summary.json`：单Token点的组件时间账本。
-- `results/llama31_8b_m1_gpu{0,1}.json`、
-  `results/llama31_8b_m1_summary.json`：8B 双卡组件与流水结果。
-- `results/h2d_llama31_8b_shards_gpu{0,1}.json`：8B 精确层倍数的
-  Driver API pinned H2D 原始结果。
-- `results/pinned_arena_probe.json`：2.302 GiB 全量 pinned arena 结果。
-- `results/validation.json`：65 项结果 QA receipt。
-- `report.html`：自包含、离线可读的最终技术报告。
+- Token ID 8/8 完全一致；
+- 完整 logits 形状为 `[8, 128256]`；
+- 最低 cosine similarity 为 0.999739；
+- 最大绝对误差为 0.265625；
+- Top-10 overlap 为 9～10/10。
 
-## 构建和复现
+原始收据：
 
-```bash
-cc -O2 -std=c11 -Wall -Wextra -Werror -pedantic \
-  h2d_driver_bench.c -o h2d_driver_bench -ldl -lm
+- [`real_results/correctness_vocab_streamed_matrix_group_8token.json`](real_results/correctness_vocab_streamed_matrix_group_8token.json)
+- [`real_results/correctness_comparison_vocab_streamed_matrix_group_8token.json`](real_results/correctness_comparison_vocab_streamed_matrix_group_8token.json)
 
-./h2d_driver_bench --device 0 --output h2d_results_gpu0.json
-./h2d_driver_bench --device 1 --output h2d_results_gpu1.json
-
-./h2d_driver_bench --device 0 --large-shards \
-  --output results/h2d_large_shards_gpu0.json
-./h2d_driver_bench --device 1 --large-shards \
-  --output results/h2d_large_shards_gpu1.json
-
-jq empty h2d_results_gpu0.json h2d_results_gpu1.json \
-  h2d_results_summary.json
-```
-
-Python 基准使用本目录隔离环境：
-
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-bench.txt
-
-.venv/bin/python benchmarks/pinned_arena_probe.py \
-  --output results/pinned_arena_probe.json
-
-.venv/bin/python benchmarks/torch_llama32_1b_bench.py \
-  --device 0 --warmup 5 --repetitions 30 --pipeline-stages 16 \
-  --output results/torch_llama32_1b_gpu0.json
-
-.venv/bin/python benchmarks/large_shard_pipeline_bench.py \
-  --device 0 --group-layers 1,2,4,8 --rows 1,512,2048,4096 \
-  --warmup 3 --repetitions 7 \
-  --output results/large_shard_pipeline_gpu0.json
-
-# 第二张卡反向测试顺序，用于检查 DVFS/温度/顺序偏差。
-.venv/bin/python benchmarks/large_shard_pipeline_bench.py \
-  --device 1 --group-layers 8,4,2,1 --rows 1,512,2048,4096 \
-  --warmup 3 --repetitions 7 \
-  --output results/large_shard_pipeline_gpu1.json
-
-.venv/bin/python benchmarks/validate_large_shards.py
-.venv/bin/python benchmarks/validate_results.py
-.venv/bin/python benchmarks/build_report_artifact.py
-
-node /path/to/data-analytics/skills/build-report/scripts/deliver_portable_artifact.mjs \
-  --input artifact.json --output report.html
-```
-
-不传 `--output` 时 JSON 写到 stdout，进度写到 stderr。两张 GPU 应当串行
-测试；并行测试会让两张卡争用 CPU 内存和 PCIe 路径，所得结果不是单卡
-isolated baseline。
-
-## 测量方法
-
-每次传输用一对 CUDA Event 包围，并用
-`cuEventElapsedTime` 取得 GPU timeline 时间。host latency 只包围一次
-`cuMemcpyHtoD[_Async]` 函数调用：
-
-- sync API 的 host latency 包含阻塞等待；
-- pinned async 的 host latency 是 enqueue 返回时间；
-- async GPU Event 时间包含实际 stream 中的 copy。
-
-pageable 源用 4 KiB 对齐的普通 `posix_memalign`；pinned 源用
-`cuMemHostAlloc`。两个 256 MiB host buffer 都先完整 `memset`，排除首次
-缺页。各点先 warmup，再记录 10–200 个样本。百分位使用排序后的
-`round(p * (n - 1))` 下标。GB/s 是十进制 GB/s。
-
-必测尺寸为 0 B、1 B、4 KiB、64 KiB、1/4/16/64/116/256 MiB。为
-Llama-3.2-1B 另加 2/8/20/32/96 MiB 和 121,643,008 B：
-
-- K/V projection 各 2 MiB；
-- Q/O projection 各 8 MiB；
-- attention 权重合计 20 MiB；
-- MLP 单矩阵 32 MiB，gate + up 64 MiB，MLP 合计 96 MiB；
-- 矩阵合计 116 MiB；若把两个 4 KiB BF16 norm 算入，则整层为
-  121,643,008 B。
-
-“单次启动开销”另用 pinned async 批量测试：每批 1、2、4、…、1024
-次 copy，对 batch median 拟合
-`T_batch = intercept + copies * per_copy_slope`。0 B、1 B 和 4 KiB
-分别拟合 host enqueue 与 GPU Event 总时间。
-
-## 本机环境
-
-- CPU：AMD Ryzen Threadripper 3970X，32 核/64 线程，单 NUMA node。
-- GPU：2 × NVIDIA GeForce RTX 3080 Ti 12 GiB。
-- GPU0 / GPU1：`0000:01:00.0` / `0000:48:00.0`，最大 PCIe Gen4 x16。
-- 驱动：555.42.02；CUDA Driver API version 12050。
-- Linux：5.15.0-139-generic x86_64。
-- 两卡均报告 2 个 async engines，支持 concurrent kernels。
-- `nvidia-smi topo -m` 显示 GPU0 与 GPU1 之间为 `SYS`。
-
-系统 `ulimit -l` 只有 64 KiB，但本机 NVIDIA 驱动仍成功完成了
-`cuMemHostAlloc(256 MiB)`；不要据此假设其他机器也一定能成功。
-
-## 结果
-
-以下都是 pinned `cuMemcpyHtoDAsync_v2` 的 median。完整 p10/p90 见原始
-JSON。
-
-| 分片 | GPU0 event | GPU0 GB/s | GPU1 event | GPU1 GB/s |
-|---:|---:|---:|---:|---:|
-| 4 KiB | 2.944 µs | 1.391 | 2.976 µs | 1.376 |
-| 64 KiB | 5.344 µs | 12.263 | 5.376 µs | 12.190 |
-| 1 MiB | 42.592 µs | 24.619 | 42.656 µs | 24.582 |
-| 2 MiB | 82.816 µs | 25.323 | 82.720 µs | 25.352 |
-| 8 MiB | 321.568 µs | 26.087 | 321.696 µs | 26.076 |
-| 20 MiB | 799.328 µs | 26.236 | 799.744 µs | 26.223 |
-| 32 MiB | 1.277 ms | 26.267 | 1.278 ms | 26.252 |
-| 64 MiB | 2.703 ms | 24.832 | 2.797 ms | 23.992 |
-| 96 MiB | 4.144 ms | 24.290 | 4.197 ms | 23.985 |
-| 116 MiB | 5.018 ms | 24.242 | 5.055 ms | 24.062 |
-| 116 MiB + 8 KiB | 5.020 ms | 24.232 | 5.055 ms | 24.066 |
-| 256 MiB | 11.040 ms | 24.319 | 11.062 ms | 24.268 |
-
-116 MiB pinned async 的稳定性：
-
-| GPU | event p10 / median / p90 | GB/s p10 / median / p90 | host enqueue median |
-|---:|---:|---:|---:|
-| 0 | 5015.840 / 5017.568 / 5027.424 µs | 24.194 / 24.242 / 24.250 | 1.804 µs |
-| 1 | 5050.528 / 5055.136 / 5059.168 µs | 24.042 / 24.062 / 24.084 | 1.824 µs |
-
-大分片用 64/96/116/256 MiB 拟合 `T = alpha + size / B`：
-
-| GPU / memory | alpha | B | R² |
-|---|---:|---:|---:|
-| GPU0 pinned async | -31.313 µs | 24.223 GB/s | 0.999936 |
-| GPU1 pinned async | 59.761 µs | 24.390 GB/s | 0.999990 |
-| GPU0 pageable async | 21.133 µs | 13.290 GB/s | 0.999961 |
-| GPU1 pageable async | 111.357 µs | 13.381 GB/s | 0.999995 |
-
-GPU0 的负 intercept 不是“负启动开销”；它说明 32–64 MiB 附近存在
-cache/传输分段效应，单一直线不应被外推到小尺寸。规划大分片时使用约
-24.0 GB/s 的保守值更可靠。
-
-pageable async 在当前驱动上返回成功，但并不是真的 non-blocking：
-
-| GPU | 116 MiB memory | host call median | event median | median GB/s |
-|---:|---|---:|---:|---:|
-| 0 | pageable async | 9098.613 µs | 9137.952 µs | 13.311 |
-| 0 | pinned async | 1.804 µs | 5017.568 µs | 24.242 |
-| 1 | pageable async | 9151.271 µs | 9184.096 µs | 13.244 |
-| 1 | pinned async | 1.824 µs | 5055.136 µs | 24.062 |
-
-因此调度器必须让权重驻留在真正 page-locked 的 CPU buffer 中。不能把
-“pageable + Async 后缀”当作可重叠路径，而且这种接受 pageable 指针的
-行为是驱动相关的。
-
-批量启动拟合：
-
-| GPU | copy size | host slope | GPU Event slope | GPU Event intercept | R² (GPU) |
-|---:|---:|---:|---:|---:|---:|
-| 0 | 0 B | 0.0587 µs | 0.0588 µs | 1.281 µs | 0.999926 |
-| 1 | 0 B | 0.0571 µs | 0.0573 µs | 1.319 µs | 0.999866 |
-| 0 | 1 B | 2.1304 µs | 2.1308 µs | -3.562 µs | 0.999925 |
-| 1 | 1 B | 2.0992 µs | 2.0994 µs | -3.595 µs | 0.999924 |
-| 0 | 4 KiB | 1.8341 µs | 1.8339 µs | 3.305 µs | 0.999971 |
-| 1 | 4 KiB | 1.8203 µs | 1.8200 µs | 1.709 µs | 0.999925 |
-
-0 B 被驱动优化成 no-op，其约 0.058 µs slope 只是参数检查/循环成本，
-不是 DMA 启动成本。1 B 与 4 KiB 的约 1.82–2.13 µs slope 包含连续提交
-和串行 tiny-copy command 成本；单独一次 pinned async 的实测 host call
-median 约 1.8 µs。负 intercept 同样只是全区间最小二乘结果，不能赋予
-物理含义。
-
-## 对异步分层调度器的直接结论
-
-1. CPU 权重必须预先进入 pinned pool。若模型最初由普通 pageable 内存
-   载入，应由 CPU worker 提前拷入复用的 pinned staging slot，不能在
-   compute 临界路径中临时锁页。
-2. 使用至少两个 device weight slot：copy stream 把分片 `i+1` 搬入
-   slot B 的同时，compute stream 用 slot A 执行分片 `i`。ready event
-   从 copy stream 传给 compute stream；slot-reuse event 反向约束下一次
-   覆盖。不要逐层 `cuStreamSynchronize`。
-3. 64 KiB 只有约 12 GB/s，1 MiB 已达约 24.6 GB/s。建议调度粒度至少
-   1–2 MiB；Llama 的 2 MiB K/V 矩阵已经足够接近饱和。更大的自然矩阵
-   边界可减少 event/allocator/bookkeeping 数量。
-4. 对 116 MiB 整层，下一层预取窗口约 5.0 ms；若当前层 GPU compute
-   少于这个值，双缓冲仍会露出 H2D 尾巴。此时需要把调度粒度拆到
-   projection/MLP 矩阵，并尽早发出后续分片，或用更深的 lookahead。
-5. 双缓冲最少额外占用“两片权重 + activation/KV/cache/workspace”显存。
-   实际 slot 大小应由显存预算和 `T_copy(chunk) ≈ T_compute(chunk)`
-   共同决定，而不是固定为一整个 decoder layer。
-
-本基准只测 isolated H2D。真实 overlap 还会受到 GPU DRAM 带宽竞争、
-kernel occupancy、stream priority、功耗/时钟状态和 CPU staging worker
-的影响；下一步必须用真实 Llama kernel 做“copy-only、compute-only、
-overlap”三组 Nsight/CUDA Event 测量，并报告 overlap hidden fraction：
+## 项目结构
 
 ```text
-hidden_fraction =
-  (T_copy_only + T_compute_only - T_overlap) /
-  min(T_copy_only, T_compute_only)
+layer_streaming/
+  plan.py          静态权重布局、矩阵组和词表分块计划
+  weight_store.py  full_pinned / pinned_staging CPU Arena
+  runtime.py       GPU双Slot、CUDA Stream和Event调度
+  llama31.py       Llama-3.1-8B执行器与KV Cache
+  vocab.py         Embedding按行和LM Head在线Top-k
+
+tools/
+  run_llama31.py   本地生成入口
+
+benchmarks/
+  real_llama31_benchmark.py       真实端到端基准
+  real_llama31_correctness.py     CPU参考与流式正确性
+  summarize_vocab_streaming.py    当前版本汇总
+  airllm_llama31_8b_benchmark.py  AirLLM公平对照
+
+real_results/
+  vocab_streaming_report.md       当前实验报告
+  vocab_streaming_summary.json    机器可读汇总
+  airllm/                         AirLLM对照收据
 ```
 
-该值为 1 才表示较短的一侧被完全隐藏。
+## 设计取舍
+
+Cascade-LLM 的目标不是替代通用推理框架，而是研究个人用户单机单请求下，
+CPU→GPU 权重流式化能达到的显存和吞吐边界。
+
+主要取舍：
+
+- 用 14.958 GiB full-pinned CPU 内存换取约 24 GB/s H2D；
+- 用模型专用执行器换取热路径无 Hook、无 meta 转换、无动态权重分配；
+- 用 LM Head 每 Token 额外约 43.7 ms H2D，换取约 1.749 GiB GPU
+  峰值节省；
+- 暂不切矩阵内部 Tile，以避免开发自定义 GEMM。
+
+## 贡献
+
+欢迎通过 Issue 或 Pull Request 提交：
+
+- 其他 Llama 尺寸适配；
+- 长上下文 KV Cache 管理；
+- 调度时间线和 Nsight Systems 分析；
+- pinned staging 优化；
+- INT8/INT4 传输；
+- Linux/NVIDIA 环境复现报告。
+
+提交性能数据时，请同时提供硬件、软件版本、checkpoint、测试 prompt、
+warmup、样本数量、原始 JSON 和正确性结果。合成基准不得标记为真实模型
+端到端结果。
+
+## 致谢
+
+项目思路来源于 [AirLLM](https://github.com/lyogavin/airllm)。感谢
+PyTorch、Hugging Face Transformers、safetensors 和 Meta Llama 社区。
+
+## 许可证与模型条款
+
+本仓库当前尚未包含代码开源许可证。维护者选择并提交正式 `LICENSE`
+之前，请不要假设代码已获得再分发或商用授权。
+
+Llama-3.1-8B 模型权重不属于本项目许可证范围。模型下载和使用必须遵守
+Meta Llama 3.1 License、Acceptable Use Policy 以及模型分发平台条款。

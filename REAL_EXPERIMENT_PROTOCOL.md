@@ -65,7 +65,10 @@ python scripts/download_llama31_8b_modelscope.py
 - `full_pinned`：完整真实checkpoint驻留Pinned CPU内存；
 - `pinned_staging`：完整真实checkpoint驻留pageable RAM，两个Pinned
   staging slot循环复用；
-- GPU常驻区确实包含Embedding、LM Head和Norm；
+- 词表流式模式下，Embedding和LM Head只存在于CPU权重Arena；
+- Embedding只传输当前Token对应的行；
+- LM Head按词表行分块，并验证在线Top-k等价于完整logits Top-k；
+- GPU常驻区只包含当前计划声明的Norm等小型权重；
 - 两个device slot的峰值显存符合当前粒度计划；
 - slot覆写发生在对应H2D/Compute Event完成之后。
 
@@ -89,6 +92,8 @@ python scripts/download_llama31_8b_modelscope.py
 2. 单缓冲串行真实权重；
 3. 整层双缓冲真实权重；
 4. 矩阵双缓冲真实权重；
-5. `full_pinned`和`pinned_staging`分别报告。
+5. 矩阵组加词表常驻真实权重；
+6. 矩阵组加Embedding按行和LM Head词表分块；
+7. `full_pinned`和`pinned_staging`分别报告。
 
 结果必须标明实测、推算或合成校准，三者不得混用。

@@ -1,5 +1,11 @@
 # Llama-3.1-8B 矩阵级双缓冲实现报告
 
+> 历史文档：本文记录词表常驻GPU的上一版实现。当前
+> `llama-3.1-8b`发布分支已经采用Embedding按行传输和LM Head词表分块；
+> 最新架构、实测结果与用法以[`README.md`](README.md)和
+> [`real_results/vocab_streaming_report.md`](real_results/vocab_streaming_report.md)
+> 为准。
+
 测试/实现日期：2026-07-25。
 
 ## 完成范围
