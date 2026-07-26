@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "implementation": "AirLLM",
+  "airllm_version": "3.0.1",
+  "checkpoint": "/ssd/cascade-llm/models/Llama-3.1-8B",
+  "layer_shards_root": "/ssd/cascade-llm/airllm-layer-shards/llama31-8b",
+  "split_before": {
+    "path": "/ssd/cascade-llm/airllm-layer-shards/llama31-8b/splitted_model",
+    "exists": false,
+    "file_count": 0,
+    "bytes": 0
+  },
+  "split_after": {
+    "path": "/ssd/cascade-llm/airllm-layer-shards/llama31-8b/splitted_model",
+    "exists": true,
+    "file_count": 70,
+    "bytes": 16060555480
+  },
+  "split_created_by_run": true,
+  "initialization_seconds": 17.50852771900827,
+  "prompt": "The meaning of life is",
+  "prompt_tokens": 6,
+  "dtype": "torch.bfloat16",
+  "prefetching": true,
+  "compression": null,
+  "streamed_units": 35,
+  "prefill_wall_ms": 7648.59015296679,
+  "prefill_gpu_ms": 7648.53125,
+  "warmup_decode": 1,
+  "decode_repeats": 7,
+  "decode_wall_ms": [
+    6748.104161990341,
+    6664.42999697756,
+    6684.526525961701,
+    6690.6390489893965,
+    6785.592603031546,
+    6748.901781975292,
+    6769.773198000621
+  ],
+  "decode_gpu_ms": [
+    6748.07080078125,
+    6664.39697265625,
+    6684.49365234375,
+    6690.60205078125,
+    6785.5595703125,
+    6748.86962890625,
+    6769.74267578125
+  ],
+  "decode_wall_distribution_ms": {
+    "count": 7,
+    "mean": 6727.423902418065,
+    "median": 6748.104161990341,
+    "p10": 6676.487914368045,
+    "p90": 6776.100960012991,
+    "min": 6664.42999697756,
+    "max": 6785.592603031546
+  },
+  "decode_gpu_distribution_ms": {
+    "count": 7,
+    "mean": 6727.390764508928,
+    "median": 6748.07080078125,
+    "p10": 6676.45498046875,
+    "p90": 6776.06943359375,
+    "min": 6664.39697265625,
+    "max": 6785.5595703125
+  },
+  "profile_repeats": 1,
+  "profile_rows": [
+    {
+      "wall_ms": 6726.378204999492,
+      "gpu_ms": 6726.345703125,
+      "load_calls": 35,
+      "load_wall_ms": 4988.72123286128,
+      "move_calls": 35,
+      "move_wall_ms": 1443.9215189195238,
+      "move_gpu_ms": 1442.0962188839912,
+      "move_bytes": 16060522496,
+      "move_pinned_bytes": 0
+    }
+  ],
+  "before_init": {
+    "rss_bytes": 420143104,
+    "vms_bytes": 5892644864,
+    "read_bytes": 0,
+    "write_bytes": 4096,
+    "vm_locked_bytes": 0,
+    "rss_anon_bytes": 236470272,
+    "rss_file_bytes": 183672832
+  },
+  "after_init": {
+    "rss_bytes": 712953856,
+    "vms_bytes": 14233657344,
+    "read_bytes": 0,
+    "write_bytes": 16090337280,
+    "vm_locked_bytes": 0,
+    "rss_anon_bytes": 388698112,
+    "rss_file_bytes": 315863040
+  },
+  "measured_decode_io_delta": {
+    "read_bytes": 0,
+    "write_bytes": 0
+  },
+  "cuda_peak_allocated_bytes": 1061569024,
+  "cuda_peak_reserved_bytes": 1075838976,
+  "generated_token_ids": [
+    [
+      311,
+      1505,
+      701,
+      8352,
+      13,
+      578,
+      7580,
+      315,
+      2324,
+      374
+    ]
+  ],
+  "first_eight_generated_token_ids": [
+    [
+      311,
+      1505,
+      701,
+      8352,
+      13,
+      578,
+      7580,
+      315
+    ]
+  ],
+  "generated_text": " to find your gift. The purpose of life is",
+  "torch_version": "2.4.1+cu121",
+  "transformers_version": "4.57.6",
+  "cuda_visible_devices": "0"
+}

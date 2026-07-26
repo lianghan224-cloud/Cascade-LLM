@@ -125,6 +125,49 @@ bash scripts/restart_airllm_cn_mirror.sh --clean
 使用后续统一benchmark脚本，不能把AirLLM初始化拆分时间计入单Token
 decode口径。
 
+### AirLLM 8B 单卡真实对比
+
+在GPU0上使用同一Llama-3.1-8B BF16 checkpoint、同一6-token prompt、
+batch=1、1次decode warmup和7次稳态decode进行对比。AirLLM为3.0.1、
+默认预取且不压缩；Cascade为`full_pinned + matrix + 2 slots`。
+
+| 指标 | AirLLM 3.0.1 | Cascade |
+|---|---:|---:|
+| 稳态中位延迟 | 6555.016 ms/token | 582.340 ms/token |
+| 稳态速度 | 0.153 token/s | 1.717 token/s |
+| P10–P90 | 6534.794–6568.603 ms | 582.281–582.413 ms |
+| Prefill | 7381.899 ms | 727.397 ms |
+| CUDA peak allocated | 0.989 GiB | 2.197 GiB |
+| CUDA peak reserved | 1.002 GiB | 2.223 GiB |
+
+Cascade在该口径下是AirLLM的**11.26倍**速度，但CUDA peak allocated是
+AirLLM的2.22倍，多用约1.209 GiB。AirLLM逐token传输全部35个单元；
+诊断得到权重读取/映射累计4988.721 ms，H2D/参数安装累计1442.096 ms，
+有效H2D吞吐11.137 GB/s，进入H2D的pinned权重实测为0 B。Cascade把
+Embedding、LM Head和Norm常驻，只传输Transformer矩阵，H2D累计
+580.558 ms、有效吞吐24.044 GB/s。
+
+两者在测量窗口的物理磁盘读取均为0 B，前8个greedy token完全一致。
+AirLLM的低显存来自逐层流式加载所有模块；Cascade多用显存换取常驻输出层、
+预分配双slot和全量CPU锁页权重。完整报告见
+[`real_results/airllm/comparison_report.md`](real_results/airllm/comparison_report.md)。
+
+复现AirLLM：
+
+```bash
+CUDA_VISIBLE_DEVICES=0 \
+  /ssd/cascade-llm/venvs/airllm/bin/python \
+  benchmarks/airllm_llama31_8b_benchmark.py \
+  --checkpoint /ssd/cascade-llm/models/Llama-3.1-8B \
+  --layer-shards-root /ssd/cascade-llm/airllm-layer-shards/llama31-8b \
+  --warmup-decode 1 \
+  --decode-repeats 7 \
+  --profile-repeats 1 \
+  --output real_results/airllm/bench_airllm_bf16_prefetch_gpu0.json
+
+.venv/bin/python benchmarks/summarize_airllm_comparison.py
+```
+
 ## 历史合成硬件校准
 
 `results/`和仓库根目录的旧H2D数据是开发真实运行时之前的合成硬件校准，
