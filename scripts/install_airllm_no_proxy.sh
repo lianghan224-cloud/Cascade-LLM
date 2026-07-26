@@ -18,6 +18,7 @@ AIRLLM_MODEL_PATH="${AIRLLM_MODEL_PATH:-${AIRLLM_STORAGE_ROOT}/models/Llama-3.1-
 AIRLLM_INSTALL_RECEIPT="${AIRLLM_INSTALL_RECEIPT:-${CASCADE_ROOT}/real_results/airllm/install_receipt.json}"
 AIRLLM_PYPI_INDEX="${AIRLLM_PYPI_INDEX:-https://pypi.org/simple}"
 AIRLLM_TORCH_INDEX="${AIRLLM_TORCH_INDEX:-https://download.pytorch.org/whl/cu121}"
+AIRLLM_TORCH_WHEEL_URL="${AIRLLM_TORCH_WHEEL_URL:-}"
 
 # Clear both conventional and lowercase proxy variables. Git commands below
 # also override configured HTTP proxies for this invocation.
@@ -64,6 +65,9 @@ printf '  virtual environment: %s\n' "${AIRLLM_VENV}"
 printf '  model checkpoint: %s\n' "${AIRLLM_MODEL_PATH}"
 printf '  Python package index: %s\n' "${AIRLLM_PYPI_INDEX}"
 printf '  PyTorch package index: %s\n' "${AIRLLM_TORCH_INDEX}"
+if [[ -n "${AIRLLM_TORCH_WHEEL_URL}" ]]; then
+    printf '  PyTorch wheel override: %s\n' "${AIRLLM_TORCH_WHEEL_URL}"
+fi
 
 GIT_DIRECT=(git -c http.proxy= -c https.proxy=)
 "${GIT_DIRECT[@]}" ls-remote https://github.com/lyogavin/airllm.git "${AIRLLM_COMMIT}" >/dev/null
@@ -130,14 +134,23 @@ if [[ ! -x "${AIRLLM_VENV}/bin/python" ]]; then
 fi
 
 # Install the same CUDA-enabled PyTorch major/minor used by the Cascade
-# experiment. The explicit local version prevents selecting the CPU-only PyPI
-# wheel.
-uv pip install \
-    --python "${AIRLLM_VENV}/bin/python" \
-    --index-url "${AIRLLM_PYPI_INDEX}" \
-    --extra-index-url "${AIRLLM_TORCH_INDEX}" \
-    --index-strategy unsafe-best-match \
-    "torch==2.4.1+cu121"
+# experiment. Some domestic mirrors host the CUDA wheel but omit its local
+# version (`+cu121`) from their PEP 503 index. In that case the wrapper passes
+# the already-probed wheel URL directly, while dependencies still resolve
+# through the selected PyPI mirror and reuse the persistent uv cache.
+if [[ -n "${AIRLLM_TORCH_WHEEL_URL}" ]]; then
+    uv pip install \
+        --python "${AIRLLM_VENV}/bin/python" \
+        --index-url "${AIRLLM_PYPI_INDEX}" \
+        "${AIRLLM_TORCH_WHEEL_URL}"
+else
+    uv pip install \
+        --python "${AIRLLM_VENV}/bin/python" \
+        --index-url "${AIRLLM_PYPI_INDEX}" \
+        --extra-index-url "${AIRLLM_TORCH_INDEX}" \
+        --index-strategy unsafe-best-match \
+        "torch==2.4.1+cu121"
+fi
 
 # Use a stable Transformers 4.x API surface. AirLLM 3.0.1 declares
 # transformers>=4.49,<5.13, but a 4.x cap avoids introducing a future major API

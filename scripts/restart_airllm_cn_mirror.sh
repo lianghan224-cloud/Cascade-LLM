@@ -28,7 +28,7 @@ AIRLLM_INSTALL_LOG="${AIRLLM_INSTALL_LOG:-${CASCADE_ROOT}/real_results/airllm/in
 
 AIRLLM_PYPI_INDEX="${AIRLLM_PYPI_INDEX:-https://mirrors.aliyun.com/pypi/simple}"
 AIRLLM_TORCH_INDEX="${AIRLLM_TORCH_INDEX:-https://mirrors.aliyun.com/pytorch-wheels/cu121}"
-TORCH_PROBE_URL="${AIRLLM_TORCH_INDEX}/torch-2.4.1%2Bcu121-cp311-cp311-linux_x86_64.whl"
+AIRLLM_TORCH_WHEEL_URL="${AIRLLM_TORCH_WHEEL_URL:-${AIRLLM_TORCH_INDEX}/torch-2.4.1%2Bcu121-cp311-cp311-linux_x86_64.whl}"
 
 unset http_proxy https_proxy all_proxy no_proxy
 unset HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY
@@ -121,7 +121,7 @@ MIRROR_SPEED="$(
         --silent \
         --show-error \
         --write-out '%{speed_download}' \
-        "${TORCH_PROBE_URL}"
+        "${AIRLLM_TORCH_WHEEL_URL}"
 )"
 printf 'Aliyun probe speed: %s bytes/s\n' "${MIRROR_SPEED}"
 if ! awk -v speed="${MIRROR_SPEED}" 'BEGIN {exit !(speed >= 1048576)}'; then
@@ -131,11 +131,13 @@ fi
 
 export AIRLLM_PYPI_INDEX
 export AIRLLM_TORCH_INDEX
+export AIRLLM_TORCH_WHEEL_URL
 export AIRLLM_UV_CACHE
 
 printf 'Restarting AirLLM installation with domestic mirrors.\n'
 printf '  PyPI: %s\n' "${AIRLLM_PYPI_INDEX}"
 printf '  PyTorch: %s\n' "${AIRLLM_TORCH_INDEX}"
+printf '  PyTorch wheel: %s\n' "${AIRLLM_TORCH_WHEEL_URL}"
 printf '  log: %s\n' "${AIRLLM_INSTALL_LOG}"
 
 set -o pipefail
