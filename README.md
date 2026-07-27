@@ -1,411 +1,272 @@
 # Cascade-LLM
 
-面向个人用户单机单卡场景的 CPU 常驻权重流式推理运行时。
+面向个人用户单机单卡场景的 CPU 常驻权重流式推理研究原型。项目思路来源于
+[AirLLM](https://github.com/lyogavin/airllm)，当前分支在真实
+Llama-3.1-70B-Instruct W8A8 checkpoint 上验证细粒度 H2D、双缓冲和
+CPU 锁页内存策略。
 
-Cascade-LLM 将完整 Llama-3.1-8B BF16 权重保存在 CPU 内存，只把当前
-计算需要的矩阵组异步传入 GPU。Embedding 按 Token ID 查行，LM Head
-沿词表方向分块并在线归并全局 Top-k，从而在消费级显卡上同时降低显存和
-逐 Token 延迟。
-
-> 当前发布分支：`llama-3.1-8b`
+> 当前分支：`llama-3.1-70b-int8`
 >
-> 状态：研究原型；已在真实 Llama-3.1-8B 权重和 RTX 3080 Ti 上验证。
+> 8B 稳定实验保留在 `llama-3.1-8b` 分支。
 
-## 实测摘要
+## 真实实验结果
 
-统一测试条件：
+测试环境：
 
-- 模型：Meta-Llama-3.1-8B，BF16，8,030,261,248 参数；
-- GPU：NVIDIA RTX 3080 Ti 12 GB，PCIe Gen4 x16；
+- 模型：`RedHatAI/Meta-Llama-3.1-70B-Instruct-quantized.w8a8`；
+- 固定 revision：`8d0dcbba33eeef589b0a607e46abe05a5a6431a8`；
+- 15 个 safetensors，1,283 个 tensor，精确载荷 72,669,806,592 bytes；
+- 560 个 INT8 线性权重，723 个 BF16 scale、norm、Embedding 和 LM Head；
+- GPU：单张 NVIDIA RTX 3080 Ti 12 GiB；
 - CPU：AMD Threadripper 3970X，125 GiB RAM；
-- batch=1，6-token prompt，1 次 decode 预热，7 次稳态 decode；
-- 单卡运行，KV Cache 保存在 GPU；
-- 显存指标为 `torch.cuda.max_memory_allocated`。
+- PyTorch 2.4.1+cu121，Transformers 4.45.2；
+- batch=1，6-token prompt，单 token 自回归 decode。
 
-| 实现 | 中位延迟 | 速度 | CUDA 峰值显存 |
-|---|---:|---:|---:|
-| AirLLM 3.0.1，BF16，热分层文件 | 6555.016 ms/token | 0.153 token/s | 0.989 GiB |
-| Cascade 上一版，词表常驻 GPU | 582.340 ms/token | 1.717 token/s | 2.197 GiB |
-| **Cascade 当前版，词表流式化** | **624.162 ms/token** | **1.602 token/s** | **0.448 GiB** |
+| CPU 权重模式 | Transformer 粒度 | Slot | 中位延迟 | 速度 | H2D | CUDA 峰值显存 | 锁页 CPU 内存 |
+|---|---|---:|---:|---:|---:|---:|---:|
+| full_pinned | 矩阵 | 1 | 3680.545 ms | 0.272 token/s | 24.052 GB/s | 0.670 GiB | 67.684 GiB |
+| **full_pinned** | **矩阵** | **2** | **2965.803 ms** | **0.337 token/s** | **24.064 GB/s** | **1.327 GiB** | **67.684 GiB** |
+| full_pinned | 层 | 2 | 2985.189 ms | 0.335 token/s | 24.085 GB/s | 2.483 GiB | 67.684 GiB |
+| pinned_staging | 矩阵 | 1 | 7268.460 ms | 0.138 token/s | 21.536 GB/s | 0.670 GiB | 0.348 GiB |
+| pinned_staging | 矩阵 | 2 | 6190.552 ms | 0.162 token/s | 16.843 GB/s | 1.326 GiB | 0.692 GiB |
+| pinned_staging | 矩阵组 | 2 | 6815.273 ms | 0.147 token/s | 18.742 GB/s | 1.764 GiB | 1.129 GiB |
+| **pinned_staging** | **层** | **2** | **5695.903 ms** | **0.176 token/s** | **12.644 GB/s** | **2.483 GiB** | **1.848 GiB** |
 
-当前版本相对 AirLLM：
+推荐配置：
 
-- 逐 Token 速度提升 **10.50 倍**；
-- CUDA 峰值显存降低 **54.65%**，少用约 553 MiB；
-- Prefill 从 7381.899 ms 降至 746.872 ms；
-- H2D 有效吞吐从 11.137 GB/s 提高到约 24.04 GB/s。
+- 专用推理机器：`full_pinned + matrix + slots=2`；
+- 无法锁定约 67.7 GiB 内存：`pinned_staging + layer + slots=2`。
 
-当前版本相对 Cascade 上一版：
+主配置的关键结论：
 
-- CUDA 峰值显存从 2.197 GiB 降至 0.448 GiB，降低 **4.90 倍**；
-- 节省 79.60% / 1.749 GiB；
-- 保留 93.30% 吞吐，延迟增加 7.18%。
+- 相对同粒度单缓冲提速 1.241×；
+- 实测 CUDA 峰值权重路径显存 1.327 GiB；
+- 相对完整 67.679 GiB checkpoint tensor 载荷缩减 51.01×，节省 98.04%；
+- 每 token 传输 70.566 GB 权重；
+- Transformer H2D 为 2845.051 ms，有效吞吐 24.064 GB/s；
+- Transformer compute 为 680.513 ms，其中 GPU BF16 解量化 489.726 ms；
+- Transformer 与 LM Head 的 H2D event 总和为 2932.486 ms，占 token wall
+  的 98.88%；
+- 双缓冲隐藏了约 96.65% 的可重叠计算时间。
 
-详细原始数据见：
+完整 70B INT8 权重无法装入 12 GiB GPU，因此没有伪造“普通 full-GPU”
+速度基线。51.01× 是精确 checkpoint 载荷与实测流式 CUDA peak 的显存口径
+对比，不是 full-GPU 端到端速度倍数。
 
-- [`real_results/vocab_streaming_report.md`](real_results/vocab_streaming_report.md)
-- [`real_results/vocab_streaming_summary.json`](real_results/vocab_streaming_summary.json)
-- [`real_results/airllm/comparison_report.md`](real_results/airllm/comparison_report.md)
+详细报告和原始收据：
+
+- [`real_results/70b_int8/report.html`](real_results/70b_int8/report.html)
+- [`real_results/70b_int8/summary.json`](real_results/70b_int8/summary.json)
+- [`real_results/70b_int8/checkpoint_validation.json`](real_results/70b_int8/checkpoint_validation.json)
+- [`real_results/70b_int8/`](real_results/70b_int8/)
 
 ## 架构
 
 ```text
-               CPU DRAM
-    ┌────────────────────────────────┐
-    │ 完整 BF16 权重 Arena           │
-    │                                │
-    │ Embedding [V,H]：按 Token 查行 │
-    │ Transformer：按矩阵组连续布局  │
-    │ LM Head [V,H]：按词表行分块    │
-    └───────────────┬────────────────┘
-                    │ H2D
-                    ▼
-                 GPU VRAM
-    ┌────────────────────────────────┐
-    │ Slot A：当前矩阵组             │
-    │ Slot B：下一矩阵组预取         │
-    │ Norm：小型常驻区               │
-    │ KV Cache：随上下文增长         │
-    └────────────────────────────────┘
+                         CPU DRAM
+  ┌──────────────────────────────────────────────────────┐
+  │ 72.67 GB 混合 dtype checkpoint arena                 │
+  │                                                      │
+  │ full_pinned：按传输单元边界拆成多个锁页 chunk         │
+  │ pinned_staging：pageable 全量 arena + 有限锁页 slot   │
+  └─────────────────────────┬────────────────────────────┘
+                            │ INT8/BF16 H2D
+                            ▼
+                          GPU VRAM
+  ┌──────────────────────────────────────────────────────┐
+  │ Raw Slot A/B：checkpoint 原始 INT8 权重              │
+  │ BF16 Workspace A/B：按矩阵复用的解量化输出           │
+  │ 小型常驻区：norm 与 scale                            │
+  │ Embedding：只传当前 token 行                         │
+  │ LM Head：沿词表分块传输并在线合并 Top-k              │
+  └──────────────────────────────────────────────────────┘
 
-       Copy Stream ∥ Compute Stream
+           H2D Copy Stream  ∥  Compute Stream
 ```
 
-### Transformer 矩阵组
+### Transformer
 
-每个 Decoder Layer 分成四个完整矩阵组：
+最低调度粒度为一个完整矩阵，不切矩阵内部 Tile，也不开发自定义 GEMM。
+70B 模型共有 80 个 Decoder Layer；每层 7 个线性矩阵，因此矩阵粒度每
+token 有 560 个 Transformer 传输单元。
 
-| 顺序 | 矩阵组 | BF16 权重大小 |
-|---:|---|---:|
-| 1 | Q + K + V | 48 MiB |
-| 2 | Attention O | 32 MiB |
-| 3 | MLP Gate + Up | 224 MiB |
-| 4 | MLP Down | 112 MiB |
-
-最大矩阵组为 224 MiB，因此运行时预分配两个 224 MiB GPU Slot。当前版本
-不切单个矩阵内部 Tile，也不使用自定义 CUDA 算子；组内计算仍调用标准
-PyTorch `F.linear`、SDPA、RMSNorm 和逐元素算子。
-
-### Embedding 按行传输
-
-Embedding 权重保持 CPU 行连续布局。Prefill 只收集输入 Token 对应的行，
-单 Token decode 只传：
+运行时直接传输 checkpoint 中的 INT8 矩阵和 BF16 per-output-channel
+scale，在 GPU 的可复用 workspace 中执行：
 
 ```text
-1 × 4096 × BF16 = 8 KiB
+BF16_weight = INT8_weight × BF16_scale
 ```
 
-因此不需要在 GPU 上完整保存约 0.979 GiB Embedding。
+随后调用标准 PyTorch BF16 `F.linear`、SDPA、RMSNorm、RoPE 和 SwiGLU。
+这能验证 CPU 常驻权重与 H2D 流水，但不是最终的 W8A8 activation-quantized
+kernel。
 
-### LM Head 词表分块
+### Embedding 和 LM Head
 
-Llama-3.1-8B 的 LM Head 为 `[128256, 4096]`。运行时沿词表方向切成
-约 128 MiB 的连续行块：
+- Embedding 为 BF16 `[V,H]`，按输入 token ID 只提取并传输需要的行；
+- LM Head 为 BF16 `[V,H]`，按 8,192 行、约 128 MiB 分成 16 块；
+- 每块计算局部 logits，再在线维护全局 Top-k；
+- 不需要让约 1.96 GiB 的完整词表矩阵常驻 GPU。
 
-```text
-每个完整块：16,384 行
-分块数量：8
-最后一块：13,568 行
-```
+## 为什么两种模式的最优粒度不同
 
-每块完成 H2D 后调用标准 `F.linear` 计算局部 logits，再使用
-`torch.topk` 将局部 Top-k 与当前全局候选归并。该过程不进行近似词表
-裁剪，连续 8 个 greedy Token 已与 CPU 参考完全一致。
+`full_pinned` 的 CPU 权重可以直接异步 H2D。层粒度和矩阵粒度都能跑满约
+24 GB/s，矩阵粒度还快 0.65%，并少用约 1.16 GiB GPU 显存，因此选
+矩阵。
 
-Llama-3.1-8B 的 `tie_word_embeddings=false`，因此 Embedding 和
-LM Head 共享布局和调度代码，但保留 checkpoint 中两份不同的数值权重。
+`pinned_staging` 需要先做 pageable DRAM→锁页 slot 的 CPU copy。细分为
+560 个矩阵后，staging 生产者频繁同步并与 H2D 竞争内存带宽；本机实测层
+粒度虽然 H2D event 吞吐更低，但端到端 source wait 更少，最终比矩阵双缓冲
+快 8.73%。因此“粒度越细越快”并不成立。
 
-## 与 AirLLM 的架构区别
+## 环境
 
-| 项目 | AirLLM | Cascade-LLM |
-|---|---|---|
-| CPU 权重 | 按层文件映射/page cache | 连续 CPU Arena |
-| H2D 来源 | 实测为 pageable Tensor | full-pinned 或 pinned staging |
-| GPU 权重分配 | Hook 动态安装、转 meta、释放 | 启动时预分配双 Slot |
-| Transformer 粒度 | 完整层/模块 | 完整矩阵组 |
-| Embedding | 完整模块装载 | 只传所需行 |
-| LM Head | 完整模块装载 | 128 MiB 词表块 |
-| 计算/传输重叠 | 主要预取下一层到 CPU | CUDA Copy/Compute 双流 |
-| 模型通用性 | 较强 | 当前专门适配 Llama-3.1-8B |
-| 锁页内存要求 | 较低 | full_pinned 约 14.958 GiB |
+建议：
 
-Cascade-LLM 选择模型专用执行器和更强的 CPU 内存约束，换取更低的 GPU
-显存、更高 H2D 吞吐和稳定的单请求延迟。
-
-## 支持范围
-
-当前已支持：
-
-- Llama-3.1-8B BF16 safetensors；
-- batch=1、无 Padding 的 Prefill；
-- 单 Token 自回归 Decode；
-- GQA、RoPE、SDPA、RMSNorm 和 SwiGLU MLP；
-- GPU 常驻 KV Cache；
-- `full_pinned` 与 `pinned_staging` 两种 CPU 权重模式；
-- `matrix`、`matrix_group` 和 `layer` 三种 Transformer 粒度；
-- Embedding 按行提取；
-- LM Head 词表分块和在线 Top-k；
-- 单卡 CUDA 执行。
-
-当前不支持或尚未优化：
-
-- 多请求连续批处理和动态 Batch；
-- Tensor Parallel / Pipeline Parallel；
-- 单矩阵内部 Tile 流水；
-- 自定义或融合 CUDA Kernel；
-- INT8/INT4 权重传输；
-- 分页、量化或 CPU Offload KV Cache；
-- 通用 Hugging Face 模型自动适配；
-- Windows 和 macOS。
-
-## 环境要求
-
-已验证环境：
-
-- Ubuntu 20.04；
-- Python 3.8；
+- Linux + NVIDIA CUDA；
+- Python 3.8+；
 - PyTorch 2.4.1 + CUDA 12.1；
 - Transformers 4.45.2；
-- 支持 BF16 的 NVIDIA GPU；
-- 推荐至少 32 GiB 系统内存；
-- `full_pinned` 需要能够锁定约 14.958 GiB CPU 内存；
-- 模型目录和缓存建议保留至少 30 GiB SSD 空间。
+- 至少 90 GiB 可用系统内存；
+- 至少 85 GiB SSD 空间保存 checkpoint；
+- `full_pinned` 需要约 67.7 GiB 可锁页内存和足够高的 memlock 限额；
+- `pinned_staging` 不要求锁定完整权重。
 
-12 GB 显卡不是硬性下限；短上下文权重峰值约 0.448 GiB，但实际需求还包括
-CUDA Context、activation、workspace 和随上下文增长的 KV Cache。
-
-Llama-3.1-8B BF16 KV Cache 约为 128 KiB/Token：
-
-| 上下文长度 | KV Cache 估算 |
-|---:|---:|
-| 2K | 256 MiB |
-| 4K | 512 MiB |
-| 8K | 1 GiB |
-| 32K | 4 GiB |
-
-## 快速开始
-
-### 1. 克隆发布分支
-
-```bash
-git clone --branch llama-3.1-8b \
-  https://github.com/lianghan224-cloud/Cascade-LLM.git
-cd Cascade-LLM
-```
-
-### 2. 创建 Python 环境
+创建环境：
 
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
-
-# CUDA 12.1 PyTorch
-.venv/bin/pip install \
-  torch==2.4.1 \
+.venv/bin/pip install torch==2.4.1 \
   --index-url https://download.pytorch.org/whl/cu121
-
 .venv/bin/pip install -r requirements-bench.txt
 ```
 
-验证 CUDA：
+## 获取模型
+
+模型权重不在 Git 仓库中。国内镜像、清除代理、固定 revision、断点续传：
 
 ```bash
-.venv/bin/python -c \
-  "import torch; print(torch.__version__, torch.cuda.is_available())"
+bash scripts/download_llama31_70b_int8_cn.sh
 ```
 
-### 3. 配置持久化目录
+可以覆盖目标目录或并发数：
 
 ```bash
-cp .env.example .env.local
+MODEL_DIR=/ssd/cascade-llm/models/Llama-3.1-70B-Instruct-W8A8 \
+DOWNLOAD_WORKERS=4 \
+bash scripts/download_llama31_70b_int8_cn.sh
 ```
 
-默认模型目录为：
+中断后运行同一命令即可继续，不要删除 `.cache` 或 `.incomplete` 文件。
 
-```text
-/ssd/cascade-llm/models/Llama-3.1-8B
-```
+## 运行真实实验
 
-如需修改，请编辑 `.env.local`。该文件被 Git 忽略，不要在其中保存
-Hugging Face Token 或其他凭据。
-
-加载环境变量：
+先验证 checkpoint：
 
 ```bash
-source scripts/activate_env.sh
+.venv/bin/python benchmarks/validate_llama31_70b_int8_checkpoint.py \
+  --checkpoint /ssd/cascade-llm/models/Llama-3.1-70B-Instruct-W8A8 \
+  --output real_results/70b_int8/checkpoint_validation.json
 ```
 
-### 4. 获取模型权重
-
-模型权重不包含在本仓库中。请遵守 Meta Llama 3.1 License 和
-Acceptable Use Policy。
-
-通过 Hugging Face 官方受限仓库：
-
-```bash
-huggingface-cli login
-.venv/bin/python scripts/download_llama31_8b.py
-```
-
-网络受限时，可使用固定 revision、逐文件 SHA-256 校验的 ModelScope
-下载器：
-
-```bash
-.venv/bin/python scripts/download_llama31_8b_modelscope.py
-```
-
-下载器支持断点续传，不会把模型或访问凭据提交到 Git。
-
-### 5. 检查环境
-
-```bash
-source scripts/activate_env.sh
-.venv/bin/python scripts/check_real_environment.py
-```
-
-### 6. 运行生成
-
-推荐的高性能配置：
-
-```bash
-CUDA_VISIBLE_DEVICES=0 .venv/bin/python tools/run_llama31.py \
-  --checkpoint "${CASCADE_LLAMA31_8B}" \
-  --weight-store full_pinned \
-  --granularity matrix_group \
-  --vocab-mode streamed \
-  --top-k 10 \
-  --prompt "The meaning of life is" \
-  --max-new-tokens 8
-```
-
-锁页内存不足时：
-
-```bash
-CUDA_VISIBLE_DEVICES=0 .venv/bin/python tools/run_llama31.py \
-  --checkpoint "${CASCADE_LLAMA31_8B}" \
-  --weight-store pinned_staging \
-  --granularity matrix_group \
-  --vocab-mode streamed \
-  --top-k 10 \
-  --max-new-tokens 8
-```
-
-`pinned_staging` 减少锁页内存，但增加 CPU pageable→pinned 拷贝，速度会
-明显低于 `full_pinned`。
-
-## 复现实验
-
-正式 7 次稳态 Decode 基准：
+推荐的 full-pinned 矩阵双缓冲：
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 .venv/bin/python \
-  benchmarks/real_llama31_benchmark.py \
-  --checkpoint "${CASCADE_LLAMA31_8B}" \
+  benchmarks/real_llama31_70b_int8_benchmark.py \
+  --checkpoint /ssd/cascade-llm/models/Llama-3.1-70B-Instruct-W8A8 \
   --weight-store full_pinned \
-  --granularity matrix_group \
-  --vocab-mode streamed \
-  --top-k 10 \
+  --granularity matrix \
   --slots 2 \
-  --warmup-decode 1 \
-  --decode-repeats 7 \
-  --profile-repeats 3 \
-  --output real_results/bench_full_pinned_matrix_group_vocab_streamed_s2.json
+  --decode-repeats 3 \
+  --profile-repeats 2 \
+  --output real_results/70b_int8/bench_full_pinned_matrix_s2_repeat.json
 ```
 
-重新生成汇总：
+低锁页内存的 staging 层双缓冲：
 
 ```bash
-.venv/bin/python benchmarks/summarize_vocab_streaming.py
+CUDA_VISIBLE_DEVICES=0 .venv/bin/python \
+  benchmarks/real_llama31_70b_int8_benchmark.py \
+  --checkpoint /ssd/cascade-llm/models/Llama-3.1-70B-Instruct-W8A8 \
+  --weight-store pinned_staging \
+  --granularity layer \
+  --slots 2 \
+  --decode-repeats 3 \
+  --profile-repeats 2 \
+  --output real_results/70b_int8/bench_pinned_staging_layer_s2_repeat.json
 ```
 
-运行测试：
+加载阶段会真实读取约 72.67 GB 权重到 CPU。推理测量窗口内权重从 CPU
+DRAM 读取并传往 GPU，不是从 SSD 逐层读取；重复实验的 decode I/O 增量仅
+为少量系统元数据读取。
+
+重新汇总和生成报告：
+
+```bash
+.venv/bin/python benchmarks/summarize_llama31_70b_int8.py
+.venv/bin/python benchmarks/build_llama31_70b_int8_artifact.py
+```
+
+运行单元测试：
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-当前分支应通过 11 项单元测试。
+## 正确性边界
 
-真实模型实验的证据标准见
-[`REAL_EXPERIMENT_PROTOCOL.md`](REAL_EXPERIMENT_PROTOCOL.md)。
+已经验证：
 
-## 正确性
+- checkpoint key、shape、dtype 和总字节数全部匹配；
+- `full_pinned` 与 `pinned_staging` 推荐模式连续 6 步生成相同 token；
+- 两种模式每一步的 Top-10 完全相同；
+- 生成文本为 ` not just about technology, but`。
 
-当前版本与 Transformers CPU 参考连续比较 8 个 greedy Token：
+尚未验证：
 
-- Token ID 8/8 完全一致；
-- 完整 logits 形状为 `[8, 128256]`；
-- 最低 cosine similarity 为 0.999739；
-- 最大绝对误差为 0.265625；
-- Top-10 overlap 为 9～10/10。
-
-原始收据：
-
-- [`real_results/correctness_vocab_streamed_matrix_group_8token.json`](real_results/correctness_vocab_streamed_matrix_group_8token.json)
-- [`real_results/correctness_comparison_vocab_streamed_matrix_group_8token.json`](real_results/correctness_comparison_vocab_streamed_matrix_group_8token.json)
+- 当前环境没有安装官方 `compressed_tensors` 执行参考；
+- 尚未做本运行时与官方 W8A8 kernel 的逐层 activation/logits 对比；
+- 因此不能宣称模型级完整数值等价；
+- 尚未测长上下文、批处理、多请求和多 GPU。
 
 ## 项目结构
 
 ```text
 layer_streaming/
-  plan.py          静态权重布局、矩阵组和词表分块计划
-  weight_store.py  full_pinned / pinned_staging CPU Arena
-  runtime.py       GPU双Slot、CUDA Stream和Event调度
-  llama31.py       Llama-3.1-8B执行器与KV Cache
-  vocab.py         Embedding按行和LM Head在线Top-k
-
-tools/
-  run_llama31.py   本地生成入口
+  int8.py          70B 混合 dtype 计划、CPU store、GPU slot 与解量化流水
+  llama31.py       通用 Llama-3.1 decode 执行器与 KV cache
+  vocab.py         Embedding 按行和 LM Head 分块在线 Top-k
 
 benchmarks/
-  real_llama31_benchmark.py       真实端到端基准
-  real_llama31_correctness.py     CPU参考与流式正确性
-  summarize_vocab_streaming.py    当前版本汇总
-  airllm_llama31_8b_benchmark.py  AirLLM公平对照
+  real_llama31_70b_int8_benchmark.py       真实端到端实验
+  validate_llama31_70b_int8_checkpoint.py  checkpoint 完整性校验
+  summarize_llama31_70b_int8.py            汇总与 QA
+  build_llama31_70b_int8_artifact.py       可移植报告数据构建
 
-real_results/
-  vocab_streaming_report.md       当前实验报告
-  vocab_streaming_summary.json    机器可读汇总
-  airllm/                         AirLLM对照收据
+real_results/70b_int8/
+  bench_*.json                原始实验收据
+  checkpoint_validation.json  checkpoint 校验
+  summary.json                机器可读汇总
+  report.html                 可移植详细报告
 ```
 
 ## 设计取舍
 
-Cascade-LLM 的目标不是替代通用推理框架，而是研究个人用户单机单请求下，
-CPU→GPU 权重流式化能达到的显存和吞吐边界。
+- 用约 67.7 GiB full-pinned CPU 内存换取约 24 GB/s H2D；
+- 用两个 raw INT8 slot 和两个 BF16 workspace 换取传输/计算重叠；
+- 用矩阵粒度节省显存，但不在矩阵内部切 Tile；
+- 用模型专用执行器换取无 Hook、无 meta 转换、热路径无权重分配；
+- 暂不将当前 BF16 解量化执行路径包装成“原生 W8A8 性能”。
 
-主要取舍：
-
-- 用 14.958 GiB full-pinned CPU 内存换取约 24 GB/s H2D；
-- 用模型专用执行器换取热路径无 Hook、无 meta 转换、无动态权重分配；
-- 用 LM Head 每 Token 额外约 43.7 ms H2D，换取约 1.749 GiB GPU
-  峰值节省；
-- 暂不切矩阵内部 Tile，以避免开发自定义 GEMM。
-
-## 贡献
-
-欢迎通过 Issue 或 Pull Request 提交：
-
-- 其他 Llama 尺寸适配；
-- 长上下文 KV Cache 管理；
-- 调度时间线和 Nsight Systems 分析；
-- pinned staging 优化；
-- INT8/INT4 传输；
-- Linux/NVIDIA 环境复现报告。
-
-提交性能数据时，请同时提供硬件、软件版本、checkpoint、测试 prompt、
-warmup、样本数量、原始 JSON 和正确性结果。合成基准不得标记为真实模型
-端到端结果。
-
-## 致谢
-
-项目思路来源于 [AirLLM](https://github.com/lyogavin/airllm)。感谢
-PyTorch、Hugging Face Transformers、safetensors 和 Meta Llama 社区。
+下一阶段重点是官方参考正确性、融合 INT8/W8A8 kernel、KV cache 分页和
+长上下文显存管理。
 
 ## 许可证与模型条款
 
-本仓库当前尚未包含代码开源许可证。维护者选择并提交正式 `LICENSE`
-之前，请不要假设代码已获得再分发或商用授权。
+本仓库当前尚未包含代码开源许可证。维护者提交正式 `LICENSE` 前，请不要
+假设代码已获得再分发或商用授权。
 
-Llama-3.1-8B 模型权重不属于本项目许可证范围。模型下载和使用必须遵守
-Meta Llama 3.1 License、Acceptable Use Policy 以及模型分发平台条款。
+模型权重不属于本仓库许可证范围。下载与使用必须遵守 Meta Llama 3.1
+License、Acceptable Use Policy 和模型分发平台条款。

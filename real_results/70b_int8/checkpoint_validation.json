@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-07-27T04:12:36.255840+00:00",
+  "checkpoint": "/ssd/cascade-llm/models/Llama-3.1-70B-Instruct-W8A8",
+  "safetensor_shards": 15,
+  "expected_tensor_count": 1283,
+  "actual_tensor_count": 1283,
+  "dtype_counts": {
+    "BF16": 723,
+    "I8": 560
+  },
+  "tensor_payload_bytes": 72669806592,
+  "plan_host_arena_bytes": 72669806592,
+  "missing": [],
+  "extra": [],
+  "mismatches": [],
+  "status": "passed"
+}

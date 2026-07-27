@@ -1,0 +1,417 @@
+{
+  "schema_version": 1,
+  "benchmark": "real_llama31_70b_int8_streaming",
+  "checkpoint": "/ssd/cascade-llm/models/Llama-3.1-70B-Instruct-W8A8",
+  "model_id": "RedHatAI/Meta-Llama-3.1-70B-Instruct-quantized.w8a8",
+  "prompt": "The future of AI is",
+  "prompt_tokens": 6,
+  "weight_store": "pinned_staging",
+  "granularity": "layer",
+  "slots": 2,
+  "top_k": 10,
+  "allocation_seconds": 1.5140772410086356,
+  "load_seconds": 16.59258595603751,
+  "resident_load_seconds": 0.10931755299679935,
+  "prefill_wall_ms": 6065.741450001951,
+  "prefill_gpu_ms": 6065.71630859375,
+  "warmup_decode": 0,
+  "decode_repeats": 3,
+  "decode_wall_ms": [
+    5698.24682502076,
+    5689.456722990144,
+    5695.903057989199
+  ],
+  "decode_gpu_ms": [
+    5698.244140625,
+    5689.4580078125,
+    5695.90576171875
+  ],
+  "decode_wall_distribution_ms": {
+    "min": 5689.456722990144,
+    "median": 5695.903057989199,
+    "max": 5698.24682502076,
+    "mean": 5694.535535333368
+  },
+  "decode_gpu_distribution_ms": {
+    "min": 5689.4580078125,
+    "median": 5695.90576171875,
+    "max": 5698.244140625,
+    "mean": 5694.535970052083
+  },
+  "profile_repeats": 2,
+  "profile_total_wall_ms": [
+    5697.9839080013335,
+    5703.216226014774
+  ],
+  "profile_total_gpu_ms": [
+    5697.98388671875,
+    5703.21826171875
+  ],
+  "profiles": [
+    {
+      "wall_ms": 5521.33798901923,
+      "host_submit_ms": 5473.787081020419,
+      "source_wait_ms": 5267.853138910141,
+      "gpu_pipeline_ms": 5521.015625,
+      "h2d_event_sum_ms": 5412.776947021484,
+      "compute_event_sum_ms": 685.9212789535522,
+      "dequant_event_sum_ms": 493.7154545709491,
+      "h2d_bytes": 68464476160,
+      "h2d_effective_gbps": 12.64867864131632,
+      "staging_copy_count": 80,
+      "staging_event_sum_ms": 10826.306675211526,
+      "staging_event_max_ms": 164.16044399375096
+    },
+    {
+      "wall_ms": 5525.455008028075,
+      "host_submit_ms": 5473.852667026222,
+      "source_wait_ms": 5243.163516919594,
+      "gpu_pipeline_ms": 5525.1494140625,
+      "h2d_event_sum_ms": 5416.515003204346,
+      "compute_event_sum_ms": 687.4634237289429,
+      "dequant_event_sum_ms": 495.53183947503567,
+      "h2d_bytes": 68464476160,
+      "h2d_effective_gbps": 12.639949509878074,
+      "staging_copy_count": 80,
+      "staging_event_sum_ms": 10828.812582010869,
+      "staging_event_max_ms": 163.21711998898536
+    }
+  ],
+  "vocab_profiles": [
+    {
+      "wall_ms": 173.55975200189278,
+      "pipeline_ms": 173.47378540039062,
+      "h2d_event_sum_ms": 164.87270307540894,
+      "compute_event_sum_ms": 3.8502399921417236,
+      "h2d_bytes": 2101346304,
+      "h2d_effective_gbps": 12.745265073011469,
+      "chunk_count": 16,
+      "chunk_rows": 8192,
+      "requested_top_k": 10
+    },
+    {
+      "wall_ms": 174.49590098112822,
+      "pipeline_ms": 174.40972900390625,
+      "h2d_event_sum_ms": 164.8260793685913,
+      "compute_event_sum_ms": 3.82566399872303,
+      "h2d_bytes": 2101346304,
+      "h2d_effective_gbps": 12.748870276170784,
+      "chunk_count": 16,
+      "chunk_rows": 8192,
+      "requested_top_k": 10
+    }
+  ],
+  "runtime": {
+    "transfer_units": 80,
+    "slot_count": 2,
+    "transfer_slot_bytes": 855805952,
+    "dequant_workspace_bytes": 469762048,
+    "device_transfer_slots_bytes": 1711611904,
+    "device_dequant_workspaces_bytes": 939524096,
+    "device_slots_bytes": 2651136000,
+    "resident_bytes": 2637824,
+    "weight_gpu_bytes": 2653773824
+  },
+  "plan": {
+    "model_id": "RedHatAI/Meta-Llama-3.1-70B-Instruct-quantized.w8a8",
+    "granularity": "layer",
+    "checkpoint_format": "compressed-tensors/int-quantized",
+    "transfer_unit_count": 80,
+    "stream_bytes_per_token": 68464476160,
+    "host_arena_bytes": 72669806592,
+    "resident_bytes": 2637824,
+    "transfer_slot_bytes": 855805952,
+    "dequant_workspace_bytes": 469762048,
+    "device_bytes_per_slot": 1325568000,
+    "vocab": {
+      "embedding_key": "model.embed_tokens.weight",
+      "lm_head_key": "lm_head.weight",
+      "vocab_size": 128256,
+      "hidden_size": 8192,
+      "chunk_rows": 8192,
+      "chunk_bytes": 134217728,
+      "chunk_count": 16
+    },
+    "unit_bytes": {
+      "min": 855805952,
+      "max": 855805952,
+      "sum": 68464476160
+    }
+  },
+  "h2d_accounting": {
+    "transformer_bytes_per_token": 68464476160,
+    "lm_head_bytes_per_token": 2101346304,
+    "embedding_bytes_last_step": 16384,
+    "total_decode_weight_bytes": 70565822464
+  },
+  "cpu_pinned_bytes": 1711611904,
+  "vocab_extra_pinned_cpu_bytes": 272629760,
+  "cpu_arena_is_pinned": false,
+  "staging_slots_are_pinned": [
+    true,
+    true
+  ],
+  "before_load": {
+    "rss_bytes": 473923584,
+    "vms_bytes": 9662623744,
+    "read_bytes": 107819008,
+    "write_bytes": 0,
+    "system_available_bytes": 130909257728
+  },
+  "after_allocate": {
+    "rss_bytes": 2702716928,
+    "vms_bytes": 84935135232,
+    "read_bytes": 109932544,
+    "write_bytes": 0,
+    "system_available_bytes": 128639713280
+  },
+  "after_load": {
+    "rss_bytes": 75317309440,
+    "vms_bytes": 87274889216,
+    "read_bytes": 18098008064,
+    "write_bytes": 0,
+    "system_available_bytes": 55923470336
+  },
+  "after_runtime_init": {
+    "rss_bytes": 75774001152,
+    "vms_bytes": 90490597376,
+    "read_bytes": 18105253888,
+    "write_bytes": 0,
+    "system_available_bytes": 55469113344
+  },
+  "measured_decode_io_delta": {
+    "read_bytes": 167936,
+    "write_bytes": 0
+  },
+  "cuda_peak_allocated_bytes": 2666347520,
+  "cuda_peak_reserved_bytes": 2705326080,
+  "generated_token_ids": [
+    [
+      539,
+      1120,
+      922,
+      5557,
+      11,
+      719
+    ]
+  ],
+  "generated_topk": [
+    {
+      "values": [
+        [
+          [
+            13.375,
+            13.0625,
+            13.0,
+            13.0,
+            12.5625,
+            12.5,
+            12.375,
+            12.125,
+            12.125,
+            11.6875
+          ]
+        ]
+      ],
+      "indices": [
+        [
+          [
+            539,
+            1618,
+            304,
+            3823,
+            264,
+            1694,
+            36218,
+            2736,
+            682,
+            10107
+          ]
+        ]
+      ]
+    },
+    {
+      "values": [
+        [
+          [
+            16.75,
+            15.75,
+            15.0625,
+            14.5,
+            14.375,
+            13.75,
+            13.5625,
+            13.5,
+            13.1875,
+            13.0
+          ]
+        ]
+      ],
+      "indices": [
+        [
+          [
+            1120,
+            922,
+            304,
+            264,
+            1148,
+            439,
+            3823,
+            2555,
+            21075,
+            15592
+          ]
+        ]
+      ]
+    },
+    {
+      "values": [
+        [
+          [
+            19.0,
+            16.375,
+            15.5,
+            14.4375,
+            14.4375,
+            14.4375,
+            14.125,
+            13.9375,
+            13.875,
+            13.625
+          ]
+        ]
+      ],
+      "indices": [
+        [
+          [
+            922,
+            304,
+            264,
+            12933,
+            21075,
+            3823,
+            25530,
+            369,
+            7941,
+            15592
+          ]
+        ]
+      ]
+    },
+    {
+      "values": [
+        [
+          [
+            16.375,
+            16.25,
+            15.875,
+            15.5,
+            15.375,
+            15.125,
+            14.625,
+            14.375,
+            14.375,
+            14.3125
+          ]
+        ]
+      ],
+      "indices": [
+        [
+          [
+            5557,
+            12933,
+            279,
+            6968,
+            33762,
+            11478,
+            4857,
+            3339,
+            11469,
+            12966
+          ]
+        ]
+      ]
+    },
+    {
+      "values": [
+        [
+          [
+            20.125,
+            18.625,
+            18.25,
+            18.125,
+            17.75,
+            17.25,
+            17.25,
+            16.75,
+            15.9375,
+            15.875
+          ]
+        ]
+      ],
+      "indices": [
+        [
+          [
+            11,
+            1389,
+            26,
+            719,
+            198,
+            13,
+            482,
+            2001,
+            44603,
+            25
+          ]
+        ]
+      ]
+    },
+    {
+      "values": [
+        [
+          [
+            22.375,
+            21.0,
+            16.0,
+            15.375,
+            14.0625,
+            14.0,
+            13.875,
+            13.6875,
+            13.5,
+            13.25
+          ]
+        ]
+      ],
+      "indices": [
+        [
+          [
+            719,
+            433,
+            2795,
+            1202,
+            1102,
+            90578,
+            6463,
+            15592,
+            323,
+            1101
+          ]
+        ]
+      ]
+    }
+  ],
+  "generated_text": " not just about technology, but",
+  "quantization": {
+    "quant_method": "compressed-tensors",
+    "format": "int-quantized",
+    "ignore": [
+      "lm_head"
+    ],
+    "execution_note": "INT8 weights are transferred as stored and dequantized per matrix to a reusable BF16 GPU workspace; activation quantization is not used by this runtime."
+  },
+  "torch_version": "2.4.1+cu121",
+  "transformers_version": "4.45.2",
+  "cuda_visible_devices": "0",
+  "nvidia_smi": "0, 00000000:01:00.0, NVIDIA GeForce RTX 3080 Ti, 12288, 2948, 9001, P0, 1665, 9501\n1, 00000000:48:00.0, NVIDIA GeForce RTX 3080 Ti, 12288, 18, 11931, P8, 0, 405\n"
+}

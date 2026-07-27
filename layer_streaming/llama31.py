@@ -1,4 +1,4 @@
-"""Llama-3.1-8B matrix-wise decode executor."""
+"""Llama-3.1 8B/70B matrix-wise decode executor."""
 
 from dataclasses import dataclass, field
 
@@ -90,23 +90,22 @@ class Llama31DecodeExecutor:
                 "transformers is required for the Llama executor"
             ) from error
 
-        expected = {
-            "hidden_size": 4096,
-            "intermediate_size": 14336,
-            "num_hidden_layers": 32,
-            "num_attention_heads": 32,
-            "num_key_value_heads": 8,
-            "vocab_size": 128256,
+        geometry = (
+            config.hidden_size,
+            config.intermediate_size,
+            config.num_hidden_layers,
+            config.num_attention_heads,
+            config.num_key_value_heads,
+            config.vocab_size,
+        )
+        supported = {
+            (4096, 14336, 32, 32, 8, 128256),
+            (8192, 28672, 80, 64, 8, 128256),
         }
-        for name, value in expected.items():
-            if getattr(config, name, None) != value:
-                raise ValueError(
-                    "config {}={} is not Llama-3.1-8B value {}".format(
-                        name,
-                        getattr(config, name, None),
-                        value,
-                    )
-                )
+        if geometry not in supported:
+            raise ValueError(
+                "unsupported Llama-3.1 geometry {}".format(geometry)
+            )
         self.config = config
         self.resident = resident
         self.vocab_runtime = vocab_runtime

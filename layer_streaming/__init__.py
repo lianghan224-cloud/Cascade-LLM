@@ -15,6 +15,15 @@ from .plan import (
     build_llama31_8b_plan,
 )
 from .runtime import DoubleBufferRuntime, ResidentDeviceArena
+from .int8 import (
+    Int8DoubleBufferRuntime,
+    Int8FullPinnedWeightStore,
+    Int8PinnedStagingWeightStore,
+    Int8ResidentDeviceArena,
+    Int8WeightStoreMode,
+    build_llama31_70b_int8_plan,
+    create_int8_weight_store,
+)
 from .vocab import VocabStreamingRuntime, merge_topk
 from .weight_store import (
     FullPinnedWeightStore,
@@ -28,6 +37,11 @@ __all__ = [
     "FullPinnedWeightStore",
     "Granularity",
     "HostPlacement",
+    "Int8DoubleBufferRuntime",
+    "Int8FullPinnedWeightStore",
+    "Int8PinnedStagingWeightStore",
+    "Int8ResidentDeviceArena",
+    "Int8WeightStoreMode",
     "LLAMA31_8B_MODEL_ID",
     "Llama31DecodeExecutor",
     "ModelPlan",
@@ -40,6 +54,8 @@ __all__ = [
     "VocabStreamingRuntime",
     "WeightStoreMode",
     "build_llama31_8b_plan",
+    "build_llama31_70b_int8_plan",
+    "create_int8_weight_store",
     "create_weight_store",
     "merge_topk",
 ]

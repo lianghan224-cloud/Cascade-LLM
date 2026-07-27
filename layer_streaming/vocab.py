@@ -57,11 +57,14 @@ class VocabStreamingRuntime:
         self.profile = bool(profile)
         self.last_profile = None
         self.last_embedding_bytes = 0
+        self.slot_count = len(self.device_slots)
         self.embedding_staging_rows = int(embedding_staging_rows)
         if self.embedding_staging_rows < 1:
             raise ValueError("embedding_staging_rows must be positive")
-        if len(self.device_slots) != 2:
-            raise ValueError("vocabulary streaming requires two GPU slots")
+        if self.slot_count not in (1, 2):
+            raise ValueError(
+                "vocabulary streaming requires one or two GPU slots"
+            )
         if self.device_slots[0].numel() < self.vocab.chunk_elements:
             raise ValueError("shared GPU slot is smaller than vocab chunk")
 
@@ -80,7 +83,7 @@ class VocabStreamingRuntime:
                     device="cpu",
                     pin_memory=True,
                 )
-                for _ in range(2)
+                for _ in range(self.slot_count)
             ]
 
     @property
@@ -205,7 +208,7 @@ class VocabStreamingRuntime:
 
         transferred_bytes = 0
         for chunk_index in range(chunk_count):
-            slot_index = chunk_index % 2
+            slot_index = chunk_index % self.slot_count
             start_row = chunk_index * self.vocab.chunk_rows
             end_row = min(
                 start_row + self.vocab.chunk_rows,
@@ -214,8 +217,8 @@ class VocabStreamingRuntime:
             rows = end_row - start_row
             elements = rows * self.vocab.hidden_size
             previous_ready = (
-                ready_events[chunk_index - 2]
-                if chunk_index >= 2
+                ready_events[chunk_index - self.slot_count]
+                if chunk_index >= self.slot_count
                 else None
             )
             source = self._head_source(
@@ -225,8 +228,10 @@ class VocabStreamingRuntime:
                 previous_ready,
             )
             slot = self.device_slots[slot_index]
-            if chunk_index >= 2:
-                self.copy_stream.wait_event(free_events[chunk_index - 2])
+            if chunk_index >= self.slot_count:
+                self.copy_stream.wait_event(
+                    free_events[chunk_index - self.slot_count]
+                )
             with torch.cuda.stream(self.copy_stream):
                 if self.profile:
                     copy_starts[chunk_index].record(self.copy_stream)
