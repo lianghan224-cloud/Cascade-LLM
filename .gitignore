@@ -23,5 +23,9 @@ h2d_driver_bench
 # Real experiment outputs: receipts/summaries are tracked, raw traces are not.
 real_results/raw/
 real_results/airllm/*.log
+real_results/70b_int8/airllm_compression/*.log
+real_results/70b_int8/airllm_compression/*.pid
+real_results/70b_int8/airllm_compression/*.failed
+real_results/70b_int8/airllm_compression/smoke_*.json
 *.nsys-rep
 *.qdrep
