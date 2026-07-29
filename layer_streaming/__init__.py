@@ -1,5 +1,13 @@
 """CPU-resident, CUDA-streamed LLM inference primitives."""
 
+from .chat import (
+    RenderedChat,
+    SamplingConfig,
+    collect_stop_token_ids,
+    first_stop_string,
+    render_chat_prompt,
+    select_next_token,
+)
 from .llama31 import (
     LLAMA31_8B_MODEL_ID,
     Llama31DecodeExecutor,
@@ -46,6 +54,8 @@ __all__ = [
     "Llama31DecodeExecutor",
     "ModelPlan",
     "PinnedStagingWeightStore",
+    "RenderedChat",
+    "SamplingConfig",
     "ResidentDeviceArena",
     "SimpleKVCache",
     "TensorSpec",
@@ -55,7 +65,11 @@ __all__ = [
     "WeightStoreMode",
     "build_llama31_8b_plan",
     "build_llama31_70b_int8_plan",
+    "collect_stop_token_ids",
     "create_int8_weight_store",
     "create_weight_store",
+    "first_stop_string",
     "merge_topk",
+    "render_chat_prompt",
+    "select_next_token",
 ]

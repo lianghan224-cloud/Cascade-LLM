@@ -27,5 +27,8 @@ real_results/70b_int8/airllm_compression/*.log
 real_results/70b_int8/airllm_compression/*.pid
 real_results/70b_int8/airllm_compression/*.failed
 real_results/70b_int8/airllm_compression/smoke_*.json
+# Local chats can contain private prompts and are runtime state, not receipts.
+real_results/70b_int8/chat_*.jsonl
+real_results/70b_int8/chat_*session*.json
 *.nsys-rep
 *.qdrep

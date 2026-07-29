@@ -67,8 +67,9 @@ class DecodeState:
 class Llama31DecodeExecutor:
     """Stateful callbacks consumed by :class:`DoubleBufferRuntime`.
 
-    This implementation targets an unpadded single request. It supports a
-    multi-token initial prefill and subsequent one-token decode calls.
+    This implementation targets an unpadded batch whose requests have the
+    same sequence length. It supports a multi-token initial prefill and
+    subsequent one-token decode calls.
     """
 
     def __init__(
@@ -125,9 +126,12 @@ class Llama31DecodeExecutor:
         self._apply_rotary_pos_emb = apply_rotary_pos_emb
 
     def begin(self, input_ids, position_ids=None):
-        if input_ids.ndim != 2 or input_ids.shape[0] != 1:
-            raise ValueError("first runtime supports one unpadded request")
+        if input_ids.ndim != 2 or input_ids.shape[0] < 1:
+            raise ValueError(
+                "runtime expects a non-empty [batch, sequence] tensor"
+            )
         past = self.kv_cache.sequence_length()
+        batch = input_ids.shape[0]
         sequence = input_ids.shape[1]
         if past and sequence != 1:
             raise ValueError(
@@ -139,7 +143,15 @@ class Llama31DecodeExecutor:
                 past + sequence,
                 dtype=torch.long,
                 device=input_ids.device,
-            ).unsqueeze(0)
+            ).unsqueeze(0).expand(batch, -1)
+        elif position_ids.shape not in {
+            (1, sequence),
+            (batch, sequence),
+        }:
+            raise ValueError(
+                "position_ids must have shape [1, sequence] or "
+                "[batch, sequence]"
+            )
         if self.vocab_runtime is None:
             hidden = F.embedding(
                 input_ids,
