@@ -1,0 +1,23 @@
+{
+  "provider": "cutlass_w8a16",
+  "provider_version": "2",
+  "abi": 2,
+  "compiled_architectures": [
+    "sm86"
+  ],
+  "weight_formats": [
+    "int8_symmetric_per_channel",
+    "int8_symmetric_per_group"
+  ],
+  "activation_dtypes": [
+    "bf16",
+    "fp16"
+  ],
+  "build_environment": {
+    "cuda": "unverified",
+    "compiler": "unverified",
+    "cutlass": "unverified"
+  },
+  "status": "compiled",
+  "schema_version": 1
+}

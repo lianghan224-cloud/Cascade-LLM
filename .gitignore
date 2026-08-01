@@ -30,5 +30,18 @@ real_results/70b_int8/airllm_compression/smoke_*.json
 # Local chats can contain private prompts and are runtime state, not receipts.
 real_results/70b_int8/chat_*.jsonl
 real_results/70b_int8/chat_*session*.json
+# Large per-layer numerical traces are local diagnostic intermediates. Keep
+# their compact gate summaries and versioned contracts in the repository.
+real_results/8b_w8a16/fused_decode_diagnostics.json
+real_results/8b_w8a16/fused_decode_diagnostics_fp32_reference.json
+real_results/8b_w8a16/fused_decode_diagnostics_golden_chongqing.json
+real_results/8b_w8a16/fused_decode_diagnostics_golden_france.json
+real_results/8b_w8a16/golden_v1/baseline_special_tokens.json
+real_results/8b_w8a16/golden_v1/chinese_chongqing.json
+real_results/8b_w8a16/golden_v1/english_france.json
 *.nsys-rep
 *.qdrep
+
+# Locally compiled optional CUDA providers. Keep validated metadata reviewable.
+layer_streaming/providers/*/_build/*
+!layer_streaming/providers/*/_build/*.metadata.json

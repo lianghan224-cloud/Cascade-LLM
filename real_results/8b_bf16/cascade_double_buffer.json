@@ -1,0 +1,131 @@
+{
+  "hardware": {
+    "cuda_available": true,
+    "cuda_runtime": "12.1",
+    "device": "cuda:0",
+    "gpu_compute_capability": [
+      8,
+      6
+    ],
+    "gpu_name": "NVIDIA GeForce RTX 3080 Ti",
+    "gpu_total_memory_bytes": 12528123904,
+    "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+    "python": "3.8.10",
+    "torch": "2.4.1+cu121"
+  },
+  "results": [
+    {
+      "actual_backends": [
+        "bf16_linear"
+      ],
+      "case": {
+        "backend_requested": "bf16_linear",
+        "case_id": "bf16/bf16_linear/matrix_group/pinned_staging/streamed/s2/p2",
+        "checkpoint": "/ssd/cascade-llm/models/Llama-3.1-8B-Instruct",
+        "decode_tokens": 2,
+        "granularity": "matrix_group",
+        "prefetch_depth": 2,
+        "prefill_tokens": 8,
+        "slot_count": 2,
+        "vocab_mode": "streamed",
+        "weight_format": "bf16",
+        "weight_store": "pinned_staging"
+      },
+      "fallback_backends": [],
+      "median": {
+        "attention_ms": 365.20064044743776,
+        "combined_weight_scale_h2d_ms": 2228.442432641983,
+        "compute_wait_ms": 3173.7614086596295,
+        "decode_ms_per_token": 1459.1398239135742,
+        "dequant_ms": 0.0,
+        "embedding_ms": 0.4542440874502063,
+        "gemm_ms": 81.43660786375403,
+        "gpu_peak_allocated_bytes": 481863168,
+        "gpu_peak_reserved_bytes": 497025024,
+        "lm_head_ms": 295.32191902399063,
+        "pageable_to_pinned_ms": 7241.95541581139,
+        "ready_queue_max_depth": 2,
+        "scale_h2d_bytes": 0,
+        "source_queue_max_depth": 2,
+        "source_wait_ms": 3886.8910991586745,
+        "ttft_ms": 1457.8134609619156,
+        "weight_h2d_bytes": 41875931136
+      },
+      "samples": [
+        {
+          "attention_ms": 365.20064044743776,
+          "combined_weight_scale_h2d_ms": 2222.1520051956177,
+          "compute_wait_ms": 3173.7614086596295,
+          "decode_ms_per_token": 1454.109431419056,
+          "dequant_ms": 0.0,
+          "embedding_ms": 0.47346914652734995,
+          "gemm_ms": 81.43660786375403,
+          "gpu_peak_allocated_bytes": 481863168,
+          "gpu_peak_reserved_bytes": 497025024,
+          "lm_head_ms": 292.5972050288692,
+          "pageable_to_pinned_ms": 7241.95541581139,
+          "ready_queue_max_depth": 2,
+          "scale_h2d_bytes": 0,
+          "source_queue_max_depth": 2,
+          "source_wait_ms": 3878.6442796699703,
+          "ttft_ms": 1454.2055189376697,
+          "weight_h2d_bytes": 41875931136
+        },
+        {
+          "attention_ms": 364.6752336025238,
+          "combined_weight_scale_h2d_ms": 2237.967549800873,
+          "compute_wait_ms": 3174.751790938899,
+          "decode_ms_per_token": 1459.1398239135742,
+          "dequant_ms": 0.0,
+          "embedding_ms": 0.4350050585344434,
+          "gemm_ms": 85.66588783822954,
+          "gpu_peak_allocated_bytes": 481863168,
+          "gpu_peak_reserved_bytes": 497025024,
+          "lm_head_ms": 295.32191902399063,
+          "pageable_to_pinned_ms": 7244.75719279144,
+          "ready_queue_max_depth": 2,
+          "scale_h2d_bytes": 0,
+          "source_queue_max_depth": 2,
+          "source_wait_ms": 3887.0602309470996,
+          "ttft_ms": 1457.8134609619156,
+          "weight_h2d_bytes": 41875931136
+        },
+        {
+          "attention_ms": 399.57996786385775,
+          "combined_weight_scale_h2d_ms": 2228.442432641983,
+          "compute_wait_ms": 3146.203832933679,
+          "decode_ms_per_token": 1460.758892528247,
+          "dequant_ms": 0.0,
+          "embedding_ms": 0.4542440874502063,
+          "gemm_ms": 81.30147190392017,
+          "gpu_peak_allocated_bytes": 481863168,
+          "gpu_peak_reserved_bytes": 497025024,
+          "lm_head_ms": 296.9744448782876,
+          "pageable_to_pinned_ms": 7237.655391334556,
+          "ready_queue_max_depth": 2,
+          "scale_h2d_bytes": 0,
+          "source_queue_max_depth": 2,
+          "source_wait_ms": 3886.8910991586745,
+          "ttft_ms": 1462.6656649634242,
+          "weight_h2d_bytes": 41875931136
+        }
+      ],
+      "skip_reason": null,
+      "status": "ok"
+    }
+  ],
+  "schema_version": 1,
+  "software": {
+    "duration_seconds": 22.04961371421814,
+    "measurement_notes": [
+      "weight and scale share one transfer-unit copy; time is combined",
+      "weight_h2d_bytes and scale_h2d_bytes remain separately reported",
+      "synthetic checkpoints are regression data, not real-model performance",
+      "backend mismatch is an error; no silent fallback is allowed"
+    ],
+    "preset": "smoke",
+    "python": "3.8.10",
+    "torch": "2.4.1+cu121"
+  },
+  "synthetic_only": false
+}

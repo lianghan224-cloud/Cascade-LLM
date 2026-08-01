@@ -55,6 +55,7 @@ class BaseWeightStore:
         self.tensor_factory = tensor_factory or torch.empty
         self.arena = None
         self._loaded = False
+        self._closed = False
         if allocate:
             self.allocate()
 
@@ -77,6 +78,7 @@ class BaseWeightStore:
     def allocate(self):
         if self.arena is not None:
             return self.arena
+        self._closed = False
         self.arena = self.tensor_factory(
             self.plan.host_arena_elements,
             dtype=torch.bfloat16,
@@ -157,6 +159,14 @@ class BaseWeightStore:
                                     tuple(target.shape),
                                 )
                             )
+                        if tensor.dtype != torch.bfloat16:
+                            raise ValueError(
+                                "{} dtype {} != expected {}".format(
+                                    key,
+                                    tensor.dtype,
+                                    torch.bfloat16,
+                                )
+                            )
                         target.copy_(tensor.to(dtype=torch.bfloat16))
                         loaded.add(key)
 
@@ -171,8 +181,20 @@ class BaseWeightStore:
         return self
 
     def close(self):
+        if self._closed:
+            return
         self.arena = None
         self._loaded = False
+        self._closed = True
+
+    def __enter__(self):
+        if self.arena is None:
+            self.allocate()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+        return False
 
     def reset_profile(self):
         return None
@@ -214,10 +236,20 @@ class PinnedStagingWeightStore(BaseWeightStore):
         plan,
         allocate=True,
         tensor_factory=None,
-        worker_count=2,
+        worker_count=None,
+        slot_count=None,
     ):
         self.staging_slots = None
-        self.worker_count = worker_count
+        self.slot_count = (
+            plan.slot_count if slot_count is None else int(slot_count)
+        )
+        if self.slot_count < 1:
+            raise ValueError("slot_count must be positive")
+        self.worker_count = (
+            self.slot_count if worker_count is None else int(worker_count)
+        )
+        if self.worker_count < 1:
+            raise ValueError("worker_count must be positive")
         self._executor = None
         self._profile_lock = threading.Lock()
         self._stage_durations_ms = []
@@ -234,7 +266,7 @@ class PinnedStagingWeightStore(BaseWeightStore):
 
     @property
     def pinned_cpu_bytes(self):
-        return self.plan.two_slot_bytes
+        return self.slot_count * self.plan.slot_bytes
 
     def allocate(self):
         arena = super().allocate()
@@ -246,7 +278,7 @@ class PinnedStagingWeightStore(BaseWeightStore):
                     device="cpu",
                     pin_memory=True,
                 )
-                for _ in range(self.plan.slot_count)
+                for _ in range(self.slot_count)
             ]
         if self._executor is None:
             self._executor = ThreadPoolExecutor(
@@ -303,6 +335,7 @@ def create_weight_store(
     mode=WeightStoreMode.FULL_PINNED,
     allocate=True,
     tensor_factory=None,
+    slot_count=None,
 ):
     mode = WeightStoreMode(mode)
     if mode == WeightStoreMode.FULL_PINNED:
@@ -315,4 +348,5 @@ def create_weight_store(
         plan,
         allocate=allocate,
         tensor_factory=tensor_factory,
+        slot_count=slot_count,
     )

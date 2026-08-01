@@ -1,0 +1,199 @@
+{
+  "core_api_version": 1,
+  "schema_versions": {
+    "execution_plan": 1,
+    "run_report": 2
+  },
+  "dataclass_fields": {
+    "ModelGeometry": [
+      "model_id",
+      "model_type",
+      "hidden_size",
+      "intermediate_size",
+      "num_hidden_layers",
+      "num_attention_heads",
+      "num_key_value_heads",
+      "head_dim",
+      "vocab_size",
+      "max_position_embeddings",
+      "rms_norm_eps",
+      "rope_theta",
+      "rope_scaling",
+      "tie_word_embeddings",
+      "hidden_act"
+    ],
+    "WeightSpec": [
+      "name",
+      "logical_shape",
+      "storage_shape",
+      "storage_dtype",
+      "compute_dtype",
+      "role",
+      "quantization",
+      "alias_of",
+      "alignment"
+    ],
+    "QuantizationSpec": [
+      "bits",
+      "scheme",
+      "granularity",
+      "group_size",
+      "scale_dtype",
+      "zero_point",
+      "zero_point_dtype",
+      "packing",
+      "axis"
+    ],
+    "CheckpointManifest": [
+      "root",
+      "files",
+      "tensors",
+      "aliases",
+      "total_bytes",
+      "errors",
+      "weight_map"
+    ],
+    "ExecutionPlan": [
+      "model_id",
+      "geometry",
+      "granularity",
+      "weights",
+      "regions",
+      "host_offsets",
+      "units",
+      "resident",
+      "aliases",
+      "slot_bytes",
+      "workspace_bytes",
+      "vocab",
+      "slot_count"
+    ],
+    "RunReport": [
+      "model",
+      "runtime_config",
+      "timings",
+      "throughput",
+      "memory",
+      "pipeline",
+      "checkpoint_validation",
+      "memory_preflight",
+      "hardware",
+      "schema_version",
+      "created_at_unix"
+    ]
+  },
+  "linear_backend": {
+    "attributes": [
+      "name",
+      "is_fallback",
+      "info"
+    ],
+    "methods": {
+      "validate": [
+        "self",
+        "weight",
+        "input_dtype"
+      ],
+      "transfer_bytes": [
+        "self",
+        "weight"
+      ],
+      "workspace_bytes": [
+        "self",
+        "weight",
+        "batch_tokens"
+      ],
+      "execute": [
+        "self",
+        "x",
+        "weight_view",
+        "quant_views",
+        "workspace"
+      ]
+    }
+  },
+  "mixed_runtime": {
+    "class": "MixedDtypeRuntime",
+    "alias": "MixedRuntime",
+    "methods": {
+      "__init__": [
+        "self",
+        "plan",
+        "store",
+        "resident",
+        "device",
+        "slot_count",
+        "prefetch_depth",
+        "source_timeout_seconds",
+        "profile"
+      ],
+      "run": [
+        "self",
+        "compute_unit",
+        "state"
+      ],
+      "close": [
+        "self"
+      ]
+    },
+    "properties": [
+      "stats"
+    ]
+  },
+  "backend_registry": {
+    "bf16_linear": {
+      "is_fallback": false,
+      "storage_dtype": "bfloat16",
+      "activation_dtype": "bfloat16",
+      "output_dtype": "bfloat16"
+    },
+    "fp16_linear": {
+      "is_fallback": false,
+      "storage_dtype": "float16",
+      "activation_dtype": "float16",
+      "output_dtype": "float16"
+    },
+    "fused_w4a16": {
+      "is_fallback": false,
+      "storage_dtype": "uint8",
+      "activation_dtype": "bfloat16",
+      "output_dtype": "bfloat16"
+    },
+    "fused_w8a16": {
+      "is_fallback": false,
+      "storage_dtype": "int8",
+      "activation_dtype": "bfloat16",
+      "output_dtype": "bfloat16"
+    },
+    "fused_w8a8": {
+      "is_fallback": false,
+      "storage_dtype": "int8",
+      "activation_dtype": "int8",
+      "output_dtype": "bfloat16"
+    },
+    "int4_dequant_bf16_fallback": {
+      "is_fallback": true,
+      "storage_dtype": "uint8",
+      "activation_dtype": "bfloat16",
+      "output_dtype": "bfloat16"
+    },
+    "int4_dequant_fp16_fallback": {
+      "is_fallback": true,
+      "storage_dtype": "uint8",
+      "activation_dtype": "float16",
+      "output_dtype": "float16"
+    },
+    "int8_dequant_bf16_fallback": {
+      "is_fallback": true,
+      "storage_dtype": "int8",
+      "activation_dtype": "bfloat16",
+      "output_dtype": "bfloat16"
+    },
+    "int8_dequant_fp16_fallback": {
+      "is_fallback": true,
+      "storage_dtype": "int8",
+      "activation_dtype": "float16",
+      "output_dtype": "float16"
+    }
+  }
+}

@@ -1,4 +1,4 @@
-"""Static weight layout and transfer plan for Llama-3.1-8B."""
+"""Static BF16 weight layouts for Llama-family checkpoints."""
 
 from dataclasses import dataclass
 from enum import Enum
@@ -91,6 +91,8 @@ class VocabPlan:
     chunk_elements: int
     chunk_bytes: int
     chunk_count: int
+    stream_embedding: bool = True
+    stream_lm_head: bool = True
 
 
 @dataclass(frozen=True)
@@ -108,6 +110,7 @@ class ModelPlan:
     slot_count: int = 2
     host_only: Tuple[HostPlacement, ...] = ()
     vocab: Optional[VocabPlan] = None
+    geometry: object = None
 
     @property
     def slot_bytes(self):
@@ -168,6 +171,8 @@ class ModelPlan:
                     "chunk_rows": self.vocab.chunk_rows,
                     "chunk_bytes": self.vocab.chunk_bytes,
                     "chunk_count": self.vocab.chunk_count,
+                    "stream_embedding": self.vocab.stream_embedding,
+                    "stream_lm_head": self.vocab.stream_lm_head,
                 }
                 if self.vocab is not None
                 else None
@@ -243,25 +248,32 @@ def _place_unit(
     return unit, host_cursor + unit_elements
 
 
-def build_llama31_8b_plan(
+def build_llama_plan(
+    geometry,
     granularity=Granularity.MATRIX,
-    tie_word_embeddings=False,
-    stream_vocab=False,
+    embedding_mode="resident",
+    lm_head_mode="resident",
     vocab_chunk_bytes=128 * MIB,
 ):
-    """Build a packed BF16 plan for the official Llama-3.1-8B geometry.
-
-    The default checkpoint has separate embedding and LM-head tensors. Set
-    ``tie_word_embeddings`` only for a compatible checkpoint that omits
-    ``lm_head.weight`` and intentionally aliases it to the token embedding.
-    """
+    """Build a packed BF16 plan from a validated Llama geometry."""
 
     granularity = Granularity(granularity)
-    hidden = 4096
-    intermediate = 14336
-    kv = 1024
-    vocab = 128256
-    layers = 32
+    embedding_mode = str(getattr(embedding_mode, "value", embedding_mode))
+    lm_head_mode = str(getattr(lm_head_mode, "value", lm_head_mode))
+    valid_modes = {"resident", "streamed"}
+    if embedding_mode not in valid_modes:
+        raise ValueError("embedding_mode must be resident or streamed")
+    if lm_head_mode not in valid_modes:
+        raise ValueError("lm_head_mode must be resident or streamed")
+
+    hidden = int(geometry.hidden_size)
+    intermediate = int(geometry.intermediate_size)
+    kv = int(geometry.num_key_value_heads) * int(geometry.head_dim)
+    vocab = int(geometry.vocab_size)
+    layers = int(geometry.num_hidden_layers)
+    tie_word_embeddings = bool(geometry.tie_word_embeddings)
+    stream_embedding = embedding_mode == "streamed"
+    stream_lm_head = lm_head_mode == "streamed"
     projection_shapes = (
         ("q_proj", (hidden, hidden)),
         ("k_proj", (kv, hidden)),
@@ -271,7 +283,6 @@ def build_llama31_8b_plan(
         ("up_proj", (intermediate, hidden)),
         ("down_proj", (hidden, intermediate)),
     )
-
     specs = {}
 
     def add(key, shape, resident=False, alias_of=None):
@@ -287,20 +298,20 @@ def build_llama31_8b_plan(
     embedding = add(
         "model.embed_tokens.weight",
         (vocab, hidden),
-        resident=not stream_vocab,
+        resident=not stream_embedding,
     )
     if tie_word_embeddings:
         add(
             "lm_head.weight",
             (vocab, hidden),
-            resident=not stream_vocab,
+            resident=not stream_lm_head,
             alias_of=embedding.key,
         )
     else:
         add(
             "lm_head.weight",
             (vocab, hidden),
-            resident=not stream_vocab,
+            resident=not stream_lm_head,
         )
 
     layer_projections = []
@@ -381,14 +392,21 @@ def build_llama31_8b_plan(
     alignment_elements = ALIGNMENT_BYTES // BF16_BYTES
     resident_specs = []
     host_only_specs = []
-    if stream_vocab:
-        host_only_specs.append(embedding)
-        if not tie_word_embeddings:
-            host_only_specs.append(specs["lm_head.weight"])
+    if tie_word_embeddings:
+        if stream_embedding and stream_lm_head:
+            host_only_specs.append(embedding)
+        else:
+            resident_specs.append(embedding)
     else:
-        resident_specs.append(embedding)
-        if not tie_word_embeddings:
-            resident_specs.append(specs["lm_head.weight"])
+        if stream_embedding:
+            host_only_specs.append(embedding)
+        else:
+            resident_specs.append(embedding)
+        lm_head = specs["lm_head.weight"]
+        if stream_lm_head:
+            host_only_specs.append(lm_head)
+        else:
+            resident_specs.append(lm_head)
     resident_specs.extend(layer_norms)
     resident_specs.append(final_norm)
     host_only = []
@@ -420,12 +438,12 @@ def build_llama31_8b_plan(
     if tie_word_embeddings:
         aliases["lm_head.weight"] = embedding.key
     vocab_plan = None
-    if stream_vocab:
+    if stream_embedding or stream_lm_head:
         row_bytes = hidden * BF16_BYTES
         requested_chunk_bytes = int(vocab_chunk_bytes)
         if requested_chunk_bytes < row_bytes:
             raise ValueError("vocab chunk must hold at least one row")
-        chunk_rows = requested_chunk_bytes // row_bytes
+        chunk_rows = min(vocab, requested_chunk_bytes // row_bytes)
         chunk_elements = chunk_rows * hidden
         chunk_bytes = chunk_elements * BF16_BYTES
         chunk_count = (vocab + chunk_rows - 1) // chunk_rows
@@ -438,12 +456,14 @@ def build_llama31_8b_plan(
             chunk_elements=chunk_elements,
             chunk_bytes=chunk_bytes,
             chunk_count=chunk_count,
+            stream_embedding=stream_embedding,
+            stream_lm_head=stream_lm_head,
         )
     slot_elements = max(unit.elements for unit in units)
-    if vocab_plan is not None:
+    if vocab_plan is not None and vocab_plan.stream_lm_head:
         slot_elements = max(slot_elements, vocab_plan.chunk_elements)
     return ModelPlan(
-        model_id="meta-llama/Llama-3.1-8B",
+        model_id=str(geometry.model_id),
         granularity=granularity,
         tensors=specs,
         units=tuple(units),
@@ -454,4 +474,5 @@ def build_llama31_8b_plan(
         slot_elements=slot_elements,
         host_only=tuple(host_only),
         vocab=vocab_plan,
+        geometry=geometry,
     )

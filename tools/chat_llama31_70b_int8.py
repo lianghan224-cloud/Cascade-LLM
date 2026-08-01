@@ -3,6 +3,7 @@
 
 import argparse
 import atexit
+from contextlib import ExitStack
 import json
 from pathlib import Path
 import sys
@@ -17,12 +18,17 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from layer_streaming import (  # noqa: E402
+    ExecutionPolicy,
     Int8DoubleBufferRuntime,
     Int8ResidentDeviceArena,
     Llama31DecodeExecutor,
+    MemoryPlanner,
+    PlacementMode,
     SamplingConfig,
     VocabStreamingRuntime,
-    build_llama31_70b_int8_plan,
+    WeightFormat,
+    adapter_for_config,
+    build_inference_report,
     collect_stop_token_ids,
     create_int8_weight_store,
     first_stop_string,
@@ -73,7 +79,30 @@ def parse_args():
         choices=("matrix", "matrix_group", "layer"),
         default="matrix",
     )
-    parser.add_argument("--slots", type=int, choices=(1, 2), default=2)
+    parser.add_argument("--slots", type=int, choices=(1, 2, 3, 4), default=2)
+    parser.add_argument(
+        "--prefetch-depth", type=int, choices=tuple(range(1, 9))
+    )
+    parser.add_argument(
+        "--embedding-mode",
+        choices=("resident", "streamed"),
+        default="streamed",
+    )
+    parser.add_argument(
+        "--lm-head-mode",
+        choices=("resident", "streamed"),
+        default="streamed",
+    )
+    parser.add_argument("--kv-block-size", type=int, choices=(16, 32), default=16)
+    parser.add_argument("--cuda-safety-margin-mib", type=int, default=512)
+    parser.add_argument(
+        "--profile", action="store_true", help="Enable CUDA stage timings"
+    )
+    parser.add_argument(
+        "--run-report",
+        type=Path,
+        help="Overwrite this JSON file with the latest completed turn report",
+    )
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--cpu-threads", type=int, default=32)
     parser.add_argument("--min-new-tokens", type=int, default=0)
@@ -177,6 +206,8 @@ class ChatSession:
         system_prompt,
         transcript=None,
         session_path=None,
+        report_context=None,
+        run_report_path=None,
     ):
         self.tokenizer = tokenizer
         self.config = config
@@ -196,8 +227,12 @@ class ChatSession:
         self.system_prompt = system_prompt
         self.transcript = transcript
         self.session_path = session_path
+        self.report_context = report_context
+        self.run_report_path = run_report_path
         self.messages = []
         self.last_stats = None
+        self.last_report = None
+        self._resource_stack = None
         self.reset(autosave=False)
 
     def _validate_model_limits(self, top_k, max_context_tokens):
@@ -226,6 +261,7 @@ class ChatSession:
         self.executor.kv_cache.clear()
         self.messages = self._base_messages()
         self.last_stats = None
+        self.last_report = None
         if autosave:
             self.autosave()
 
@@ -260,6 +296,12 @@ class ChatSession:
                     "max_context_tokens must exceed max_new_tokens"
                 )
             self._validate_model_limits(self.sampling.top_k, value)
+            if value > self.executor.kv_cache.max_length:
+                raise ValueError(
+                    "max_context_tokens cannot exceed the preallocated KV limit {}".format(
+                        self.executor.kv_cache.max_length
+                    )
+                )
             self.max_context_tokens = value
         elif name == "seed":
             self.seed = value
@@ -310,6 +352,7 @@ class ChatSession:
         del self.messages[-2:]
         self.executor.kv_cache.clear()
         self.last_stats = None
+        self.last_report = None
         self.autosave()
         return removed
 
@@ -338,6 +381,10 @@ class ChatSession:
         )
         torch.cuda.synchronize(self.device)
         elapsed_ms = (time.perf_counter() - started) * 1000.0
+        self._runtime_profiles.append(dict(self.runtime.last_profile or {}))
+        vocab_runtime = self.executor.vocab_runtime
+        if vocab_runtime is not None:
+            self._vocab_profiles.append(vocab_runtime.profile_stats())
         return next_token, elapsed_ms
 
     def ask(self, user_text, stream=True):
@@ -362,6 +409,8 @@ class ChatSession:
         generated = []
         token_history = rendered.input_ids.reshape(-1).tolist()
         token_latencies_ms = []
+        self._runtime_profiles = []
+        self._vocab_profiles = []
         decoded = ""
         stop_reason = "length"
         matched_stop = None
@@ -435,9 +484,69 @@ class ChatSession:
             ),
             "token_latency_ms": token_latencies_ms,
         }
+        self._build_turn_report(
+            prompt_tokens=int(rendered.input_ids.numel()),
+            generated_tokens=len(generated),
+            wall_seconds=wall_seconds,
+            token_latencies_ms=token_latencies_ms,
+            user_text=user_text,
+            assistant_text=decoded,
+            stop_reason=stop_reason,
+        )
         self._append_transcript(user_text, decoded)
         self.autosave()
         return decoded, dict(self.last_stats)
+
+    def _build_turn_report(
+        self,
+        prompt_tokens,
+        generated_tokens,
+        wall_seconds,
+        token_latencies_ms,
+        user_text,
+        assistant_text,
+        stop_reason,
+    ):
+        if self.report_context is None:
+            return None
+        context = self.report_context
+        report = build_inference_report(
+            plan=context["plan"],
+            geometry=context["geometry"],
+            policy=context["policy"],
+            checkpoint=context["checkpoint"],
+            validation=context["validation"],
+            preflight=context["preflight"],
+            checkpoint_load_seconds=context["checkpoint_load_seconds"],
+            prompt_tokens=prompt_tokens,
+            generated_tokens=generated_tokens,
+            generation_wall_seconds=wall_seconds,
+            time_to_first_token_ms=(
+                token_latencies_ms[0] if token_latencies_ms else 0.0
+            ),
+            decode_token_latencies_ms=token_latencies_ms[1:],
+            runtime_profiles=self._runtime_profiles,
+            vocab_profiles=self._vocab_profiles,
+            gpu_peak_memory_bytes=torch.cuda.max_memory_allocated(self.device),
+            cpu_resident_bytes=context["cpu_resident_bytes"],
+            pinned_bytes=context["pinned_bytes"],
+            kv_cache_bytes=self.executor.kv_cache.nbytes,
+            device=self.device,
+        )
+        payload = report.as_dict()
+        payload["generation"] = {
+            "user_text": user_text,
+            "assistant_text": assistant_text,
+            "stop_reason": stop_reason,
+        }
+        self.last_report = payload
+        if self.run_report_path is not None:
+            self.run_report_path.parent.mkdir(parents=True, exist_ok=True)
+            self.run_report_path.write_text(
+                json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+        return payload
 
     def _append_transcript(self, user_text, assistant_text):
         if self.transcript is None:
@@ -515,6 +624,12 @@ class ChatSession:
         if max_context <= loaded_sampling.max_new_tokens:
             raise ValueError("saved context is smaller than output budget")
         self._validate_model_limits(loaded_sampling.top_k, max_context)
+        if max_context > self.executor.kv_cache.max_length:
+            raise ValueError(
+                "saved context exceeds preallocated KV limit {}".format(
+                    self.executor.kv_cache.max_length
+                )
+            )
         self.system_prompt = payload.get("system_prompt") or ""
         self.messages = [dict(item) for item in messages]
         self.sampling = loaded_sampling
@@ -531,8 +646,15 @@ class ChatSession:
         self.executor.top_k = self.sampling.top_k
         self.executor.kv_cache.clear()
         self.last_stats = None
+        self.last_report = None
         self.session_path = path
         return path
+
+    def close(self):
+        self.executor.kv_cache.clear()
+        if self._resource_stack is not None:
+            self._resource_stack.close()
+            self._resource_stack = None
 
 
 def sampling_from_args(args):
@@ -573,6 +695,92 @@ def validate_args(args):
         raise SystemExit("CUDA is unavailable")
 
 
+def _allocate_runtime(
+    args,
+    config,
+    plan,
+    device,
+    sampling,
+    prefetch_depth,
+    profile_enabled,
+):
+    """Allocate all long-lived resources with rollback on any failure."""
+
+    resources = ExitStack()
+    try:
+        print(
+            "[2/4] Allocating the {} CPU weight store...".format(
+                args.weight_store
+            ),
+            flush=True,
+        )
+        allocation_started = time.perf_counter()
+        store = resources.enter_context(create_int8_weight_store(
+            plan,
+            args.weight_store,
+            slot_count=args.slots,
+            allocate=False,
+        ))
+        store.allocate()
+        allocation_seconds = time.perf_counter() - allocation_started
+
+        print(
+            "[3/4] Reading {:.2f} GB of checkpoint tensors from SSD...".format(
+                plan.host_arena_bytes / 1e9
+            ),
+            flush=True,
+        )
+        load_started = time.perf_counter()
+        store.load_checkpoint(args.checkpoint)
+        load_seconds = time.perf_counter() - load_started
+
+        print("[4/4] Initializing GPU slots and executor...", flush=True)
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats(device)
+        resident = resources.enter_context(
+            Int8ResidentDeviceArena(plan, store, device)
+        )
+        runtime = resources.enter_context(Int8DoubleBufferRuntime(
+            plan,
+            store,
+            resident,
+            device=device,
+            slot_count=args.slots,
+            profile=profile_enabled,
+            prefetch_depth=prefetch_depth,
+        ))
+        vocab_runtime = None
+        if plan.vocab is not None:
+            vocab_runtime = resources.enter_context(VocabStreamingRuntime(
+                plan,
+                store,
+                runtime,
+                embedding_staging_rows=args.max_context_tokens,
+                profile=profile_enabled,
+            ))
+        executor = resources.enter_context(Llama31DecodeExecutor(
+            config,
+            resident,
+            vocab_runtime=vocab_runtime,
+            top_k=sampling.top_k,
+            max_cache_length=args.max_context_tokens,
+            kv_block_size=args.kv_block_size,
+        ))
+        return (
+            resources.pop_all(),
+            store,
+            resident,
+            runtime,
+            vocab_runtime,
+            executor,
+            allocation_seconds,
+            load_seconds,
+        )
+    except BaseException:
+        resources.close()
+        raise
+
+
 def initialize(args):
     validate_args(args)
     torch.set_num_threads(args.cpu_threads)
@@ -586,60 +794,76 @@ def initialize(args):
     if not tokenizer.chat_template:
         raise SystemExit("checkpoint tokenizer has no chat template")
 
-    print(
-        "[2/4] Allocating the {} CPU weight store...".format(
-            args.weight_store
-        ),
-        flush=True,
-    )
-    plan = build_llama31_70b_int8_plan(args.granularity)
-    allocation_started = time.perf_counter()
-    store = create_int8_weight_store(
-        plan,
-        args.weight_store,
+    prefetch_depth = args.prefetch_depth or args.slots
+    policy = ExecutionPolicy(
+        granularity=args.granularity,
+        weight_format=WeightFormat.INT8_DEQUANT_BF16_FALLBACK,
+        cpu_weight_mode=args.weight_store,
+        embedding_mode=PlacementMode(args.embedding_mode),
+        lm_head_mode=PlacementMode(args.lm_head_mode),
         slot_count=args.slots,
+        prefetch_depth=prefetch_depth,
     )
-    allocation_seconds = time.perf_counter() - allocation_started
-
-    print(
-        "[3/4] Reading {:.2f} GB of checkpoint tensors from SSD...".format(
-            plan.host_arena_bytes / 1e9
-        ),
-        flush=True,
-    )
-    load_started = time.perf_counter()
-    store.load_checkpoint(args.checkpoint)
-    load_seconds = time.perf_counter() - load_started
-
-    print("[4/4] Initializing GPU slots and executor...", flush=True)
+    adapter = adapter_for_config(config)
+    geometry = adapter.build_geometry(config)
+    plan = adapter.build_plan(config, policy)
+    validation = adapter.validate_checkpoint(
+        args.checkpoint, config, policy
+    ).raise_for_error()
     device = torch.device(args.device)
     torch.cuda.set_device(device)
-    torch.cuda.empty_cache()
-    torch.cuda.reset_peak_memory_stats(device)
-    resident = Int8ResidentDeviceArena(plan, store, device)
-    runtime = Int8DoubleBufferRuntime(
+    preflight = MemoryPlanner(
         plan,
-        store,
-        resident,
-        device=device,
-        slot_count=args.slots,
-        profile=False,
-    )
-    vocab_runtime = VocabStreamingRuntime(
-        plan,
-        store,
-        runtime,
-        profile=False,
-    )
+        geometry,
+        policy=policy,
+        max_context=args.max_context_tokens,
+        max_prefill_tokens=args.max_context_tokens,
+        kv_block_size=args.kv_block_size,
+        embedding_staging_rows=args.max_context_tokens,
+        cuda_safety_margin_bytes=args.cuda_safety_margin_mib * 1024 ** 2,
+    ).preflight(device=device)
+    print(preflight.format_text(), flush=True)
+
     sampling = sampling_from_args(args)
-    executor = Llama31DecodeExecutor(
-        config,
+    stop_token_ids = collect_stop_token_ids(config, tokenizer)
+    profile_enabled = args.profile or args.run_report is not None
+    (
+        resource_stack,
+        store,
         resident,
-        vocab_runtime=vocab_runtime,
-        top_k=sampling.top_k,
+        runtime,
+        vocab_runtime,
+        executor,
+        allocation_seconds,
+        load_seconds,
+    ) = _allocate_runtime(
+        args,
+        config,
+        plan,
+        device,
+        sampling,
+        prefetch_depth,
+        profile_enabled,
     )
+
     generator = torch.Generator(device=device)
     generator.manual_seed(args.seed)
+    vocab_pinned_bytes = (
+        vocab_runtime.extra_pinned_cpu_bytes
+        if vocab_runtime is not None
+        else 0
+    )
+    report_context = {
+        "plan": plan,
+        "geometry": geometry,
+        "policy": policy,
+        "checkpoint": args.checkpoint,
+        "validation": validation,
+        "preflight": preflight,
+        "checkpoint_load_seconds": load_seconds,
+        "cpu_resident_bytes": plan.host_arena_bytes,
+        "pinned_bytes": store.pinned_cpu_bytes + vocab_pinned_bytes,
+    }
     session = ChatSession(
         tokenizer=tokenizer,
         config=config,
@@ -648,31 +872,45 @@ def initialize(args):
         device=device,
         sampling=sampling,
         max_context_tokens=args.max_context_tokens,
-        stop_token_ids=collect_stop_token_ids(config, tokenizer),
+        stop_token_ids=stop_token_ids,
         stop_strings=args.stop,
         generator=generator,
         seed=args.seed,
         system_prompt=args.system_prompt,
         transcript=args.transcript,
         session_path=args.session,
+        report_context=report_context,
+        run_report_path=args.run_report,
     )
-    if args.session is not None and args.session.is_file():
-        session.load_session(args.session)
-        print("Loaded session: {}".format(args.session), flush=True)
+    session._resource_stack = resource_stack
+    try:
+        if args.session is not None and args.session.is_file():
+            session.load_session(args.session)
+            print("Loaded session: {}".format(args.session), flush=True)
+    except BaseException:
+        session.close()
+        raise
     startup = {
         "allocation_seconds": allocation_seconds,
         "load_seconds": load_seconds,
         "pinned_cpu_gib": (
-            store.pinned_cpu_bytes + vocab_runtime.extra_pinned_cpu_bytes
-        )
-        / 1024**3,
+            store.pinned_cpu_bytes + vocab_pinned_bytes
+        ) / 1024**3,
         "planned_gpu_weight_gib": runtime.stats["weight_gpu_bytes"]
         / 1024**3,
         "model_id": plan.model_id,
+        "weight_format": policy.weight_format.value,
         "weight_store": args.weight_store,
         "granularity": args.granularity,
         "slots": args.slots,
+        "prefetch_depth": prefetch_depth,
+        "embedding_mode": args.embedding_mode,
+        "lm_head_mode": args.lm_head_mode,
         "device": str(device),
+        "profile": profile_enabled,
+        "run_report": str(args.run_report) if args.run_report else None,
+        "checkpoint_validation": validation.as_dict(),
+        "memory_preflight": preflight.as_dict(),
     }
     return session, store, startup
 
@@ -901,6 +1139,7 @@ def main():
     args = parse_args()
     configure_readline(args.history_file)
     store = None
+    session = None
     try:
         session, store, startup = initialize(args)
         print_ready(session, startup)
@@ -916,7 +1155,9 @@ def main():
             return
         repl(session, stream=not args.no_stream)
     finally:
-        if store is not None:
+        if session is not None:
+            session.close()
+        elif store is not None:
             store.close()
 
 

@@ -1,0 +1,326 @@
+{
+  "baseline_comparisons": [],
+  "hardware": {
+    "cuda_available": true,
+    "cuda_runtime": "12.1",
+    "device": "cuda:0",
+    "gpu_compute_capability": [
+      8,
+      6
+    ],
+    "gpu_name": "NVIDIA GeForce RTX 3080 Ti",
+    "gpu_total_memory_bytes": 12528123904,
+    "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+    "python": "3.8.10",
+    "torch": "2.4.1+cu121"
+  },
+  "results": [
+    {
+      "actual_backends": [
+        "bf16_linear"
+      ],
+      "case": {
+        "backend_requested": "bf16_linear",
+        "case_id": "bf16/bf16_linear/matrix_group/pinned_staging/mixed/s2/p2/e-streamed/lm-resident/r0",
+        "checkpoint": "/ssd/cascade-llm/models/Llama-3.1-8B-Instruct",
+        "decode_tokens": 2,
+        "embedding_placement": "streamed",
+        "gpu_resident_weight_budget_bytes": 0,
+        "granularity": "matrix_group",
+        "lm_head_placement": "resident",
+        "prefetch_depth": 2,
+        "prefill_tokens": 8,
+        "slot_count": 2,
+        "vocab_mode": "mixed",
+        "weight_format": "bf16",
+        "weight_store": "pinned_staging"
+      },
+      "fallback_backends": [],
+      "median": {
+        "attention_ms": 388.16460717469454,
+        "combined_weight_scale_h2d_ms": 2207.6692469120026,
+        "compute_stall_ratio": 0.7744577186837784,
+        "compute_wait_ms": 3142.198918503709,
+        "decode_ms_per_token": 1354.099840449635,
+        "dequant_ms": 0.0,
+        "effective_h2d_gbps": 18.96838994091816,
+        "effective_pageable_to_pinned_gbps": 5.785324523814154,
+        "embedding_ms": 0.0,
+        "gemm_ms": 88.49008000455797,
+        "gpu_peak_allocated_bytes": 1541056000,
+        "gpu_peak_reserved_bytes": 1570766848,
+        "lm_head_h2d_bytes_per_forward": 0.0,
+        "lm_head_ms": 0.0,
+        "overlap_ratio": 0.5924794958118829,
+        "pageable_to_pinned_ms": 7238.302875426598,
+        "ready_queue_max_depth": 2,
+        "resident_hit_ratio": 0.0,
+        "resident_weight_bytes": 0,
+        "scale_h2d_bytes": 0,
+        "source_queue_max_depth": 2,
+        "source_stall_ratio": 0.9581715204050655,
+        "source_wait_ms": 3885.1161636412144,
+        "streamed_weight_bytes": 13958643712,
+        "transformer_compute_ms": 508.18466997891665,
+        "transformer_weight_h2d_bytes_per_forward": 13958643712.0,
+        "ttft_ms": 1357.2557880543172,
+        "weight_h2d_bytes": 41875931136
+      },
+      "samples": [
+        {
+          "attention_ms": 401.7464956045151,
+          "combined_weight_scale_h2d_ms": 2207.1259224414825,
+          "compute_stall_ratio": 0.7689990208049978,
+          "compute_wait_ms": 3120.8475350867957,
+          "decode_ms_per_token": 1354.8348264885135,
+          "dequant_ms": 0.0,
+          "effective_h2d_gbps": 18.97305935751849,
+          "effective_pageable_to_pinned_gbps": 5.791206775569785,
+          "embedding_ms": 0.0,
+          "gemm_ms": 88.49008000455797,
+          "gpu_peak_allocated_bytes": 1541056000,
+          "gpu_peak_reserved_bytes": 1570766848,
+          "lm_head_h2d_bytes_per_forward": 0.0,
+          "lm_head_ms": 0.0,
+          "overlap_ratio": 0.5924794958118829,
+          "pageable_to_pinned_ms": 7230.9507774189115,
+          "ready_queue_max_depth": 2,
+          "resident_hit_ratio": 0.0,
+          "resident_weight_bytes": 0,
+          "scale_h2d_bytes": 0,
+          "source_queue_max_depth": 2,
+          "source_stall_ratio": 0.9555804245279594,
+          "source_wait_ms": 3878.0554094118997,
+          "streamed_weight_bytes": 13958643712,
+          "transformer_compute_ms": 520.5006411597133,
+          "transformer_weight_h2d_bytes_per_forward": 13958643712.0,
+          "ttft_ms": 1357.2557880543172,
+          "weight_h2d_bytes": 41875931136
+        },
+        {
+          "attention_ms": 367.90870559215546,
+          "combined_weight_scale_h2d_ms": 2214.590589284897,
+          "compute_stall_ratio": 0.7787751624528713,
+          "compute_wait_ms": 3157.714362256229,
+          "decode_ms_per_token": 1353.7138979299925,
+          "dequant_ms": 0.0,
+          "effective_h2d_gbps": 18.90910732602813,
+          "effective_pageable_to_pinned_gbps": 5.785324523814154,
+          "embedding_ms": 0.0,
+          "gemm_ms": 84.25897602923214,
+          "gpu_peak_allocated_bytes": 1541056000,
+          "gpu_peak_reserved_bytes": 1570766848,
+          "lm_head_h2d_bytes_per_forward": 0.0,
+          "lm_head_ms": 0.0,
+          "overlap_ratio": 0.591711765802793,
+          "pageable_to_pinned_ms": 7238.302875426598,
+          "ready_queue_max_depth": 2,
+          "resident_hit_ratio": 0.0,
+          "resident_weight_bytes": 0,
+          "scale_h2d_bytes": 0,
+          "source_queue_max_depth": 2,
+          "source_stall_ratio": 0.9581715204050655,
+          "source_wait_ms": 3885.1161636412144,
+          "streamed_weight_bytes": 13958643712,
+          "transformer_compute_ms": 478.1271976083517,
+          "transformer_weight_h2d_bytes_per_forward": 13958643712.0,
+          "ttft_ms": 1355.5507078999653,
+          "weight_h2d_bytes": 41875931136
+        },
+        {
+          "attention_ms": 388.16460717469454,
+          "combined_weight_scale_h2d_ms": 2207.6692469120026,
+          "compute_stall_ratio": 0.7744577186837784,
+          "compute_wait_ms": 3142.198918503709,
+          "decode_ms_per_token": 1354.099840449635,
+          "dequant_ms": 0.0,
+          "effective_h2d_gbps": 18.96838994091816,
+          "effective_pageable_to_pinned_gbps": 5.764260043646952,
+          "embedding_ms": 0.0,
+          "gemm_ms": 89.32873605005443,
+          "gpu_peak_allocated_bytes": 1541056000,
+          "gpu_peak_reserved_bytes": 1570766848,
+          "lm_head_h2d_bytes_per_forward": 0.0,
+          "lm_head_ms": 0.0,
+          "overlap_ratio": 0.5934827603756196,
+          "pageable_to_pinned_ms": 7264.7539873141795,
+          "ready_queue_max_depth": 2,
+          "resident_hit_ratio": 0.0,
+          "resident_weight_bytes": 0,
+          "scale_h2d_bytes": 0,
+          "source_queue_max_depth": 2,
+          "source_stall_ratio": 0.9586040973277802,
+          "source_wait_ms": 3889.3340271897614,
+          "streamed_weight_bytes": 13958643712,
+          "transformer_compute_ms": 508.18466997891665,
+          "transformer_weight_h2d_bytes_per_forward": 13958643712.0,
+          "ttft_ms": 1357.6556399930269,
+          "weight_h2d_bytes": 41875931136
+        }
+      ],
+      "skip_reason": null,
+      "status": "ok",
+      "variability": {
+        "latency_cv_threshold": 0.05,
+        "max_latency_cv": 0.0008238957890153167,
+        "metrics": {
+          "attention_ms": {
+            "coefficient_of_variation": 0.04412147100346053,
+            "mean": 385.93993612378836,
+            "stddev": 17.02823770076314
+          },
+          "combined_weight_scale_h2d_ms": {
+            "coefficient_of_variation": 0.0018833233956537276,
+            "mean": 2209.795252879461,
+            "stddev": 4.161759099352434
+          },
+          "compute_stall_ratio": {
+            "coefficient_of_variation": 0.006329032794326434,
+            "mean": 0.7740773006472158,
+            "stddev": 0.004899160621139911
+          },
+          "compute_wait_ms": {
+            "coefficient_of_variation": 0.005894504249844323,
+            "mean": 3140.2536052822447,
+            "stddev": 18.51023822192515
+          },
+          "decode_ms_per_token": {
+            "coefficient_of_variation": 0.0004205012346389888,
+            "mean": 1354.2161882893804,
+            "stddev": 0.5694495791437898
+          },
+          "dequant_ms": {
+            "coefficient_of_variation": 0.0,
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "effective_h2d_gbps": {
+            "coefficient_of_variation": 0.001881317049764227,
+            "mean": 18.95018554148826,
+            "stddev": 0.0356513071553974
+          },
+          "effective_pageable_to_pinned_gbps": {
+            "coefficient_of_variation": 0.002451146251543098,
+            "mean": 5.780263781010297,
+            "stddev": 0.014168271899753724
+          },
+          "embedding_ms": {
+            "coefficient_of_variation": 0.0,
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "gemm_ms": {
+            "coefficient_of_variation": 0.031106900069777066,
+            "mean": 87.35926402794819,
+            "stddev": 2.7174758962866545
+          },
+          "gpu_peak_allocated_bytes": {
+            "coefficient_of_variation": 0.0,
+            "mean": 1541056000.0,
+            "stddev": 0.0
+          },
+          "gpu_peak_reserved_bytes": {
+            "coefficient_of_variation": 0.0,
+            "mean": 1570766848.0,
+            "stddev": 0.0
+          },
+          "lm_head_h2d_bytes_per_forward": {
+            "coefficient_of_variation": 0.0,
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "lm_head_ms": {
+            "coefficient_of_variation": 0.0,
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "overlap_ratio": {
+            "coefficient_of_variation": 0.0014987627563575788,
+            "mean": 0.5925580073300986,
+            "stddev": 0.0008881038723678129
+          },
+          "pageable_to_pinned_ms": {
+            "coefficient_of_variation": 0.002453960358815639,
+            "mean": 7244.669213386563,
+            "stddev": 17.778131062382702
+          },
+          "ready_queue_max_depth": {
+            "coefficient_of_variation": 0.0,
+            "mean": 2.0,
+            "stddev": 0.0
+          },
+          "resident_hit_ratio": {
+            "coefficient_of_variation": 0.0,
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "resident_weight_bytes": {
+            "coefficient_of_variation": 0.0,
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "scale_h2d_bytes": {
+            "coefficient_of_variation": 0.0,
+            "mean": 0.0,
+            "stddev": 0.0
+          },
+          "source_queue_max_depth": {
+            "coefficient_of_variation": 0.0,
+            "mean": 2.0,
+            "stddev": 0.0
+          },
+          "source_stall_ratio": {
+            "coefficient_of_variation": 0.0017078781714179622,
+            "mean": 0.957452014086935,
+            "stddev": 0.0016352113950392395
+          },
+          "source_wait_ms": {
+            "coefficient_of_variation": 0.0014671636794878415,
+            "mean": 3884.1685334142917,
+            "stddev": 5.698710997235005
+          },
+          "streamed_weight_bytes": {
+            "coefficient_of_variation": 0.0,
+            "mean": 13958643712.0,
+            "stddev": 0.0
+          },
+          "transformer_compute_ms": {
+            "coefficient_of_variation": 0.04339681607428247,
+            "mean": 502.2708362489939,
+            "stddev": 21.796955100173633
+          },
+          "transformer_weight_h2d_bytes_per_forward": {
+            "coefficient_of_variation": 0.0,
+            "mean": 13958643712.0,
+            "stddev": 0.0
+          },
+          "ttft_ms": {
+            "coefficient_of_variation": 0.0008238957890153167,
+            "mean": 1356.8207119824365,
+            "stddev": 1.1178788710510932
+          },
+          "weight_h2d_bytes": {
+            "coefficient_of_variation": 0.0,
+            "mean": 41875931136.0,
+            "stddev": 0.0
+          }
+        },
+        "stable": true
+      }
+    }
+  ],
+  "schema_version": 2,
+  "software": {
+    "duration_seconds": 20.794550895690918,
+    "measurement_notes": [
+      "weight and scale share one transfer-unit copy; time is combined",
+      "weight_h2d_bytes and scale_h2d_bytes remain separately reported",
+      "synthetic checkpoints are regression data, not real-model performance",
+      "backend mismatch is an error; no silent fallback is allowed"
+    ],
+    "preset": "smoke",
+    "python": "3.8.10",
+    "torch": "2.4.1+cu121"
+  },
+  "synthetic_only": false
+}

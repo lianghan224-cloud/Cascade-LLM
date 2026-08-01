@@ -57,25 +57,73 @@ class VocabStreamingRuntime:
         self.profile = bool(profile)
         self.last_profile = None
         self.last_embedding_bytes = 0
+        self.last_embedding_wall_ms = 0.0
         self.slot_count = len(self.device_slots)
         self.embedding_staging_rows = int(embedding_staging_rows)
         if self.embedding_staging_rows < 1:
             raise ValueError("embedding_staging_rows must be positive")
-        if self.slot_count not in (1, 2):
-            raise ValueError(
-                "vocabulary streaming requires one or two GPU slots"
-            )
-        if self.device_slots[0].numel() < self.vocab.chunk_elements:
+        if self.slot_count < 1:
+            raise ValueError("vocabulary streaming requires a GPU slot")
+        if (
+            self.vocab.stream_lm_head
+            and self.device_slots[0].numel() < self.vocab.chunk_elements
+        ):
             raise ValueError("shared GPU slot is smaller than vocab chunk")
+        self.ready_events = []
+        self.free_events = []
+        self._profile_events = None
+        if self.vocab.stream_lm_head:
+            self.ready_events = [
+                torch.cuda.Event(enable_timing=False)
+                for _ in range(self.vocab.chunk_count)
+            ]
+            self.free_events = [
+                torch.cuda.Event(enable_timing=False)
+                for _ in range(self.vocab.chunk_count)
+            ]
+            if self.profile:
+                self._profile_events = {
+                    name: [
+                        torch.cuda.Event(enable_timing=True)
+                        for _ in range(self.vocab.chunk_count)
+                    ]
+                    for name in (
+                        "copy_starts",
+                        "copy_ends",
+                        "compute_starts",
+                        "compute_ends",
+                    )
+                }
+                self._profile_events["pipeline_start"] = torch.cuda.Event(
+                    enable_timing=True
+                )
+                self._profile_events["pipeline_end"] = torch.cuda.Event(
+                    enable_timing=True
+                )
 
-        self.embedding_staging = torch.empty(
-            (self.embedding_staging_rows, self.vocab.hidden_size),
-            dtype=torch.bfloat16,
-            device="cpu",
-            pin_memory=True,
-        )
+        self.embedding_staging = None
+        self.embedding_ready_event = None
+        self.embedding_copy_events = None
+        if self.vocab.stream_embedding:
+            self.embedding_staging = torch.empty(
+                (self.embedding_staging_rows, self.vocab.hidden_size),
+                dtype=torch.bfloat16,
+                device="cpu",
+                pin_memory=True,
+            )
+            self.embedding_ready_event = torch.cuda.Event(
+                enable_timing=False
+            )
+            if self.profile:
+                self.embedding_copy_events = (
+                    torch.cuda.Event(enable_timing=True),
+                    torch.cuda.Event(enable_timing=True),
+                )
         self.head_staging_slots = None
-        if self.store.mode == WeightStoreMode.PINNED_STAGING:
+        if (
+            self.vocab.stream_lm_head
+            and self.store.mode == WeightStoreMode.PINNED_STAGING
+        ):
             self.head_staging_slots = [
                 torch.empty(
                     self.vocab.chunk_elements,
@@ -92,7 +140,12 @@ class VocabStreamingRuntime:
 
     @property
     def extra_pinned_cpu_bytes(self):
-        total = self.embedding_staging.numel() * self.embedding_staging.element_size()
+        total = 0
+        if self.embedding_staging is not None:
+            total += (
+                self.embedding_staging.numel()
+                * self.embedding_staging.element_size()
+            )
         if self.head_staging_slots is not None:
             total += sum(
                 slot.numel() * slot.element_size()
@@ -103,6 +156,10 @@ class VocabStreamingRuntime:
     def embedding(self, input_ids):
         """Gather only requested CPU rows and transfer them to the GPU."""
 
+        if not self.vocab.stream_embedding or self.embedding_staging is None:
+            raise RuntimeError("embedding streaming is disabled by the plan")
+
+        wall_started = time.perf_counter()
         shape = tuple(input_ids.shape)
         ids_cpu = input_ids.detach().reshape(-1).to(
             device="cpu",
@@ -117,20 +174,26 @@ class VocabStreamingRuntime:
         self.last_embedding_bytes = (
             ids_cpu.numel() * self.vocab.hidden_size * 2
         )
-        for start in range(0, ids_cpu.numel(), self.embedding_staging_rows):
-            end = min(start + self.embedding_staging_rows, ids_cpu.numel())
-            rows = end - start
-            staging = self.embedding_staging[:rows]
-            torch.index_select(
-                source,
-                dim=0,
-                index=ids_cpu[start:end],
-                out=staging,
+        if ids_cpu.numel() > self.embedding_staging_rows:
+            raise RuntimeError(
+                "input has {} tokens, above preallocated embedding staging "
+                "capacity {}".format(
+                    ids_cpu.numel(), self.embedding_staging_rows
+                )
             )
-            with torch.cuda.stream(self.copy_stream):
-                output[start:end].copy_(staging, non_blocking=True)
-            # The same small staging buffer is reused for the next group.
-            self.copy_stream.synchronize()
+        staging = self.embedding_staging[: ids_cpu.numel()]
+        torch.index_select(source, dim=0, index=ids_cpu, out=staging)
+        with torch.cuda.stream(self.copy_stream):
+            if self.embedding_copy_events is not None:
+                self.embedding_copy_events[0].record(self.copy_stream)
+            output.copy_(staging, non_blocking=True)
+            if self.embedding_copy_events is not None:
+                self.embedding_copy_events[1].record(self.copy_stream)
+            self.embedding_ready_event.record(self.copy_stream)
+        self.compute_stream.wait_event(self.embedding_ready_event)
+        self.last_embedding_wall_ms = (
+            time.perf_counter() - wall_started
+        ) * 1000.0
         return output.view(shape + (self.vocab.hidden_size,))
 
     def _head_source(self, start_row, end_row, slot_index, ready_event):
@@ -152,6 +215,9 @@ class VocabStreamingRuntime:
     def lm_head_topk(self, hidden_states, top_k=10, return_full_logits=False):
         """Stream row shards and maintain an exact global top-k."""
 
+        if not self.vocab.stream_lm_head:
+            raise RuntimeError("LM Head streaming is disabled by the plan")
+
         if hidden_states.shape[-1] != self.vocab.hidden_size:
             raise ValueError("hidden state width does not match vocabulary")
         if top_k < 1 or top_k > self.vocab.vocab_size:
@@ -159,14 +225,8 @@ class VocabStreamingRuntime:
 
         wall_started = time.perf_counter()
         chunk_count = self.vocab.chunk_count
-        ready_events = [
-            torch.cuda.Event(enable_timing=False)
-            for _ in range(chunk_count)
-        ]
-        free_events = [
-            torch.cuda.Event(enable_timing=False)
-            for _ in range(chunk_count)
-        ]
+        ready_events = self.ready_events
+        free_events = self.free_events
         copy_starts = []
         copy_ends = []
         compute_starts = []
@@ -174,24 +234,12 @@ class VocabStreamingRuntime:
         pipeline_start = None
         pipeline_end = None
         if self.profile:
-            pipeline_start = torch.cuda.Event(enable_timing=True)
-            pipeline_end = torch.cuda.Event(enable_timing=True)
-            copy_starts = [
-                torch.cuda.Event(enable_timing=True)
-                for _ in range(chunk_count)
-            ]
-            copy_ends = [
-                torch.cuda.Event(enable_timing=True)
-                for _ in range(chunk_count)
-            ]
-            compute_starts = [
-                torch.cuda.Event(enable_timing=True)
-                for _ in range(chunk_count)
-            ]
-            compute_ends = [
-                torch.cuda.Event(enable_timing=True)
-                for _ in range(chunk_count)
-            ]
+            pipeline_start = self._profile_events["pipeline_start"]
+            pipeline_end = self._profile_events["pipeline_end"]
+            copy_starts = self._profile_events["copy_starts"]
+            copy_ends = self._profile_events["copy_ends"]
+            compute_starts = self._profile_events["compute_starts"]
+            compute_ends = self._profile_events["compute_ends"]
             pipeline_start.record(self.coordinator)
             self.copy_stream.wait_event(pipeline_start)
             self.compute_stream.wait_event(pipeline_start)
@@ -297,9 +345,43 @@ class VocabStreamingRuntime:
                 "chunk_count": chunk_count,
                 "chunk_rows": self.vocab.chunk_rows,
                 "requested_top_k": int(top_k),
+                "embedding_wall_ms": self.last_embedding_wall_ms,
+                "embedding_h2d_ms": (
+                    self.embedding_copy_events[0].elapsed_time(
+                        self.embedding_copy_events[1]
+                    )
+                    if self.embedding_copy_events is not None
+                    else None
+                ),
             }
         return {
             "values": global_values,
             "indices": global_indices,
             "logits": logits,
         }
+
+    def close(self):
+        self.embedding_staging = None
+        self.embedding_ready_event = None
+        self.embedding_copy_events = None
+        self.head_staging_slots = None
+        self.ready_events = []
+        self.free_events = []
+        self._profile_events = None
+        self.last_profile = None
+
+    def profile_stats(self):
+        result = dict(self.last_profile or {})
+        result["embedding_wall_ms"] = self.last_embedding_wall_ms
+        if self.embedding_copy_events is not None:
+            result["embedding_h2d_ms"] = self.embedding_copy_events[
+                0
+            ].elapsed_time(self.embedding_copy_events[1])
+        return result
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+        return False

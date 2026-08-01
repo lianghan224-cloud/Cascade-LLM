@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "framework": "huggingface_transformers",
+  "checkpoint": "/ssd/cascade-llm/models/Llama-3.1-8B-Instruct",
+  "device_map": "balanced",
+  "input_ids": [
+    1,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "decode_ids": [
+    4,
+    5
+  ],
+  "weight_dtype": "torch.bfloat16",
+  "checkpoint_bytes": 16060522496,
+  "single_gpu_preflight": {
+    "supported": false,
+    "free_bytes": 12228624384,
+    "total_bytes": 12528123904,
+    "reason": "checkpoint weights alone exceed current single-GPU free memory"
+  },
+  "software": {
+    "python": "3.8.10",
+    "torch": "2.4.1+cu121",
+    "transformers": "4.45.2"
+  },
+  "status": "ok",
+  "load_time_seconds": 4.245148144080304,
+  "ttft_ms": 288.4908999549225,
+  "decode_latencies_ms": [
+    46.71227093786001,
+    30.19116201903671
+  ],
+  "decode_ms_per_token": 38.45171647844836,
+  "topk_ids": [
+    [
+      5106,
+      12898,
+      482,
+      12196,
+      24572,
+      1761,
+      43845,
+      16,
+      11567,
+      23875
+    ]
+  ],
+  "hf_device_map": {
+    "model.embed_tokens": "0",
+    "model.layers.0": "0",
+    "model.layers.1": "0",
+    "model.layers.2": "0",
+    "model.layers.3": "0",
+    "model.layers.4": "0",
+    "model.layers.5": "0",
+    "model.layers.6": "0",
+    "model.layers.7": "0",
+    "model.layers.8": "0",
+    "model.layers.9": "0",
+    "model.layers.10": "0",
+    "model.layers.11": "0",
+    "model.layers.12": "0",
+    "model.layers.13": "0",
+    "model.layers.14": "1",
+    "model.layers.15": "1",
+    "model.layers.16": "1",
+    "model.layers.17": "1",
+    "model.layers.18": "1",
+    "model.layers.19": "1",
+    "model.layers.20": "1",
+    "model.layers.21": "1",
+    "model.layers.22": "1",
+    "model.layers.23": "1",
+    "model.layers.24": "1",
+    "model.layers.25": "1",
+    "model.layers.26": "1",
+    "model.layers.27": "1",
+    "model.layers.28": "1",
+    "model.layers.29": "1",
+    "model.layers.30": "1",
+    "model.layers.31": "1",
+    "model.norm": "1",
+    "model.rotary_emb": "1",
+    "lm_head": "1"
+  },
+  "gpu_memory": [
+    {
+      "device": 0,
+      "name": "NVIDIA GeForce RTX 3080 Ti",
+      "allocated_bytes": 7167424000,
+      "reserved_bytes": 7241465856,
+      "peak_allocated_bytes": 7172019712,
+      "peak_reserved_bytes": 7241465856
+    },
+    {
+      "device": 1,
+      "name": "NVIDIA GeForce RTX 3080 Ti",
+      "allocated_bytes": 8911980032,
+      "reserved_bytes": 9003073536,
+      "peak_allocated_bytes": 8918144512,
+      "peak_reserved_bytes": 9003073536
+    }
+  ],
+  "notes": [
+    "eager Hugging Face baseline; no quantization",
+    "balanced mode uses every visible GPU and is not a single-GPU throughput comparison"
+  ]
+}

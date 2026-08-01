@@ -1,14 +1,15 @@
-"""Mixed-dtype Llama 3.1 70B W8A8 weight streaming runtime.
+"""Mixed-dtype Llama INT8-dequant-to-BF16 fallback runtime.
 
 The compressed checkpoint stores Transformer linear weights as INT8 plus one
 BF16 scale per output channel. Embedding, LM head, and normalization weights
 remain BF16. This module keeps that representation in CPU memory, transfers
 INT8 weights without expansion, and dequantizes one matrix at a time into a
-reusable BF16 GPU workspace.
+reusable BF16 GPU workspace.  It is intentionally distinct from a fused
+W8A8 activation-and-weight kernel.
 """
 
 from concurrent.futures import Future, ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from functools import reduce
 import json
@@ -20,6 +21,7 @@ import time
 import torch
 
 from .plan import Granularity, MIB, VocabPlan
+from .pipeline import PipelineRuntimeCore
 
 
 ALIGNMENT_BYTES = 256
@@ -44,6 +46,7 @@ class Int8TensorSpec:
     shape: tuple
     dtype: str
     resident: bool = False
+    alias_of: object = None
 
     @property
     def numel(self):
@@ -99,8 +102,10 @@ class Int8ModelPlan:
     resident_arena_elements: int
     transfer_slot_bytes: int
     dequant_workspace_elements: int
-    vocab: VocabPlan
+    vocab: object
     slot_count: int = 2
+    geometry: object = None
+    alias_map: dict = field(default_factory=dict)
 
     @property
     def stream_bytes_per_token(self):
@@ -130,9 +135,12 @@ class Int8ModelPlan:
 
     @property
     def aliases(self):
-        return {}
+        return self.alias_map
 
     def tensor_host_offset_bytes(self, key):
+        alias = self.aliases.get(key)
+        if alias is not None:
+            return self.tensor_host_offset_bytes(alias)
         for unit in self.units:
             for piece in unit.pieces:
                 if piece.tensor.key == key:
@@ -157,15 +165,21 @@ class Int8ModelPlan:
             "transfer_slot_bytes": self.transfer_slot_bytes,
             "dequant_workspace_bytes": self.dequant_workspace_bytes,
             "device_bytes_per_slot": self.slot_bytes,
-            "vocab": {
-                "embedding_key": self.vocab.embedding_key,
-                "lm_head_key": self.vocab.lm_head_key,
-                "vocab_size": self.vocab.vocab_size,
-                "hidden_size": self.vocab.hidden_size,
-                "chunk_rows": self.vocab.chunk_rows,
-                "chunk_bytes": self.vocab.chunk_bytes,
-                "chunk_count": self.vocab.chunk_count,
-            },
+            "vocab": (
+                {
+                    "embedding_key": self.vocab.embedding_key,
+                    "lm_head_key": self.vocab.lm_head_key,
+                    "vocab_size": self.vocab.vocab_size,
+                    "hidden_size": self.vocab.hidden_size,
+                    "chunk_rows": self.vocab.chunk_rows,
+                    "chunk_bytes": self.vocab.chunk_bytes,
+                    "chunk_count": self.vocab.chunk_count,
+                    "stream_embedding": self.vocab.stream_embedding,
+                    "stream_lm_head": self.vocab.stream_lm_head,
+                }
+                if self.vocab is not None
+                else None
+            ),
             "unit_bytes": {
                 "min": min(unit.nbytes for unit in self.units),
                 "max": max(unit.nbytes for unit in self.units),
@@ -215,18 +229,30 @@ def _place_unit(unit_id, layer_index, operation, tensors, host_cursor):
     return unit, host_cursor + unit_bytes
 
 
-def build_llama31_70b_int8_plan(
+def build_llama_int8_plan(
+    geometry,
     granularity=Granularity.MATRIX,
+    embedding_mode="streamed",
+    lm_head_mode="streamed",
     vocab_chunk_bytes=128 * MIB,
 ):
-    """Build the exact mixed-dtype plan for the RedHatAI W8A8 checkpoint."""
+    """Build the explicit INT8-dequant-to-BF16 fallback plan."""
 
     granularity = Granularity(granularity)
-    hidden = 8192
-    intermediate = 28672
-    kv = 1024
-    vocab = 128256
-    layers = 80
+    embedding_mode = str(getattr(embedding_mode, "value", embedding_mode))
+    lm_head_mode = str(getattr(lm_head_mode, "value", lm_head_mode))
+    if embedding_mode not in {"resident", "streamed"}:
+        raise ValueError("embedding_mode must be resident or streamed")
+    if lm_head_mode not in {"resident", "streamed"}:
+        raise ValueError("lm_head_mode must be resident or streamed")
+    stream_embedding = embedding_mode == "streamed"
+    stream_lm_head = lm_head_mode == "streamed"
+    hidden = int(geometry.hidden_size)
+    intermediate = int(geometry.intermediate_size)
+    kv = int(geometry.num_key_value_heads) * int(geometry.head_dim)
+    vocab = int(geometry.vocab_size)
+    layers = int(geometry.num_hidden_layers)
+    tie_word_embeddings = bool(geometry.tie_word_embeddings)
     projection_shapes = (
         ("q_proj", (hidden, hidden)),
         ("k_proj", (kv, hidden)),
@@ -239,12 +265,13 @@ def build_llama31_70b_int8_plan(
 
     specs = {}
 
-    def add(key, shape, dtype, resident=False):
+    def add(key, shape, dtype, resident=False, alias_of=None):
         spec = Int8TensorSpec(
             key=key,
             shape=tuple(shape),
             dtype=dtype,
             resident=resident,
+            alias_of=alias_of,
         )
         specs[key] = spec
         return spec
@@ -254,7 +281,15 @@ def build_llama31_70b_int8_plan(
         (vocab, hidden),
         "bfloat16",
     )
-    lm_head = add("lm_head.weight", (vocab, hidden), "bfloat16")
+    if tie_word_embeddings:
+        lm_head = add(
+            "lm_head.weight",
+            (vocab, hidden),
+            "bfloat16",
+            alias_of=embedding.key,
+        )
+    else:
+        lm_head = add("lm_head.weight", (vocab, hidden), "bfloat16")
 
     layer_matrices = []
     layer_norms = []
@@ -345,15 +380,28 @@ def build_llama31_70b_int8_plan(
                 )
                 units.append(unit)
 
+    host_only_specs = []
+    resident_specs = []
+    if tie_word_embeddings:
+        if stream_embedding and stream_lm_head:
+            host_only_specs.append(embedding)
+        else:
+            resident_specs.append(embedding)
+    else:
+        (host_only_specs if stream_embedding else resident_specs).append(
+            embedding
+        )
+        (host_only_specs if stream_lm_head else resident_specs).append(lm_head)
+
     host_only = []
-    for tensor in (embedding, lm_head):
+    for tensor in host_only_specs:
         host_cursor = _align(host_cursor)
         host_only.append(Int8HostPlacement(tensor, host_cursor))
         host_cursor += tensor.nbytes
 
     resident = []
     device_cursor = 0
-    for tensor in tuple(layer_norms) + (final_norm,):
+    for tensor in tuple(resident_specs) + tuple(layer_norms) + (final_norm,):
         host_cursor = _align(host_cursor)
         resident.append(
             Int8ResidentPlacement(
@@ -365,31 +413,35 @@ def build_llama31_70b_int8_plan(
         host_cursor += tensor.nbytes
         device_cursor += tensor.numel
 
-    row_bytes = hidden * 2
-    chunk_rows = int(vocab_chunk_bytes) // row_bytes
-    if chunk_rows < 1:
-        raise ValueError("vocabulary chunk must hold at least one row")
-    chunk_elements = chunk_rows * hidden
-    chunk_bytes = chunk_elements * 2
-    vocab_plan = VocabPlan(
-        embedding_key=embedding.key,
-        lm_head_key=lm_head.key,
-        vocab_size=vocab,
-        hidden_size=hidden,
-        chunk_rows=chunk_rows,
-        chunk_elements=chunk_elements,
-        chunk_bytes=chunk_bytes,
-        chunk_count=(vocab + chunk_rows - 1) // chunk_rows,
-    )
+    vocab_plan = None
+    chunk_elements = 0
+    if stream_embedding or stream_lm_head:
+        row_bytes = hidden * 2
+        chunk_rows = min(vocab, int(vocab_chunk_bytes) // row_bytes)
+        if chunk_rows < 1:
+            raise ValueError("vocabulary chunk must hold at least one row")
+        chunk_elements = chunk_rows * hidden
+        chunk_bytes = chunk_elements * 2
+        vocab_plan = VocabPlan(
+            embedding_key=embedding.key,
+            lm_head_key=lm_head.key,
+            vocab_size=vocab,
+            hidden_size=hidden,
+            chunk_rows=chunk_rows,
+            chunk_elements=chunk_elements,
+            chunk_bytes=chunk_bytes,
+            chunk_count=(vocab + chunk_rows - 1) // chunk_rows,
+            stream_embedding=stream_embedding,
+            stream_lm_head=stream_lm_head,
+        )
     transfer_slot_bytes = max(unit.nbytes for unit in units)
     dequant_elements = max(
         spec.numel for spec in specs.values() if spec.dtype == "int8"
     )
-    dequant_elements = max(dequant_elements, chunk_elements)
+    if stream_lm_head:
+        dequant_elements = max(dequant_elements, chunk_elements)
     return Int8ModelPlan(
-        model_id=(
-            "RedHatAI/Meta-Llama-3.1-70B-Instruct-quantized.w8a8"
-        ),
+        model_id=str(geometry.model_id),
         granularity=granularity,
         tensors=specs,
         units=tuple(units),
@@ -400,6 +452,12 @@ def build_llama31_70b_int8_plan(
         transfer_slot_bytes=transfer_slot_bytes,
         dequant_workspace_elements=dequant_elements,
         vocab=vocab_plan,
+        geometry=geometry,
+        alias_map=(
+            {"lm_head.weight": "model.embed_tokens.weight"}
+            if tie_word_embeddings
+            else {}
+        ),
     )
 
 
@@ -411,6 +469,15 @@ class Int8WeightStoreMode(str, Enum):
 def _resolved_checkpoint_files(checkpoint):
     checkpoint = Path(checkpoint)
     index_path = checkpoint / "model.safetensors.index.json"
+    single_path = checkpoint / "model.safetensors"
+    if not index_path.exists():
+        if single_path.exists():
+            return None
+        raise FileNotFoundError(
+            "expected model.safetensors or model.safetensors.index.json in {}".format(
+                checkpoint
+            )
+        )
     with index_path.open("r", encoding="utf-8") as source:
         index = json.load(source)
     weight_map = index.get("weight_map")
@@ -436,6 +503,7 @@ class Int8BaseWeightStore:
         self.tensor_factory = tensor_factory or torch.empty
         self.arena = None
         self._loaded = False
+        self._closed = False
         if allocate:
             self.allocate()
 
@@ -461,6 +529,7 @@ class Int8BaseWeightStore:
 
     def allocate(self):
         if self.arena is None:
+            self._closed = False
             self.arena = self.tensor_factory(
                 self.plan.host_arena_bytes,
                 dtype=torch.uint8,
@@ -471,6 +540,8 @@ class Int8BaseWeightStore:
 
     def _target_view(self, key):
         spec = self.plan.tensors[key]
+        if spec.alias_of is not None:
+            return self._target_view(spec.alias_of)
         start = self.plan.tensor_host_offset_bytes(key)
         raw = self._raw_view(start, spec.nbytes)
         return raw.view(spec.torch_dtype).view(spec.shape)
@@ -493,15 +564,22 @@ class Int8BaseWeightStore:
         if self.arena is None:
             self.allocate()
         weight_map = _resolved_checkpoint_files(checkpoint)
-        required = set(self.plan.tensors)
-        missing_index = required.difference(weight_map)
-        if missing_index:
-            raise KeyError(
-                "checkpoint index misses required tensors: {}".format(
-                    ", ".join(sorted(missing_index)[:8])
+        required = {
+            key
+            for key, spec in self.plan.tensors.items()
+            if spec.alias_of is None
+        }
+        if weight_map is None:
+            files = [Path(checkpoint) / "model.safetensors"]
+        else:
+            missing_index = required.difference(weight_map)
+            if missing_index:
+                raise KeyError(
+                    "checkpoint index misses required tensors: {}".format(
+                        ", ".join(sorted(missing_index)[:8])
+                    )
                 )
-            )
-        files = sorted({weight_map[key] for key in required})
+            files = sorted({weight_map[key] for key in required})
         loaded = set()
         with torch.inference_mode():
             for filename in files:
@@ -543,8 +621,20 @@ class Int8BaseWeightStore:
         return self
 
     def close(self):
+        if self._closed:
+            return
         self.arena = None
         self._loaded = False
+        self._closed = True
+
+    def __enter__(self):
+        if self.arena is None:
+            self.allocate()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+        return False
 
     def reset_profile(self):
         return None
@@ -594,6 +684,7 @@ class Int8FullPinnedWeightStore(Int8BaseWeightStore):
     def allocate(self):
         if self.pinned_chunks:
             return self.arena
+        self._closed = False
         intervals = [
             (unit.host_offset_bytes, unit.host_offset_bytes + unit.nbytes)
             for unit in self.plan.units
@@ -777,6 +868,9 @@ class Int8ResidentDeviceArena:
             source = store.tensor(spec.key)
             view.copy_(source, non_blocking=source.is_pinned())
             self.views[spec.key] = view
+        for alias, target in plan.aliases.items():
+            if target in self.views:
+                self.views[alias] = self.views[target]
         torch.cuda.current_stream(self.device).synchronize()
 
     @property
@@ -786,12 +880,23 @@ class Int8ResidentDeviceArena:
     def __getitem__(self, key):
         return self.views[key]
 
+    def close(self):
+        self.views = {}
+        self.arena = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+        return False
+
 
 class _DequantizingViews:
-    def __init__(self, raw_views, workspace, profile=False):
+    def __init__(self, raw_views, workspace, profile_events=None):
         self.raw_views = raw_views
         self.workspace = workspace
-        self.profile = profile
+        self.profile_events = profile_events
         self.dequant_events = []
 
     def __getitem__(self, key):
@@ -801,12 +906,11 @@ class _DequantizingViews:
         scale_key = key + "_scale"
         scale = self.raw_views[scale_key]
         target = self.workspace[: source.numel()].view(source.shape)
-        if self.profile:
-            start = torch.cuda.Event(enable_timing=True)
-            end = torch.cuda.Event(enable_timing=True)
+        if self.profile_events is not None:
+            start, end = self.profile_events[key]
             start.record()
         torch.mul(source, scale, out=target)
-        if self.profile:
+        if self.profile_events is not None:
             end.record()
             self.dequant_events.append((start, end))
         return target
@@ -823,6 +927,8 @@ class Int8DoubleBufferRuntime:
         device="cuda:0",
         slot_count=2,
         profile=False,
+        source_timeout_seconds=120.0,
+        prefetch_depth=None,
     ):
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA is unavailable")
@@ -831,10 +937,23 @@ class Int8DoubleBufferRuntime:
         self.resident = resident
         self.device = torch.device(device)
         self.slot_count = int(slot_count)
-        if self.slot_count not in (1, 2):
-            raise ValueError("slot_count must be 1 or 2")
+        if self.slot_count < 1:
+            raise ValueError("slot_count must be positive")
         self.profile = bool(profile)
+        self.source_timeout_seconds = float(source_timeout_seconds)
+        if self.source_timeout_seconds <= 0:
+            raise ValueError("source_timeout_seconds must be positive")
         self.last_profile = None
+        self._closed = False
+        self.prefetch_depth = (
+            self.slot_count
+            if prefetch_depth is None
+            else int(prefetch_depth)
+        )
+        if self.prefetch_depth < 1:
+            raise ValueError("prefetch_depth must be positive")
+        self._dequant_event_pairs = []
+        self._dequant_profile_events = None
         self.transfer_slots = [
             torch.empty(
                 plan.transfer_slot_bytes,
@@ -857,6 +976,45 @@ class Int8DoubleBufferRuntime:
         self.copy_stream = torch.cuda.Stream(device=self.device)
         self.compute_stream = torch.cuda.Stream(device=self.device)
         self.coordinator = torch.cuda.current_stream(self.device)
+        self.ready_events = [torch.cuda.Event() for _ in self.plan.units]
+        self.free_events = [torch.cuda.Event() for _ in self.plan.units]
+        self.run_start_event = torch.cuda.Event(enable_timing=False)
+        self._profile_events = None
+        if self.profile:
+            self._dequant_profile_events = {
+                key: (
+                    torch.cuda.Event(enable_timing=True),
+                    torch.cuda.Event(enable_timing=True),
+                )
+                for key, spec in self.plan.tensors.items()
+                if spec.dtype == "int8"
+            }
+            self._profile_events = {
+                name: [
+                    torch.cuda.Event(enable_timing=True)
+                    for _ in self.plan.units
+                ]
+                for name in (
+                    "copy_starts",
+                    "copy_ends",
+                    "compute_starts",
+                    "compute_ends",
+                )
+            }
+            self._profile_events["pipeline_start"] = torch.cuda.Event(
+                enable_timing=True
+            )
+            self._profile_events["pipeline_end"] = torch.cuda.Event(
+                enable_timing=True
+            )
+        self.pipeline = PipelineRuntimeCore(
+            plan=self.plan,
+            store=self.store,
+            slot_count=self.slot_count,
+            prefetch_depth=self.prefetch_depth,
+            source_timeout_seconds=self.source_timeout_seconds,
+            submit_copy=self._submit_copy,
+        )
 
     @property
     def stats(self):
@@ -883,11 +1041,65 @@ class Int8DoubleBufferRuntime:
             views[spec.key] = raw.view(spec.torch_dtype).view(spec.shape)
         return views
 
+    def _submit_copy(self, prepared, lease):
+        index = prepared.index
+        unit = prepared.unit
+        transfer_slot = self.transfer_slots[lease.slot_index]
+        with torch.cuda.device(self.device):
+            if lease.reuse_event is not None:
+                self.copy_stream.wait_event(lease.reuse_event)
+            with torch.cuda.stream(self.copy_stream):
+                if self.profile:
+                    self._profile_events["copy_starts"][index].record(
+                        self.copy_stream
+                    )
+                transfer_slot[: unit.nbytes].copy_(
+                    prepared.source, non_blocking=True
+                )
+                if self.profile:
+                    self._profile_events["copy_ends"][index].record(
+                        self.copy_stream
+                    )
+                ready_event = self.ready_events[index]
+                ready_event.record(self.copy_stream)
+        return ready_event
+
+    def _consume_ready(self, ready, compute_unit, state):
+        index = ready.index
+        unit = ready.unit
+        slot_index = ready.device_slot_index
+        transfer_slot = self.transfer_slots[slot_index]
+        self.compute_stream.wait_event(ready.ready_event)
+        with torch.cuda.stream(self.compute_stream):
+            if self.profile:
+                self._profile_events["compute_starts"][index].record(
+                    self.compute_stream
+                )
+            try:
+                raw_views = self._raw_unit_views(unit, transfer_slot)
+                views = _DequantizingViews(
+                    raw_views,
+                    self.dequant_slots[slot_index],
+                    profile_events=self._dequant_profile_events,
+                )
+                state = compute_unit(unit, views, state)
+                self._dequant_event_pairs.extend(views.dequant_events)
+            finally:
+                if self.profile:
+                    self._profile_events["compute_ends"][index].record(
+                        self.compute_stream
+                    )
+                free_event = self.free_events[index]
+                free_event.record(self.compute_stream)
+        return state, free_event
+
     def run(self, compute_unit, state):
+        if self._closed:
+            raise RuntimeError("runtime is closed")
         wall_started = time.perf_counter()
         units = self.plan.units
-        ready_events = [torch.cuda.Event() for _ in units]
-        free_events = [torch.cuda.Event() for _ in units]
+        if not units:
+            return state
         copy_starts = []
         copy_ends = []
         compute_starts = []
@@ -895,117 +1107,88 @@ class Int8DoubleBufferRuntime:
         pipeline_start = None
         pipeline_end = None
         if self.profile:
-            pipeline_start = torch.cuda.Event(enable_timing=True)
-            pipeline_end = torch.cuda.Event(enable_timing=True)
-            copy_starts = [
-                torch.cuda.Event(enable_timing=True) for _ in units
-            ]
-            copy_ends = [
-                torch.cuda.Event(enable_timing=True) for _ in units
-            ]
-            compute_starts = [
-                torch.cuda.Event(enable_timing=True) for _ in units
-            ]
-            compute_ends = [
-                torch.cuda.Event(enable_timing=True) for _ in units
-            ]
+            pipeline_start = self._profile_events["pipeline_start"]
+            pipeline_end = self._profile_events["pipeline_end"]
+            copy_starts = self._profile_events["copy_starts"]
+            copy_ends = self._profile_events["copy_ends"]
+            compute_starts = self._profile_events["compute_starts"]
+            compute_ends = self._profile_events["compute_ends"]
             pipeline_start.record(self.coordinator)
             self.copy_stream.wait_event(pipeline_start)
             self.compute_stream.wait_event(pipeline_start)
+        else:
+            self.run_start_event.record(self.coordinator)
+            self.copy_stream.wait_event(self.run_start_event)
+            self.compute_stream.wait_event(self.run_start_event)
 
         self.store.reset_profile()
-        staged = {}
-        for index in range(min(self.slot_count, len(units))):
-            staged[index] = self.store.prepare_unit(
-                units[index],
-                index,
-            )
-
-        source_wait_ms = 0.0
-        dequant_event_pairs = []
-        submit_started = time.perf_counter()
-        for index, unit in enumerate(units):
-            slot_index = index % self.slot_count
-            transfer_slot = self.transfer_slots[slot_index]
-            source_wait_started = time.perf_counter()
-            source = staged.pop(index).result()
-            source_wait_ms += (
-                time.perf_counter() - source_wait_started
-            ) * 1000.0
-
-            if index >= self.slot_count:
-                self.copy_stream.wait_event(
-                    free_events[index - self.slot_count]
-                )
-            with torch.cuda.stream(self.copy_stream):
-                if self.profile:
-                    copy_starts[index].record(self.copy_stream)
-                transfer_slot[: unit.nbytes].copy_(
-                    source,
-                    non_blocking=True,
-                )
-                if self.profile:
-                    copy_ends[index].record(self.copy_stream)
-                ready_events[index].record(self.copy_stream)
-
-            stage_ahead = index + self.slot_count
-            if stage_ahead < len(units):
-                reuse_event = (
-                    ready_events[index]
-                    if self.store.mode
-                    == Int8WeightStoreMode.PINNED_STAGING
-                    else None
-                )
-                staged[stage_ahead] = self.store.prepare_unit(
-                    units[stage_ahead],
-                    slot_index,
-                    reuse_event=reuse_event,
-                )
-
-            self.compute_stream.wait_event(ready_events[index])
-            with torch.cuda.stream(self.compute_stream):
-                if self.profile:
-                    compute_starts[index].record(self.compute_stream)
-                raw_views = self._raw_unit_views(unit, transfer_slot)
-                views = _DequantizingViews(
-                    raw_views,
-                    self.dequant_slots[slot_index],
-                    profile=self.profile,
-                )
-                state = compute_unit(unit, views, state)
-                dequant_event_pairs.extend(views.dequant_events)
-                if self.profile:
-                    compute_ends[index].record(self.compute_stream)
-                free_events[index].record(self.compute_stream)
-
-        submit_ms = (time.perf_counter() - submit_started) * 1000.0
-        self.coordinator.wait_event(free_events[-1])
+        self._dequant_event_pairs = []
+        state, last_free_event = self.pipeline.run(
+            lambda ready, current: self._consume_ready(
+                ready, compute_unit, current
+            ),
+            state,
+            timeout_seconds=self.source_timeout_seconds,
+        )
+        self.coordinator.wait_event(last_free_event)
         if self.profile:
             pipeline_end.record(self.coordinator)
         self.coordinator.synchronize()
         wall_ms = (time.perf_counter() - wall_started) * 1000.0
         if self.profile:
-            h2d_ms = sum(
+            h2d_durations = [
                 start.elapsed_time(end)
                 for start, end in zip(copy_starts, copy_ends)
-            )
-            compute_ms = sum(
+            ]
+            compute_durations = [
                 start.elapsed_time(end)
                 for start, end in zip(compute_starts, compute_ends)
+            ]
+            h2d_ms = sum(h2d_durations)
+            compute_ms = sum(compute_durations)
+            attention_operations = {
+                "q_proj", "k_proj", "v_proj", "o_proj", "qkv"
+            }
+            mlp_operations = {
+                "gate_proj", "up_proj", "down_proj", "gate_up"
+            }
+            attention_ms = sum(
+                duration
+                for unit, duration in zip(units, compute_durations)
+                if unit.operation in attention_operations
+            )
+            mlp_ms = sum(
+                duration
+                for unit, duration in zip(units, compute_durations)
+                if unit.operation in mlp_operations
             )
             dequant_ms = sum(
                 start.elapsed_time(end)
-                for start, end in dequant_event_pairs
+                for start, end in self._dequant_event_pairs
             )
             self.last_profile = {
                 "wall_ms": wall_ms,
-                "host_submit_ms": submit_ms,
-                "source_wait_ms": source_wait_ms,
+                "host_submit_ms": self.pipeline.last_stats[
+                    "pipeline_host_wall_ms"
+                ],
+                "source_wait_ms": self.pipeline.last_stats[
+                    "source_prepare_wait_ms"
+                ],
                 "gpu_pipeline_ms": pipeline_start.elapsed_time(
                     pipeline_end
                 ),
                 "h2d_event_sum_ms": h2d_ms,
                 "compute_event_sum_ms": compute_ms,
+                "attention_event_sum_ms": (
+                    None
+                    if self.plan.granularity.value == "layer"
+                    else attention_ms
+                ),
+                "mlp_event_sum_ms": (
+                    None
+                    if self.plan.granularity.value == "layer"
+                    else mlp_ms
+                ),
                 "dequant_event_sum_ms": dequant_ms,
                 "h2d_bytes": self.plan.stream_bytes_per_token,
                 "h2d_effective_gbps": (
@@ -1013,5 +1196,33 @@ class Int8DoubleBufferRuntime:
                 )
                 / (h2d_ms / 1000.0),
             }
+            self.last_profile.update(self.pipeline.last_stats)
             self.last_profile.update(self.store.profile_stats())
+        elif self.pipeline.last_stats:
+            self.last_profile = dict(self.pipeline.last_stats)
         return state
+
+    def close(self):
+        if self._closed:
+            return
+        self.pipeline.close()
+        self.transfer_slots = []
+        self.dequant_slots = []
+        self.device_slots = []
+        self.ready_events = []
+        self.free_events = []
+        self.run_start_event = None
+        self._profile_events = None
+        self._dequant_profile_events = None
+        self.copy_stream = None
+        self.compute_stream = None
+        self._closed = True
+
+    def __enter__(self):
+        if self._closed:
+            raise RuntimeError("runtime is closed")
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+        return False

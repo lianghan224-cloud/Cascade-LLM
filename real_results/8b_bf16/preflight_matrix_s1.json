@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "ok": false,
+  "checkpoint": "/ssd/cascade-llm/models/Llama-3.1-8B-Instruct",
+  "synthetic": false,
+  "metadata_only": true,
+  "geometry": {
+    "model_id": "/ssd/cascade-llm/models/Llama-3.1-8B-Instruct",
+    "model_type": "llama",
+    "hidden_size": 4096,
+    "intermediate_size": 14336,
+    "num_hidden_layers": 32,
+    "num_attention_heads": 32,
+    "num_key_value_heads": 8,
+    "head_dim": 128,
+    "vocab_size": 128256,
+    "max_position_embeddings": 131072,
+    "rms_norm_eps": 1e-05,
+    "rope_theta": 500000.0,
+    "rope_scaling": {
+      "factor": 8.0,
+      "high_freq_factor": 4.0,
+      "low_freq_factor": 1.0,
+      "original_max_position_embeddings": 8192,
+      "rope_type": "llama3"
+    },
+    "tie_word_embeddings": false,
+    "hidden_act": "silu"
+  },
+  "weight_format": "bf16",
+  "backend_requested": "checkpoint",
+  "planned_backends": [
+    "bf16_linear"
+  ],
+  "checkpoint_validation": {
+    "checkpoint": "/ssd/cascade-llm/models/Llama-3.1-8B-Instruct",
+    "ok": true,
+    "tensor_count": 291,
+    "shard_files": [
+      "/ssd/cascade-llm/models/Llama-3.1-8B-Instruct/model-00001-of-00004.safetensors",
+      "/ssd/cascade-llm/models/Llama-3.1-8B-Instruct/model-00002-of-00004.safetensors",
+      "/ssd/cascade-llm/models/Llama-3.1-8B-Instruct/model-00003-of-00004.safetensors",
+      "/ssd/cascade-llm/models/Llama-3.1-8B-Instruct/model-00004-of-00004.safetensors"
+    ],
+    "missing": [],
+    "unexpected": [],
+    "shape_mismatches": [],
+    "dtype_mismatches": [],
+    "index_errors": []
+  },
+  "tokenizer": {
+    "ok": true,
+    "tokenizer_class": "PreTrainedTokenizerFast",
+    "tokenizer_size": 128256,
+    "model_vocab_size": 128256,
+    "special_token_ids": {
+      "bos_token_id": 128000,
+      "eos_token_id": 128009,
+      "pad_token_id": 128004,
+      "unk_token_id": null
+    },
+    "chat_template_present": true,
+    "errors": []
+  },
+  "memory_preflight": {
+    "ok": false,
+    "estimate": {
+      "cpu_checkpoint_arena_bytes": 16060522496,
+      "pinned_staging_bytes": 268460032,
+      "estimated_cpu_peak_bytes": 16328982528,
+      "gpu_transfer_slots_bytes": 134217728,
+      "resident_parameters_bytes": 532480,
+      "dequant_workspace_bytes": 0,
+      "kv_cache_bytes": 2097152,
+      "embedding_buffer_bytes": 24576,
+      "lm_head_buffer_bytes": 0,
+      "full_logits_bytes": 1539072,
+      "temporary_workspace_bytes": 0,
+      "cuda_safety_margin_bytes": 536870912,
+      "estimated_gpu_peak_bytes": 675282040,
+      "cpu_bf16_bytes": 16060522496,
+      "cpu_fp16_bytes": 0,
+      "cpu_int8_bytes": 0,
+      "cpu_int4_packed_bytes": 0,
+      "cpu_scale_bytes": 0,
+      "cpu_zero_point_bytes": 0,
+      "gpu_weight_slot_bytes": 134217728,
+      "gpu_quant_parameter_bytes": 0,
+      "gpu_dequant_workspace_bytes": 0,
+      "gpu_resident_norm_bytes": 532480,
+      "gpu_resident_embedding_bytes": 0,
+      "gpu_resident_lm_head_bytes": 0,
+      "embedding_staging_bytes": 24576,
+      "lm_head_chunk_bytes": 134217728,
+      "topk_bytes": 120
+    },
+    "capacity": {
+      "cpu_available_bytes": 130114084864,
+      "memlock_limit_bytes": 67108864,
+      "gpu_free_bytes": null,
+      "gpu_total_bytes": null
+    },
+    "errors": [
+      "pinned memory needs 0.25 GiB, above RLIMIT_MEMLOCK 0.06 GiB"
+    ],
+    "warnings": [],
+    "suggestions": [
+      "reduce slot_count/vocab chunk size or raise RLIMIT_MEMLOCK"
+    ]
+  },
+  "input_ids": [
+    128000,
+    4,
+    7
+  ],
+  "decode_ids": [
+    9
+  ],
+  "comparison": null
+}
