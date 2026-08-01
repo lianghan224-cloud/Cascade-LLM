@@ -1,0 +1,54 @@
+services:
+  cascade:
+    image: ${CASCADE_IMAGE:-cascade-llm:local}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: runtime
+      args:
+        CUDA_IMAGE_VERSION: ${CUDA_IMAGE_VERSION}
+        UBUNTU_VERSION: ${UBUNTU_VERSION}
+        PROVIDER_BUNDLE: ${CASCADE_PROVIDER_BUNDLE:-generic}
+        IMAGE_TYPE: ${CASCADE_IMAGE_TYPE:-runtime}
+        GIT_COMMIT: ${CASCADE_GIT_COMMIT:-unverified}
+        CASCADE_UID: ${LOCAL_UID:-1000}
+        CASCADE_GID: ${LOCAL_GID:-1000}
+        CASCADE_VERSION: ${CASCADE_VERSION}
+        PYTORCH_VERSION: ${PYTORCH_VERSION}
+        CUDA_VERSION: ${CUDA_VERSION}
+        PROVIDER_ABI: ${PROVIDER_ABI}
+        EXECUTION_PLAN_SCHEMA: ${EXECUTION_PLAN_SCHEMA}
+        RUN_REPORT_SCHEMA: ${RUN_REPORT_SCHEMA}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      CASCADE_MODEL_ROOT: /models
+      CASCADE_CONFIG_ROOT: /config
+      CASCADE_CACHE_ROOT: /cache/cascade
+      CASCADE_RESULT_ROOT: /results
+      HF_HOME: /cache/huggingface
+      NVIDIA_VISIBLE_DEVICES: ${NVIDIA_VISIBLE_DEVICES:-all}
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      CASCADE_RUN_PREFLIGHT: ${CASCADE_RUN_PREFLIGHT:-1}
+    volumes:
+      - ${CASCADE_MODEL_DIR:-./models}:/models:ro
+      - ${CASCADE_CONFIG_DIR:-./config}:/config:ro
+      - ${CASCADE_CACHE_DIR:-./cache}:/cache
+      - ${CASCADE_RESULT_DIR:-./results}:/results
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    read_only: true
+    tmpfs:
+      - /tmp:size=2g,mode=1777
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    shm_size: 8gb
+    security_opt:
+      - no-new-privileges:true
+    command: ["doctor"]

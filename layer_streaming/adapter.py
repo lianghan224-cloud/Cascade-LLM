@@ -677,9 +677,39 @@ def validate_safetensors_checkpoint(checkpoint, expected_specs):
     )
 
 
+_MODEL_ADAPTER_FACTORIES = {}
+
+
+def register_model_adapter(model_type, factory, replace=False):
+    """Register an adapter factory without changing the ModelAdapter contract."""
+
+    name = str(model_type).strip().lower()
+    if not name:
+        raise ValueError("model_type must be non-empty")
+    if not callable(factory):
+        raise TypeError("adapter factory must be callable")
+    if name in _MODEL_ADAPTER_FACTORIES and not replace:
+        raise ValueError("model adapter {} is already registered".format(name))
+    _MODEL_ADAPTER_FACTORIES[name] = factory
+
+
+def unregister_model_adapter(model_type):
+    return _MODEL_ADAPTER_FACTORIES.pop(str(model_type).strip().lower(), None)
+
+
 def adapter_for_config(config):
     model_type = str(_config_value(config, "model_type", ""))
     architectures = _config_value(config, "architectures", ()) or ()
+    factory = _MODEL_ADAPTER_FACTORIES.get(model_type.lower())
+    if factory is not None:
+        adapter = factory()
+        if not isinstance(adapter, ModelAdapter):
+            raise TypeError(
+                "adapter factory for {} did not return ModelAdapter".format(
+                    model_type
+                )
+            )
+        return adapter
     if model_type == "llama" or any("Llama" in item for item in architectures):
         return LlamaModelAdapter()
     raise ValueError("no ModelAdapter is registered for {!r}".format(model_type))

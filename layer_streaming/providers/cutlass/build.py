@@ -99,8 +99,6 @@ def main():
         str(HERE / "kernels.cu"),
         "-L{}".format(runtime_lib),
         "-Xlinker",
-        "-rpath,{}".format(runtime_lib),
-        "-Xlinker",
         "-l:libcudart.so.12",
         "-o",
         str(output),

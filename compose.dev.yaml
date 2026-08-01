@@ -1,0 +1,11 @@
+services:
+  cascade:
+    build:
+      target: devel
+    read_only: false
+    volumes:
+      - .:/workspace/Cascade-LLM
+      - ${CASCADE_MODEL_DIR:-./models}:/models:ro
+      - ${CASCADE_CACHE_DIR:-./cache}:/cache
+      - ${CASCADE_RESULT_DIR:-./results}:/results
+    working_dir: /workspace/Cascade-LLM

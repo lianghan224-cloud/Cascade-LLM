@@ -1,0 +1,54 @@
+name: docker-contracts
+
+on:
+  pull_request:
+    paths:
+      - "docker/**"
+      - "providers/**"
+      - "layer_streaming/**"
+      - "tests/**"
+      - "compose*.yaml"
+      - "pyproject.toml"
+      - "requirements.lock"
+      - ".github/workflows/docker-contracts.yml"
+  push:
+    branches: [framework-v0]
+
+jobs:
+  compose-and-contracts:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose
+        run: docker compose --env-file docker/versions.env config
+      - name: Validate shell scripts
+        run: bash -n docker/*.sh docker/scripts/*.sh scripts/cascade-docker.sh
+
+  generic-image:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Load centralized versions
+        run: cat docker/versions.env >> "$GITHUB_ENV"
+      - name: Build generic runtime without publishing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: runtime
+          push: false
+          build-args: |
+            CUDA_IMAGE_VERSION=${{ env.CUDA_IMAGE_VERSION }}
+            UBUNTU_VERSION=${{ env.UBUNTU_VERSION }}
+            PROVIDER_BUNDLE=generic
+            IMAGE_TYPE=runtime
+            GIT_COMMIT=${{ github.sha }}
+            CASCADE_VERSION=${{ env.CASCADE_VERSION }}
+            PYTORCH_VERSION=${{ env.PYTORCH_VERSION }}
+            CUDA_VERSION=${{ env.CUDA_VERSION }}
+            PROVIDER_ABI=${{ env.PROVIDER_ABI }}
+            EXECUTION_PLAN_SCHEMA=${{ env.EXECUTION_PLAN_SCHEMA }}
+            RUN_REPORT_SCHEMA=${{ env.RUN_REPORT_SCHEMA }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

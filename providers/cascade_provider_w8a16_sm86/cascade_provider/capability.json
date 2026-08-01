@@ -1,0 +1,26 @@
+{
+  "provider_name": "cutlass_w8a16_sm86_abi2",
+  "provider_version": "2",
+  "provider_abi": 2,
+  "supported_architectures": ["sm86"],
+  "supported_weight_formats": [
+    "int8_symmetric_per_channel",
+    "int8_symmetric_per_group"
+  ],
+  "supported_activation_dtypes": ["bf16", "fp16"],
+  "supported_scale_dtypes": ["bf16", "fp16"],
+  "supported_group_sizes": [32, 64, 128],
+  "supported_phases": ["prefill", "decode"],
+  "min_m": 1,
+  "max_m": null,
+  "alignment_m": 1,
+  "alignment_n": 8,
+  "alignment_k": 16,
+  "requires_preprocessed_layout": false,
+  "physical_layout_names": ["row_major"],
+  "workspace_policy": "none",
+  "qualification_status": "qualified",
+  "backend_name": "fused_w8a16",
+  "explicit_fallback": false,
+  "requires_extension": true
+}

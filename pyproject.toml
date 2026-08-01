@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cascade-llm"
+dynamic = ["version"]
+description = "Low-VRAM, single-GPU Llama-family inference kernel"
+readme = "README.md"
+requires-python = ">=3.8,<3.13"
+license = {text = "See repository license and third-party notices"}
+authors = [{name = "Cascade-LLM contributors"}]
+dependencies = [
+  "torch",
+  "transformers",
+  "safetensors",
+  "huggingface-hub",
+  "numpy",
+  "psutil",
+  "sentencepiece",
+]
+
+[project.scripts]
+cascade = "layer_streaming.cli:main"
+
+[project.entry-points."cascade_llm.model_adapters"]
+llama = "layer_streaming.plugin_builtins:create_llama_adapter_plugin"
+
+[project.entry-points."cascade_llm.quantizers"]
+int8_per_channel = "layer_streaming.plugin_builtins:create_int8_per_channel_quantizer"
+
+[tool.setuptools.dynamic]
+version = {attr = "layer_streaming.version.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["layer_streaming*", "tools*"]
+
+[tool.setuptools.package-data]
+layer_streaming = ["py.typed"]

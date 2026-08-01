@@ -3,6 +3,23 @@
 from .capability import ProviderCapability
 
 
+_PLUGIN_PROVIDER_CAPABILITIES = {}
+
+
+def register_provider_capability(capability, replace=False):
+    if not isinstance(capability, ProviderCapability):
+        raise TypeError("capability must be ProviderCapability")
+    name = capability.provider_name
+    if name in _PLUGIN_PROVIDER_CAPABILITIES and not replace:
+        raise ValueError("provider capability {} is already registered".format(name))
+    _PLUGIN_PROVIDER_CAPABILITIES[name] = capability
+    return capability
+
+
+def unregister_provider_capability(name):
+    return _PLUGIN_PROVIDER_CAPABILITIES.pop(str(name), None)
+
+
 class ProviderRegistry:
     def __init__(self):
         self._providers = {}
@@ -183,4 +200,6 @@ def default_provider_registry():
                 requires_extension=True,
             )
         )
+    for capability in _PLUGIN_PROVIDER_CAPABILITIES.values():
+        registry.register(capability, replace=True)
     return registry

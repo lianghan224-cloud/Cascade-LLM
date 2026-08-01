@@ -1,0 +1,19 @@
+{
+  "bundle_version": 1,
+  "name": "qualified",
+  "providers": [
+    {
+      "package": "cascade_provider_w8a16_sm86",
+      "source": "providers/cascade_provider_w8a16_sm86",
+      "binary": "layer_streaming/providers/cutlass/_build/libcascade_cutlass_sm86.so",
+      "binary_target": "lib/libcascade_cutlass_sm86.so",
+      "build_metadata": "layer_streaming/providers/cutlass/_build/libcascade_cutlass_sm86.so.metadata.json",
+      "numerical_contract": "tests/fixtures/fused_w8a16_sm86_golden_v1.json",
+      "contract_target": "numerical_contracts/sm86_w8a16_abi2.json",
+      "provider_abi": 2,
+      "architecture": "sm86",
+      "qualification": "qualified"
+    }
+  ],
+  "declarations": []
+}

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cascade-provider-w8a16-sm86"
+dynamic = ["version"]
+description = "Qualified Cascade-LLM SM86 W8A16 provider plugin"
+requires-python = ">=3.8,<3.13"
+dependencies = []
+
+[project.entry-points."cascade_llm.providers"]
+w8a16_sm86 = "cascade_provider.provider:create_plugin"
+
+[tool.setuptools.dynamic]
+version = {attr = "cascade_provider._version.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["cascade_provider*"]
+
+[tool.setuptools.package-data]
+cascade_provider = [
+  "capability.json",
+  "build_metadata.json",
+  "lib/*.so",
+  "numerical_contracts/*.json",
+]

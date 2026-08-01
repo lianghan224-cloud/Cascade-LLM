@@ -99,6 +99,21 @@ CASCADE_CHAT_GPU=0 bash scripts/chat_llama31_70b.sh
 
 NVIDIA Compute Capability、Provider ABI、编译架构和资格状态可通过 `tools/inspect_hardware.py` 与 `tools/check_compatibility.py` 在启动前检查。当前完整真实验证边界仅为 SM86 RTX 3080 Ti；SM80、SM89、SM90 仍是未验证扩展骨架，详见 [硬件兼容文档](docs/NVIDIA_HARDWARE_COMPATIBILITY.md)。
 
+## Docker 入口
+
+容器架构提供稳定的 `cascade doctor/inspect/validate/run/chat/benchmark/qualify/quantize/shell` 命令。模型只读挂载到 `/models`，缓存和报告分别写入 `/cache`、`/results`：
+
+```bash
+export CASCADE_MODEL_DIR=/ssd/cascade-llm/models
+./scripts/cascade-docker.sh build
+./scripts/cascade-docker.sh doctor
+./scripts/cascade-docker.sh run \
+  --checkpoint /models/Llama-3.1-8B-Instruct \
+  --backend bf16_linear --max-new-tokens 32
+```
+
+当前尚未发布 GHCR 正式镜像。Generic 镜像不包含 fused Provider；SM86/full 构建只有在资格二进制、ABI metadata 和 Numerical Contract 全部存在时才允许完成。详见 [Docker 使用指南](docs/DOCKER_GUIDE.md) 与 [插件开发契约](docs/PLUGIN_DEVELOPMENT.md)。
+
 CUTLASS provider 的构建、支持矩阵、资格测试和许可要求见
 [`docs/CUTLASS_PROVIDER.md`](docs/CUTLASS_PROVIDER.md)。
 本机 M5.1 验证边界和未完成项见

@@ -1,0 +1,12 @@
+{
+  "bundle_version": 1,
+  "name": "sm89",
+  "providers": [],
+  "declarations": [
+    {
+      "provider": "cutlass_w8a16_sm89_abi1",
+      "architecture": "sm89",
+      "qualification": "declared"
+    }
+  ]
+}

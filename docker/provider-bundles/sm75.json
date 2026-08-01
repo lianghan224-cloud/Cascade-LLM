@@ -1,0 +1,12 @@
+{
+  "bundle_version": 1,
+  "name": "sm75",
+  "providers": [],
+  "declarations": [
+    {
+      "provider": "fp16/fallback only",
+      "architecture": "sm75",
+      "qualification": "unqualified"
+    }
+  ]
+}

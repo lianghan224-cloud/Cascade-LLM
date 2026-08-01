@@ -1,5 +1,7 @@
 """CPU-resident, CUDA-streamed LLM inference primitives."""
 
+from .version import __version__
+
 from .chat import (
     RenderedChat,
     SamplingConfig,
@@ -24,6 +26,8 @@ from .adapter import (
     WeightSpec,
     adapter_for_config,
     validate_safetensors_checkpoint,
+    register_model_adapter,
+    unregister_model_adapter,
 )
 from .specs import (
     DTYPE_BYTES,
@@ -142,6 +146,16 @@ from .api_contract import (
     canonical_contract_json,
     core_api_contract,
     core_api_contract_sha256,
+)
+from .plugins import (
+    MODEL_ADAPTER_ENTRY_POINT,
+    PROVIDER_ENTRY_POINT,
+    QUANTIZER_ENTRY_POINT,
+    ModelAdapterPlugin,
+    PluginLoadRecord,
+    ProviderPlugin,
+    QuantizationPlugin,
+    discover_plugins,
 )
 from .stability import (
     STABILITY_REPORT_SCHEMA_VERSION,
@@ -330,6 +344,17 @@ __all__ = [
     "BenchmarkMetrics",
     "BenchmarkResult",
     "BenchmarkSuiteReport",
+    "MODEL_ADAPTER_ENTRY_POINT",
+    "PROVIDER_ENTRY_POINT",
+    "QUANTIZER_ENTRY_POINT",
+    "ModelAdapterPlugin",
+    "PluginLoadRecord",
+    "ProviderPlugin",
+    "QuantizationPlugin",
+    "__version__",
+    "discover_plugins",
+    "register_model_adapter",
+    "unregister_model_adapter",
     "median_metrics",
     "metric_variability",
 ]

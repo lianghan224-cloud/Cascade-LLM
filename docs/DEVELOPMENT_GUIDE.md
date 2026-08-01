@@ -288,3 +288,5 @@ INT8/INT4 fallback 回归从 checkpoint metadata 读取格式：
 当前代码已经进入核心接口冻结和可重复验证阶段。KV、checkpoint、多 dtype arena、资源生命周期、有界流水线、soak 与 benchmark 已有稳定边界。SM86 W8A16 ABI 2 已在 RTX 3080 Ti 完成现有真实闭环；INT8/INT4 fallback 仍必须显式选择。
 
 NVIDIA 硬件兼容层已加入 HardwareProfile、RuntimeFeatureProfile、ProviderCapability、CompatibilityResolver、构建元数据和架构/ABI 隔离的 Numerical Contract Registry。`ExecutionPlan` schema v1 与 `RunReport` schema v2 没有改动。SM80、SM89、SM90 目前仅为 `declared/unqualified`，不得描述为已兼容；具体边界见 [NVIDIA_HARDWARE_COMPATIBILITY.md](NVIDIA_HARDWARE_COMPATIBILITY.md) 和 [COMPATIBILITY_MATRIX.md](COMPATIBILITY_MATRIX.md)。
+
+Docker D1～D4 架构已落地：单一多阶段 Dockerfile、集中版本、统一 `cascade` CLI、Provider/Adapter/Quantizer entry point、qualified Bundle、固定挂载、非 root Compose 和无 GPU CI 契约均已建立。Core wheel 与 SM86 平台 Provider wheel 已完成离线结构验证。Generic 镜像实际拉取构建、容器 tiny smoke、SM86 Golden Suite 和 GHCR 发布仍属于 D5～D7，未完成前不得声明正式 Docker 镜像可用。详见 [DOCKER_GUIDE.md](DOCKER_GUIDE.md)。
