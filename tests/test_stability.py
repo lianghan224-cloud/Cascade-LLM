@@ -85,6 +85,9 @@ class StabilityTest(unittest.TestCase):
             device="cpu",
         )
         handle = manager.allocate(max_length=3)
+        cache = manager.bind(handle)
+        tensor = torch.zeros((1, 1, 3, 4), dtype=torch.float32)
+        cache.append_only(0, tensor, tensor)
         during = capture_resource_snapshot(
             0, 0, kv_manager=manager
         )

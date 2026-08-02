@@ -9,6 +9,13 @@ from typing import Optional, Tuple
 import torch
 
 from .adapter import ExecutionPolicy, ModelGeometry, PlacementMode
+from .kv_policy import (
+    KVDataType,
+    KVPolicy,
+    KVSelectionPolicy,
+    KVStoragePolicy,
+    kv_page_pool_bytes,
+)
 
 
 GIB = 1024 ** 3
@@ -59,6 +66,13 @@ class MemoryEstimate:
     embedding_staging_bytes: int = 0
     lm_head_chunk_bytes: int = 0
     topk_bytes: int = 0
+    kv_gpu_pool_bytes: int = 0
+    kv_cpu_pool_bytes: int = 0
+    kv_nvme_budget_bytes: int = 0
+    kv_index_bytes: int = 0
+    kv_page_count: int = 0
+    kv_page_bytes: int = 0
+    kv_attention_workspace_bytes: int = 0
 
     def as_dict(self):
         return {
@@ -122,6 +136,11 @@ class PreflightResult:
             "  Resident Transformer:  {}".format(gib(estimate.gpu_resident_transformer_bytes)),
             "Dequant workspace:       {}".format(gib(estimate.dequant_workspace_bytes)),
             "KV cache:                {}".format(gib(estimate.kv_cache_bytes)),
+            "  KV GPU page pool:     {}".format(gib(estimate.kv_gpu_pool_bytes)),
+            "  KV CPU page pool:     {}".format(gib(estimate.kv_cpu_pool_bytes)),
+            "  KV NVMe budget:       {}".format(gib(estimate.kv_nvme_budget_bytes)),
+            "  KV sparse index:      {}".format(gib(estimate.kv_index_bytes)),
+            "  KV attention work:    {}".format(gib(estimate.kv_attention_workspace_bytes)),
             "Embedding buffer:        {}".format(gib(estimate.embedding_buffer_bytes)),
             "LM Head buffer:          {}".format(gib(estimate.lm_head_buffer_bytes)),
             "Top-k workspace:         {}".format(gib(estimate.topk_bytes)),
@@ -216,6 +235,7 @@ class MemoryPlanner:
         temporary_workspace_bytes=0,
         cuda_safety_margin_bytes=512 * 1024 ** 2,
         transformer_placement=None,
+        kv_policy=None,
     ):
         if not isinstance(geometry, ModelGeometry):
             raise TypeError("geometry must be a ModelGeometry")
@@ -239,6 +259,17 @@ class MemoryPlanner:
         self.temporary_workspace_bytes = int(temporary_workspace_bytes)
         self.cuda_safety_margin_bytes = int(cuda_safety_margin_bytes)
         self.transformer_placement = transformer_placement
+        inferred_kv_dtype = (
+            KVDataType.FP16
+            if getattr(self.policy, "activation_dtype", None) == "float16"
+            else KVDataType.BF16
+        )
+        self.kv_policy = kv_policy or KVPolicy(
+            dtype=inferred_kv_dtype,
+            page_size=self.kv_block_size,
+        )
+        if self.kv_policy.page_size != self.kv_block_size:
+            raise ValueError("KV policy page size does not match kv_block_size")
         for name in (
             "max_context",
             "max_prefill_tokens",
@@ -323,18 +354,58 @@ class MemoryPlanner:
         else:
             pinned = slot_count * staging_slot_bytes + pinned_vocab
 
-        rounded_context = int(
+        kv_page_count = int(
             math.ceil(self.max_context / float(self.kv_block_size))
-        ) * self.kv_block_size
-        kv_cache = (
-            2
-            * self.geometry.num_hidden_layers
-            * self.batch_size
-            * self.geometry.num_key_value_heads
-            * rounded_context
-            * self.geometry.head_dim
-            * 2
         )
+        kv_cache = kv_page_pool_bytes(
+            layer_count=self.geometry.num_hidden_layers,
+            page_count=kv_page_count,
+            num_key_value_heads=self.geometry.num_key_value_heads,
+            page_size=self.kv_block_size,
+            head_dim=self.geometry.head_dim,
+            batch_size=self.batch_size,
+            dtype=self.kv_policy.dtype,
+        )
+        kv_page_bytes = kv_page_pool_bytes(
+            layer_count=self.geometry.num_hidden_layers,
+            page_count=1,
+            num_key_value_heads=self.geometry.num_key_value_heads,
+            page_size=self.kv_block_size,
+            head_dim=self.geometry.head_dim,
+            batch_size=self.batch_size,
+            dtype=self.kv_policy.dtype,
+        )
+        kv_groups = (
+            self.geometry.num_attention_heads
+            // self.geometry.num_key_value_heads
+        )
+        kv_attention_workspace = (
+            kv_cache // self.geometry.num_hidden_layers
+        ) * (1 + kv_groups)
+        kv_cpu_pool = (
+            int(self.kv_policy.cpu_budget_bytes)
+            if self.kv_policy.storage
+            in {KVStoragePolicy.GPU_CPU, KVStoragePolicy.GPU_CPU_NVME}
+            else 0
+        )
+        kv_nvme_budget = (
+            int(self.kv_policy.nvme_budget_bytes)
+            if self.kv_policy.storage == KVStoragePolicy.GPU_CPU_NVME
+            else 0
+        )
+        kv_index_bytes = 0
+        if self.kv_policy.selection != KVSelectionPolicy.DENSE:
+            # D0 budgets a conservative FP16 Quest min/max pair for every
+            # layer/page/head. Hierarchical metadata will refine this in D7.
+            kv_index_bytes = (
+                2
+                * self.geometry.num_hidden_layers
+                * kv_page_count
+                * self.geometry.num_key_value_heads
+                * self.geometry.head_dim
+                * 2
+            )
+        pinned += kv_cpu_pool
         embedding_buffer = (
             self.batch_size
             * self.max_prefill_tokens
@@ -371,6 +442,8 @@ class MemoryPlanner:
                 resident_parameters,
                 dequant_workspace,
                 kv_cache,
+                kv_index_bytes,
+                kv_attention_workspace,
                 embedding_buffer,
                 lm_head_buffer,
                 topk_bytes,
@@ -457,6 +530,13 @@ class MemoryPlanner:
                 int(vocab.chunk_bytes) if stream_lm_head else 0
             ),
             topk_bytes=topk_bytes,
+            kv_gpu_pool_bytes=kv_cache,
+            kv_cpu_pool_bytes=kv_cpu_pool,
+            kv_nvme_budget_bytes=kv_nvme_budget,
+            kv_index_bytes=kv_index_bytes,
+            kv_page_count=kv_page_count,
+            kv_page_bytes=kv_page_bytes,
+            kv_attention_workspace_bytes=kv_attention_workspace,
         )
 
     @classmethod

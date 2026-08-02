@@ -68,6 +68,7 @@ class Llama31DecodeExecutor:
         max_batch_size=1,
         trace_callback=None,
         kv_dtype=None,
+        kv_policy=None,
         linear_trace_callback=None,
     ):
         try:
@@ -120,6 +121,7 @@ class Llama31DecodeExecutor:
                 max_batch_size=max_batch_size,
                 dtype=cache_dtype,
                 device=resident.device,
+                policy=kv_policy,
             )
             handle = self._owned_kv_manager.allocate(
                 max_cache_length,
@@ -277,22 +279,31 @@ class Llama31DecodeExecutor:
             sin,
         )
         had_past = self.kv_cache.sequence_length() > 0
-        key, value = self.kv_cache.append(
-            layer_index,
-            key,
-            value,
-        )
-        key = _repeat_kv(key, self.kv_groups)
-        value = _repeat_kv(value, self.kv_groups)
         if had_past and query_length != 1:
             raise ValueError("chunked decode with a past cache is unsupported")
-        attention = F.scaled_dot_product_attention(
-            query,
-            key,
-            value,
-            dropout_p=0.0,
-            is_causal=(not had_past and query_length > 1),
-        )
+        if callable(getattr(self.kv_cache, "attend", None)):
+            self.kv_cache.append_only(layer_index, key, value)
+            attention = self.kv_cache.attend(
+                layer_index,
+                query,
+                kv_groups=self.kv_groups,
+                position_ids=state.position_ids,
+            )
+        else:
+            key, value = self.kv_cache.append(
+                layer_index,
+                key,
+                value,
+            )
+            key = _repeat_kv(key, self.kv_groups)
+            value = _repeat_kv(value, self.kv_groups)
+            attention = F.scaled_dot_product_attention(
+                query,
+                key,
+                value,
+                dropout_p=0.0,
+                is_causal=(not had_past and query_length > 1),
+            )
         return attention.transpose(1, 2).contiguous().view(
             batch,
             query_length,

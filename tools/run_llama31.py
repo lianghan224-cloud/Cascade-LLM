@@ -22,6 +22,7 @@ from layer_streaming import (  # noqa: E402
     CompatibilityResolver,
     ExecutionPolicy,
     HardwareDetector,
+    KVPolicy,
     Llama31DecodeExecutor,
     MemoryPlanner,
     MixedDtypeRuntime,
@@ -144,7 +145,43 @@ def parse_args():
     parser.add_argument(
         "--prefetch-depth", type=int, choices=tuple(range(1, 9))
     )
-    parser.add_argument("--kv-block-size", type=int, choices=(16, 32), default=16)
+    parser.add_argument(
+        "--kv-block-size",
+        "--kv-page-size",
+        dest="kv_block_size",
+        type=int,
+        choices=(16, 32),
+        default=16,
+    )
+    parser.add_argument(
+        "--kv-accuracy",
+        choices=("exact", "quantized", "sparse"),
+        default="exact",
+    )
+    parser.add_argument(
+        "--kv-storage",
+        choices=("gpu", "gpu-cpu", "gpu-cpu-nvme"),
+        default="gpu",
+    )
+    parser.add_argument(
+        "--kv-dtype",
+        choices=("auto", "bf16", "fp16", "int8", "fp8", "int4"),
+        default="auto",
+    )
+    parser.add_argument(
+        "--kv-index",
+        choices=("none", "quest-flat", "hierarchical-quest", "centroid-only"),
+        default="none",
+    )
+    parser.add_argument(
+        "--kv-prefix-cache",
+        choices=("off", "session", "memory", "persistent"),
+        default="off",
+    )
+    parser.add_argument("--kv-cpu-budget", type=parse_byte_size, default=0)
+    parser.add_argument("--kv-nvme-budget", type=parse_byte_size, default=0)
+    parser.add_argument("--kv-page-budget", type=int, default=0)
+    parser.add_argument("--kv-recent-window", type=int, default=0)
     parser.add_argument("--return-full-logits", action="store_true")
     parser.add_argument(
         "--no-profile",
@@ -376,6 +413,44 @@ def main():
     adapter = adapter_for_config(config)
     geometry = adapter.build_geometry(config)
     plan = adapter.build_execution_plan(config, policy)
+    compute_dtype = next(
+        spec.compute_dtype
+        for spec in plan.weights.values()
+        if spec.role == "attention_q"
+    )
+    kv_dtype_name = (
+        ("bf16" if compute_dtype == "bfloat16" else "fp16")
+        if args.kv_dtype == "auto"
+        else args.kv_dtype
+    )
+    kv_reuse = {
+        "off": "none",
+        "session": "session",
+        "memory": "prefix_memory",
+        "persistent": "prefix_persistent",
+    }[args.kv_prefix_cache]
+    try:
+        kv_policy = KVPolicy(
+            accuracy=args.kv_accuracy,
+            storage=args.kv_storage.replace("-", "_"),
+            dtype=kv_dtype_name,
+            selection=args.kv_index.replace("-", "_"),
+            reuse=kv_reuse,
+            page_size=args.kv_block_size,
+            cpu_budget_bytes=args.kv_cpu_budget,
+            nvme_budget_bytes=args.kv_nvme_budget,
+            page_budget=args.kv_page_budget,
+            recent_window=args.kv_recent_window,
+        )
+        kv_policy.require_d1_supported()
+    except (ValueError, NotImplementedError) as error:
+        raise SystemExit("KV policy rejected before allocation: {}".format(error))
+    print(
+        "Expanded KV policy: {}".format(
+            json.dumps(kv_policy.as_dict(), sort_keys=True)
+        ),
+        file=sys.stderr,
+    )
     transformer_placement = build_static_transformer_placement(
         plan, args.gpu_resident_weight_budget
     )
@@ -471,6 +546,7 @@ def main():
         return_full_logits=args.return_full_logits,
         cuda_safety_margin_bytes=args.cuda_safety_margin_mib * 1024 ** 2,
         transformer_placement=transformer_placement,
+        kv_policy=kv_policy,
     ).preflight(device=device, raise_on_error=False)
     if args.ignore_memlock_limit:
         memlock_errors = tuple(
@@ -534,11 +610,6 @@ def main():
                 embedding_staging_rows=max(1, int(encoded.input_ids.numel())),
                 profile=args.profile,
             ))
-        compute_dtype = next(
-            spec.compute_dtype
-            for spec in plan.weights.values()
-            if spec.role == "attention_q"
-        )
         kv_dtype = (
             torch.bfloat16 if compute_dtype == "bfloat16" else torch.float16
         )
@@ -551,6 +622,7 @@ def main():
             max_cache_length=cache_length,
             kv_block_size=args.kv_block_size,
             kv_dtype=kv_dtype,
+            kv_policy=kv_policy,
         ))
         input_ids = encoded.input_ids.to(device)
         generated = []
@@ -619,6 +691,7 @@ def main():
             cpu_resident_bytes=plan.host_arena_bytes,
             pinned_bytes=store.pinned_bytes + vocab_pinned_bytes,
             kv_cache_bytes=executor.kv_cache.nbytes,
+            kv_profiles=[executor.kv_cache.profile_stats()],
             device=device,
         )
         result = report.as_dict()

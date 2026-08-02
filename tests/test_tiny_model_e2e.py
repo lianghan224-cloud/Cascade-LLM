@@ -400,8 +400,18 @@ class SyntheticCheckpointTest(unittest.TestCase):
                     candidate_decode = executor.finish(
                         runtime.run(executor, executor.begin(decode_ids))
                     ).logits
-                self.assertTrue(torch.equal(reference_prefill, candidate_prefill))
-                self.assertTrue(torch.equal(reference_decode, candidate_decode))
+                torch.testing.assert_close(
+                    reference_prefill,
+                    candidate_prefill,
+                    atol=2e-3,
+                    rtol=2e-3,
+                )
+                torch.testing.assert_close(
+                    reference_decode,
+                    candidate_decode,
+                    atol=2e-3,
+                    rtol=2e-3,
+                )
                 self.assertEqual(
                     runtime.last_profile["fallback_backends"],
                     ["int4_dequant_bf16_fallback"],

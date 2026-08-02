@@ -4,6 +4,7 @@ from layer_streaming import (
     ExecutionPolicy,
     LlamaModelAdapter,
     MemoryPlanner,
+    KVPolicy,
     PlacementMode,
     SystemCapacity,
 )
@@ -62,6 +63,37 @@ class MemoryPlannerTest(unittest.TestCase):
         estimate = planner.estimate()
         self.assertEqual(estimate.full_logits_bytes, 1 * 8 * 100 * 4)
         self.assertEqual(estimate.lm_head_buffer_bytes, 0)
+
+    def test_kv_dtype_tiers_and_index_are_budgeted_independently(self):
+        bf16 = self.make_planner().estimate()
+        int8 = self.make_planner(
+            kv_policy=KVPolicy(
+                accuracy="quantized",
+                dtype="int8",
+                page_size=16,
+            )
+        ).estimate()
+        self.assertEqual(bf16.kv_gpu_pool_bytes, 2 * int8.kv_gpu_pool_bytes)
+
+        tiered_sparse = self.make_planner(
+            kv_policy=KVPolicy(
+                accuracy="sparse",
+                storage="gpu_cpu_nvme",
+                dtype="bf16",
+                selection="quest_flat",
+                reuse="prefix_persistent",
+                page_size=16,
+                cpu_budget_bytes=8192,
+                nvme_budget_bytes=16384,
+            )
+        ).estimate()
+        self.assertEqual(tiered_sparse.kv_cpu_pool_bytes, 8192)
+        self.assertEqual(tiered_sparse.kv_nvme_budget_bytes, 16384)
+        self.assertGreater(tiered_sparse.kv_index_bytes, 0)
+        self.assertGreaterEqual(
+            tiered_sparse.pinned_staging_bytes,
+            bf16.pinned_staging_bytes + 8192,
+        )
 
 
 if __name__ == "__main__":

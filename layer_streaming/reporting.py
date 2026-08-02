@@ -136,9 +136,12 @@ def build_inference_report(
     pinned_bytes,
     kv_cache_bytes,
     device=None,
+    kv_profiles=(),
 ):
     runtime_profiles = [item for item in runtime_profiles if item]
     vocab_profiles = [item for item in vocab_profiles if item]
+    kv_profiles = [item for item in kv_profiles if item]
+    kv_profile = kv_profiles[-1] if kv_profiles else {}
     decode_count = len(decode_token_latencies_ms)
     decode_seconds = sum(decode_token_latencies_ms) / 1000.0
     pipeline = {
@@ -196,6 +199,20 @@ def build_inference_report(
             for profile in runtime_profiles
             if profile.get("backend_phase") is not None
         ],
+        "kv": {
+            "attention_backend": kv_profile.get("attention_backend"),
+            "attention_accuracy": kv_profile.get("attention_accuracy"),
+            "layout": kv_profile.get("layout"),
+            "append_calls": kv_profile.get("append_calls", 0),
+            "appended_tokens": kv_profile.get("appended_tokens", 0),
+            "attention_calls": kv_profile.get("attention_calls", 0),
+            "materialize_calls": kv_profile.get("materialize_calls", 0),
+            "materialized_bytes": kv_profile.get("materialized_bytes", 0),
+            "fork_calls": kv_profile.get("fork_calls", 0),
+            "cow_page_copies": kv_profile.get("cow_page_copies", 0),
+            "page_allocations": kv_profile.get("page_allocations", 0),
+            "page_releases": kv_profile.get("page_releases", 0),
+        },
     }
     timings = {
         "load_time_seconds": float(checkpoint_load_seconds),
@@ -224,6 +241,7 @@ def build_inference_report(
             vocab_profiles, "embedding_h2d_ms"
         ),
         "lm_head_time_ms": _sum(vocab_profiles, "wall_ms"),
+        "kv_attention_time_ms": _sum(kv_profiles, "attention_wall_ms"),
     }
     return RunReport(
         model={
@@ -277,6 +295,7 @@ def build_inference_report(
             "slot_count": policy.slot_count,
             "prefetch_depth": policy.prefetch_depth,
             "vocab_chunk_bytes": policy.vocab_chunk_bytes,
+            "kv_policy": kv_profile.get("policy"),
         },
         timings=timings,
         throughput={
@@ -296,6 +315,25 @@ def build_inference_report(
             "cpu_resident_bytes": int(cpu_resident_bytes),
             "pinned_bytes": int(pinned_bytes),
             "kv_cache_bytes": int(kv_cache_bytes),
+            "kv_gpu_pool_bytes": int(
+                getattr(preflight.estimate, "kv_gpu_pool_bytes", kv_cache_bytes)
+            ),
+            "kv_cpu_pool_bytes": int(
+                getattr(preflight.estimate, "kv_cpu_pool_bytes", 0)
+            ),
+            "kv_nvme_budget_bytes": int(
+                getattr(preflight.estimate, "kv_nvme_budget_bytes", 0)
+            ),
+            "kv_index_bytes": int(
+                getattr(preflight.estimate, "kv_index_bytes", 0)
+            ),
+            "kv_attention_workspace_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_attention_workspace_bytes",
+                    0,
+                )
+            ),
             "checkpoint_read_bytes": int(plan.host_arena_bytes),
             "dequant_workspace_bytes": int(
                 preflight.estimate.dequant_workspace_bytes

@@ -86,6 +86,27 @@ class RunReportTest(unittest.TestCase):
             cpu_resident_bytes=456,
             pinned_bytes=78,
             kv_cache_bytes=90,
+            kv_profiles=[
+                {
+                    "attention_backend": "dense_paged_reference",
+                    "attention_accuracy": "exact",
+                    "attention_wall_ms": 1.5,
+                    "layout": "hnd",
+                    "append_calls": 2,
+                    "appended_tokens": 5,
+                    "attention_calls": 2,
+                    "materialize_calls": 0,
+                    "materialized_bytes": 0,
+                    "policy": {
+                        "accuracy": "exact",
+                        "storage": "gpu",
+                        "dtype": "bf16",
+                        "selection": "none",
+                        "reuse": "none",
+                        "page_size": 16,
+                    },
+                }
+            ],
         )
         payload = json.loads(report.to_json())
         self.assertEqual(payload["schema_version"], 2)
@@ -96,6 +117,11 @@ class RunReportTest(unittest.TestCase):
         self.assertEqual(
             payload["runtime_config"]["weight_format"], "bf16"
         )
+        self.assertEqual(
+            payload["runtime_config"]["kv_policy"]["accuracy"], "exact"
+        )
+        self.assertEqual(payload["pipeline"]["kv"]["materialized_bytes"], 0)
+        self.assertEqual(payload["timings"]["kv_attention_time_ms"], 1.5)
         with tempfile.TemporaryDirectory() as directory:
             path = report.write(Path(directory) / "run_report.json")
             self.assertTrue(path.is_file())

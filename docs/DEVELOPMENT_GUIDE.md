@@ -1,6 +1,6 @@
 # Cascade-LLM 开发文档（本地）
 
-> 2026-08-01 更新：M1～M5.1 的核心接口、正确性、稳定流水线、统一 benchmark 和 SM86 CUTLASS W8A16 provider 已落地；M6 已完成静态整层 Transformer 常驻、独立 LM Head placement、真实 8B INT8 checkpoint 转换和第一轮显存/延迟曲线。真实 W8A16 全常驻可达到约 46 ms/token，但 provider 与 fallback 的严格逐层数值门槛及完整 M6A 长矩阵仍未关闭。详见 `docs/M6_VALIDATION.md`。
+> 2026-08-02 更新：KV Cache V2 已完成 D0 和 D1 reference：正交策略、HND 非连续页池、请求页表、Fork/COW/ref/pin 和 exact MHA/GQA attention 已接入，120 项回归通过。默认多页 SDPA reference 仍复制当前层连续 K/V；无完整 K/V 临时区的 online reference 在真实 8B 中存在误差传播且性能较差，因此 D1 生产后端尚未验收。D2～D8 仍明确标记为未实现。详见 `docs/KV_CACHE_ARCHITECTURE_V2.md` 和 `docs/KV_CACHE_D1_VALIDATION.md`。
 
 > 本文档只保存在本地，不上传 GitHub。它描述当前源码状态，重点记录设计边界、已知问题和下一阶段实现顺序。
 
