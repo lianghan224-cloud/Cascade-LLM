@@ -8,22 +8,26 @@ import json
 from .attention.paged import (
     PAGED_ATTENTION_ABI_VERSION,
     PagedAttentionCapability,
+    PagedAttentionBackend,
     PagedAttentionInput,
     PagedAttentionOutput,
-    PagedAttentionProvider,
     PagedKVAppendInput,
 )
 from .kv import (
     KV_FRAMEWORK_ABI_VERSION,
     KV_PAGE_FORMAT_VERSION,
+    PAGED_KV_KERNEL_ABI_VERSION,
     LogicalBlockTable,
     PageDescriptor,
     PageState,
     PagedBatchView,
+    PagedKVKernelBackend,
+    PagedKVKernelCapability,
     RequestKVState,
     SelectedPageView,
     SlotMapping,
 )
+from .providers.base import PagedProviderBundle
 from .kv.reuse import KV_REUSE_ABI_VERSION, KVReusePolicyProvider
 from .kv.selection import KV_SELECTION_ABI_VERSION, KVSelectionPolicyProvider
 from .kv.stores import KV_STORE_ABI_VERSION, KVStore
@@ -47,6 +51,7 @@ def kv_framework_contract():
             "framework": KV_FRAMEWORK_ABI_VERSION,
             "page_format": KV_PAGE_FORMAT_VERSION,
             "paged_attention": PAGED_ATTENTION_ABI_VERSION,
+            "paged_kv_kernel": PAGED_KV_KERNEL_ABI_VERSION,
             "store": KV_STORE_ABI_VERSION,
             "selection": KV_SELECTION_ABI_VERSION,
             "reuse": KV_REUSE_ABI_VERSION,
@@ -73,18 +78,22 @@ def kv_framework_contract():
                 PagedAttentionInput,
                 PagedAttentionOutput,
                 PagedAttentionCapability,
+                PagedKVKernelCapability,
             )
         },
-        "provider_methods": {
-            name: _parameters(getattr(PagedAttentionProvider, name))
+        "provider_bundle_fields": _fields(PagedProviderBundle),
+        "attention_backend_methods": {
+            name: _parameters(getattr(PagedAttentionBackend, name))
             for name in (
                 "capability",
                 "estimate_workspace",
-                "append_kv",
-                "copy_pages",
                 "decode",
                 "prefill",
             )
+        },
+        "page_kernel_backend_methods": {
+            name: _parameters(getattr(PagedKVKernelBackend, name))
+            for name in ("capability", "append_kv", "copy_pages")
         },
         "store_methods": {
             name: _parameters(getattr(KVStore, name))

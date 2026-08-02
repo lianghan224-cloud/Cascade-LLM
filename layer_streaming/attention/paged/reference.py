@@ -12,7 +12,7 @@ import torch
 import torch.nn.functional as F
 
 from .abi import PagedAttentionOutput
-from .base import PagedAttentionProvider
+from .base import PagedAttentionBackend
 from .capability import PagedAttentionCapability
 from .workspace import PagedWorkspaceEstimate
 
@@ -25,7 +25,7 @@ def _output_dtype(name, fallback):
     }.get(str(name), fallback)
 
 
-class ReferencePagedExactProvider(PagedAttentionProvider):
+class ReferencePagedExactBackend(PagedAttentionBackend):
     name = "reference_paged_exact"
     is_reference = True
 
@@ -55,18 +55,6 @@ class ReferencePagedExactProvider(PagedAttentionProvider):
     def estimate_workspace(self, request):
         del request
         return PagedWorkspaceEstimate(0, "page_local", False, False, False)
-
-    def append_kv(self, append_input):
-        append_input.validate()
-        for token_index in range(append_input.slot_mapping.token_count):
-            page_id = int(append_input.slot_mapping.page_ids[token_index].item())
-            offset = int(append_input.slot_mapping.offsets[token_index].item())
-            append_input.key_pool_view[page_id, :, offset, :].copy_(
-                append_input.key[token_index]
-            )
-            append_input.value_pool_view[page_id, :, offset, :].copy_(
-                append_input.value[token_index]
-            )
 
     def _execute(self, request, phase):
         request.validate()
@@ -195,12 +183,12 @@ class ReferencePagedExactProvider(PagedAttentionProvider):
         return self._execute(request, "prefill")
 
 
-class LegacyGatherSDPAReferenceProvider(PagedAttentionProvider):
+class LegacyGatherSDPAReferenceBackend(PagedAttentionBackend):
     name = "legacy_gather_sdpa_reference"
     is_reference = True
 
     def capability(self):
-        base = ReferencePagedExactProvider().capability()
+        base = ReferencePagedExactBackend().capability()
         return PagedAttentionCapability(
             provider_name=self.name,
             provider_version="1",
@@ -237,9 +225,6 @@ class LegacyGatherSDPAReferenceProvider(PagedAttentionProvider):
             True,
             False,
         )
-
-    def append_kv(self, append_input):
-        return ReferencePagedExactProvider().append_kv(append_input)
 
     def _execute(self, request, phase):
         request.validate()
@@ -322,3 +307,9 @@ class LegacyGatherSDPAReferenceProvider(PagedAttentionProvider):
 
     def prefill(self, request):
         return self._execute(request, "prefill")
+
+
+# Compatibility aliases for pre-RC imports.  These aliases expose attention
+# methods only; append/copy moved to PagedKVKernelBackend.
+ReferencePagedExactProvider = ReferencePagedExactBackend
+LegacyGatherSDPAReferenceProvider = LegacyGatherSDPAReferenceBackend

@@ -249,6 +249,12 @@ def build_inference_report(
             "paged_attention_provider": kv_profile.get(
                 "paged_attention_provider"
             ),
+            "paged_kv_kernel_backend": kv_profile.get(
+                "paged_kv_kernel_backend"
+            ),
+            "paged_provider_bundle": kv_profile.get(
+                "paged_provider_bundle"
+            ),
             "provider_fallback_reason": kv_profile.get(
                 "provider_fallback_reason"
             ),

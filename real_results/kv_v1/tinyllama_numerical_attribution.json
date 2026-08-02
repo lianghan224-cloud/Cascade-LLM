@@ -1,0 +1,611 @@
+{
+  "schema_version": 1,
+  "checkpoint": "/ssd/cascade-llm/models/TinyLlama-1.1B-Chat-v1.0",
+  "production_report": "real_results/kv_v1/tinyllama_real_generic_cuda.json",
+  "thresholds_unchanged": {
+    "atol": 0.05,
+    "rtol": 0.05
+  },
+  "production_failed_stage_count": 11,
+  "all_production_failures": [
+    {
+      "stage": "decode_0/final_norm",
+      "phase": "decode_0",
+      "component": "final_norm",
+      "layer": null,
+      "max_abs_error": 0.21875,
+      "mean_abs_error": 0.0284670889377594,
+      "max_relative_error": 3686523.5,
+      "top1_equal": null,
+      "topk_consistency": null,
+      "first_upstream_attention_difference": {
+        "stage": "decode_0/attention/0",
+        "layer": 0,
+        "max_abs_error": 0.000244140625,
+        "mean_abs_error": 5.9515368775464594e-06
+      },
+      "hf_sdpa_vs_eager_same_stage": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          1,
+          2048
+        ],
+        "max_abs_error": 0.375,
+        "mean_abs_error": 0.03441493958234787,
+        "max_relative_error": 4907226.5,
+        "mean_relative_error": 7516.2548828125
+      },
+      "cause": "attention_reduction_rounding_propagation",
+      "propagation": "RMS normalization exposes the accumulated residual difference"
+    },
+    {
+      "stage": "decode_0/logits",
+      "phase": "decode_0",
+      "component": "logits",
+      "layer": null,
+      "max_abs_error": 0.20703125,
+      "mean_abs_error": 0.03352294862270355,
+      "max_relative_error": 946.0988159179688,
+      "top1_equal": true,
+      "topk_consistency": 1.0,
+      "first_upstream_attention_difference": {
+        "stage": "decode_0/attention/0",
+        "layer": 0,
+        "max_abs_error": 0.000244140625,
+        "mean_abs_error": 5.9515368775464594e-06
+      },
+      "hf_sdpa_vs_eager_same_stage": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          1,
+          32000
+        ],
+        "max_abs_error": 0.234375,
+        "mean_abs_error": 0.04545614495873451,
+        "max_relative_error": 430.0513916015625,
+        "mean_relative_error": 0.15443764626979828,
+        "topk_consistency": 1.0,
+        "topk_equal": true,
+        "top1_equal": true
+      },
+      "cause": "attention_reduction_rounding_propagation",
+      "propagation": "LM Head projects the accumulated final hidden-state difference"
+    },
+    {
+      "stage": "decode_1/final_norm",
+      "phase": "decode_1",
+      "component": "final_norm",
+      "layer": null,
+      "max_abs_error": 0.25,
+      "mean_abs_error": 0.02913046069443226,
+      "max_relative_error": 22.687204360961914,
+      "top1_equal": null,
+      "topk_consistency": null,
+      "first_upstream_attention_difference": {
+        "stage": "decode_1/attention/0",
+        "layer": 0,
+        "max_abs_error": 0.000244140625,
+        "mean_abs_error": 5.99125814915169e-06
+      },
+      "hf_sdpa_vs_eager_same_stage": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          1,
+          2048
+        ],
+        "max_abs_error": 0.171875,
+        "mean_abs_error": 0.030182477086782455,
+        "max_relative_error": 19.842639923095703,
+        "mean_relative_error": 0.10631445050239563
+      },
+      "cause": "attention_reduction_rounding_propagation",
+      "propagation": "RMS normalization exposes the accumulated residual difference"
+    },
+    {
+      "stage": "decode_1/logits",
+      "phase": "decode_1",
+      "component": "logits",
+      "layer": null,
+      "max_abs_error": 0.234375,
+      "mean_abs_error": 0.03436439856886864,
+      "max_relative_error": 3224.60009765625,
+      "top1_equal": true,
+      "topk_consistency": 0.9,
+      "first_upstream_attention_difference": {
+        "stage": "decode_1/attention/0",
+        "layer": 0,
+        "max_abs_error": 0.000244140625,
+        "mean_abs_error": 5.99125814915169e-06
+      },
+      "hf_sdpa_vs_eager_same_stage": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          1,
+          32000
+        ],
+        "max_abs_error": 0.21875,
+        "mean_abs_error": 0.04028649255633354,
+        "max_relative_error": 4197.39990234375,
+        "mean_relative_error": 0.2735956311225891,
+        "topk_consistency": 1.0,
+        "topk_equal": true,
+        "top1_equal": true
+      },
+      "cause": "attention_reduction_rounding_propagation",
+      "propagation": "LM Head projects the accumulated final hidden-state difference"
+    },
+    {
+      "stage": "prefill/final_norm",
+      "phase": "prefill",
+      "component": "final_norm",
+      "layer": null,
+      "max_abs_error": 0.625,
+      "mean_abs_error": 0.030745714902877808,
+      "max_relative_error": 9716797.0,
+      "top1_equal": null,
+      "topk_consistency": null,
+      "first_upstream_attention_difference": {
+        "stage": "prefill/attention/0",
+        "layer": 0,
+        "max_abs_error": 0.0009765625,
+        "mean_abs_error": 5.125980806042207e-06
+      },
+      "hf_sdpa_vs_eager_same_stage": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 1.4375,
+        "mean_abs_error": 0.032036714255809784,
+        "max_relative_error": 13085938.0,
+        "mean_relative_error": 3860.697509765625
+      },
+      "cause": "attention_reduction_rounding_propagation",
+      "propagation": "RMS normalization exposes the accumulated residual difference"
+    },
+    {
+      "stage": "prefill/hidden/18",
+      "phase": "prefill",
+      "component": "hidden",
+      "layer": 18,
+      "max_abs_error": 0.09375,
+      "mean_abs_error": 0.004322734195739031,
+      "max_relative_error": 1757812.5,
+      "top1_equal": null,
+      "topk_consistency": null,
+      "first_upstream_attention_difference": {
+        "stage": "prefill/attention/0",
+        "layer": 0,
+        "max_abs_error": 0.0009765625,
+        "mean_abs_error": 5.125980806042207e-06
+      },
+      "hf_sdpa_vs_eager_same_stage": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 0.15625,
+        "mean_abs_error": 0.00430838530883193,
+        "max_relative_error": 976562.5,
+        "mean_relative_error": 307.2411193847656
+      },
+      "cause": "attention_reduction_rounding_propagation",
+      "propagation": "residual stream propagation of earlier attention rounding"
+    },
+    {
+      "stage": "prefill/hidden/20",
+      "phase": "prefill",
+      "component": "hidden",
+      "layer": 20,
+      "max_abs_error": 0.140625,
+      "mean_abs_error": 0.006601864937692881,
+      "max_relative_error": 1220703.125,
+      "top1_equal": null,
+      "topk_consistency": null,
+      "first_upstream_attention_difference": {
+        "stage": "prefill/attention/0",
+        "layer": 0,
+        "max_abs_error": 0.0009765625,
+        "mean_abs_error": 5.125980806042207e-06
+      },
+      "hf_sdpa_vs_eager_same_stage": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 0.234375,
+        "mean_abs_error": 0.006624927278608084,
+        "max_relative_error": 976562.5,
+        "mean_relative_error": 176.52304077148438
+      },
+      "cause": "attention_reduction_rounding_propagation",
+      "propagation": "residual stream propagation of earlier attention rounding"
+    },
+    {
+      "stage": "prefill/hidden/21",
+      "phase": "prefill",
+      "component": "hidden",
+      "layer": 21,
+      "max_abs_error": 0.1875,
+      "mean_abs_error": 0.009735362604260445,
+      "max_relative_error": 3906250.0,
+      "top1_equal": null,
+      "topk_consistency": null,
+      "first_upstream_attention_difference": {
+        "stage": "prefill/attention/0",
+        "layer": 0,
+        "max_abs_error": 0.0009765625,
+        "mean_abs_error": 5.125980806042207e-06
+      },
+      "hf_sdpa_vs_eager_same_stage": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 0.5,
+        "mean_abs_error": 0.01013894286006689,
+        "max_relative_error": 3906250.0,
+        "mean_relative_error": 1144.5147705078125
+      },
+      "cause": "attention_reduction_rounding_propagation",
+      "propagation": "residual stream propagation of earlier attention rounding"
+    },
+    {
+      "stage": "prefill/logits",
+      "phase": "prefill",
+      "component": "logits",
+      "layer": null,
+      "max_abs_error": 0.296875,
+      "mean_abs_error": 0.03795215114951134,
+      "max_relative_error": 16015625.0,
+      "top1_equal": true,
+      "topk_consistency": 1.0,
+      "first_upstream_attention_difference": {
+        "stage": "prefill/attention/0",
+        "layer": 0,
+        "max_abs_error": 0.0009765625,
+        "mean_abs_error": 5.125980806042207e-06
+      },
+      "hf_sdpa_vs_eager_same_stage": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          32000
+        ],
+        "max_abs_error": 0.5390625,
+        "mean_abs_error": 0.043829336762428284,
+        "max_relative_error": 33593752.0,
+        "mean_relative_error": 1632.1038818359375,
+        "topk_consistency": 1.0,
+        "topk_equal": true,
+        "top1_equal": true
+      },
+      "cause": "attention_reduction_rounding_propagation",
+      "propagation": "LM Head projects the accumulated final hidden-state difference"
+    },
+    {
+      "stage": "prefill/mlp/20",
+      "phase": "prefill",
+      "component": "mlp",
+      "layer": 20,
+      "max_abs_error": 0.078125,
+      "mean_abs_error": 0.003455342259258032,
+      "max_relative_error": 658.6923217773438,
+      "top1_equal": null,
+      "topk_consistency": null,
+      "first_upstream_attention_difference": {
+        "stage": "prefill/attention/0",
+        "layer": 0,
+        "max_abs_error": 0.0009765625,
+        "mean_abs_error": 5.125980806042207e-06
+      },
+      "hf_sdpa_vs_eager_same_stage": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 0.11328125,
+        "mean_abs_error": 0.0034838553983718157,
+        "max_relative_error": 595.05126953125,
+        "mean_relative_error": 0.1571340560913086
+      },
+      "cause": "attention_reduction_rounding_propagation",
+      "propagation": "SwiGLU nonlinearity amplifies the upstream residual difference"
+    },
+    {
+      "stage": "prefill/mlp/21",
+      "phase": "prefill",
+      "component": "mlp",
+      "layer": 21,
+      "max_abs_error": 0.34375,
+      "mean_abs_error": 0.006075802259147167,
+      "max_relative_error": 24738.83984375,
+      "top1_equal": null,
+      "topk_consistency": null,
+      "first_upstream_attention_difference": {
+        "stage": "prefill/attention/0",
+        "layer": 0,
+        "max_abs_error": 0.0009765625,
+        "mean_abs_error": 5.125980806042207e-06
+      },
+      "hf_sdpa_vs_eager_same_stage": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 0.703125,
+        "mean_abs_error": 0.006826080847531557,
+        "max_relative_error": 21134.359375,
+        "mean_relative_error": 0.8774113059043884
+      },
+      "cause": "attention_reduction_rounding_propagation",
+      "propagation": "SwiGLU nonlinearity amplifies the upstream residual difference"
+    }
+  ],
+  "first_attention_difference_by_phase": {
+    "decode_0": {
+      "stage": "decode_0/attention/0",
+      "layer": 0,
+      "max_abs_error": 0.000244140625,
+      "mean_abs_error": 5.9515368775464594e-06
+    },
+    "decode_1": {
+      "stage": "decode_1/attention/0",
+      "layer": 0,
+      "max_abs_error": 0.000244140625,
+      "mean_abs_error": 5.99125814915169e-06
+    },
+    "prefill": {
+      "stage": "prefill/attention/0",
+      "layer": 0,
+      "max_abs_error": 0.0009765625,
+      "mean_abs_error": 5.125980806042207e-06
+    }
+  },
+  "control_experiment": {
+    "comparison": "Hugging Face SDPA vs Hugging Face eager",
+    "strict_ok": false,
+    "failed_stage_count": 15,
+    "failed_stages": {
+      "decode_0/final_norm": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          1,
+          2048
+        ],
+        "max_abs_error": 0.375,
+        "mean_abs_error": 0.03441493958234787,
+        "max_relative_error": 4907226.5,
+        "mean_relative_error": 7516.2548828125
+      },
+      "decode_0/hidden/21": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          1,
+          2048
+        ],
+        "max_abs_error": 0.21875,
+        "mean_abs_error": 0.013004302978515625,
+        "max_relative_error": 1757812.5,
+        "mean_relative_error": 2670.39892578125
+      },
+      "decode_0/logits": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          1,
+          32000
+        ],
+        "max_abs_error": 0.234375,
+        "mean_abs_error": 0.04545614495873451,
+        "max_relative_error": 430.0513916015625,
+        "mean_relative_error": 0.15443764626979828,
+        "topk_consistency": 1.0,
+        "topk_equal": true,
+        "top1_equal": true
+      },
+      "decode_0/mlp/21": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          1,
+          2048
+        ],
+        "max_abs_error": 0.34375,
+        "mean_abs_error": 0.009341541677713394,
+        "max_relative_error": 57.76836013793945,
+        "mean_relative_error": 0.1551404595375061
+      },
+      "decode_1/final_norm": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          1,
+          2048
+        ],
+        "max_abs_error": 0.171875,
+        "mean_abs_error": 0.030182477086782455,
+        "max_relative_error": 19.842639923095703,
+        "mean_relative_error": 0.10631445050239563
+      },
+      "decode_1/logits": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          1,
+          32000
+        ],
+        "max_abs_error": 0.21875,
+        "mean_abs_error": 0.04028649255633354,
+        "max_relative_error": 4197.39990234375,
+        "mean_relative_error": 0.2735956311225891,
+        "topk_consistency": 1.0,
+        "topk_equal": true,
+        "top1_equal": true
+      },
+      "prefill/final_norm": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 1.4375,
+        "mean_abs_error": 0.032036714255809784,
+        "max_relative_error": 13085938.0,
+        "mean_relative_error": 3860.697509765625
+      },
+      "prefill/hidden/17": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 0.125,
+        "mean_abs_error": 0.003074286738410592,
+        "max_relative_error": 1245117.25,
+        "mean_relative_error": 171.94187927246094
+      },
+      "prefill/hidden/18": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 0.15625,
+        "mean_abs_error": 0.00430838530883193,
+        "max_relative_error": 976562.5,
+        "mean_relative_error": 307.2411193847656
+      },
+      "prefill/hidden/19": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 0.1796875,
+        "mean_abs_error": 0.005466765724122524,
+        "max_relative_error": 1953125.0,
+        "mean_relative_error": 641.828369140625
+      },
+      "prefill/hidden/20": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 0.234375,
+        "mean_abs_error": 0.006624927278608084,
+        "max_relative_error": 976562.5,
+        "mean_relative_error": 176.52304077148438
+      },
+      "prefill/hidden/21": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 0.5,
+        "mean_abs_error": 0.01013894286006689,
+        "max_relative_error": 3906250.0,
+        "mean_relative_error": 1144.5147705078125
+      },
+      "prefill/logits": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          32000
+        ],
+        "max_abs_error": 0.5390625,
+        "mean_abs_error": 0.043829336762428284,
+        "max_relative_error": 33593752.0,
+        "mean_relative_error": 1632.1038818359375,
+        "topk_consistency": 1.0,
+        "topk_equal": true,
+        "top1_equal": true
+      },
+      "prefill/mlp/20": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 0.11328125,
+        "mean_abs_error": 0.0034838553983718157,
+        "max_relative_error": 595.05126953125,
+        "mean_relative_error": 0.1571340560913086
+      },
+      "prefill/mlp/21": {
+        "ok": false,
+        "elementwise_ok": false,
+        "shape": [
+          1,
+          15,
+          2048
+        ],
+        "max_abs_error": 0.703125,
+        "mean_abs_error": 0.006826080847531557,
+        "max_relative_error": 21134.359375,
+        "mean_relative_error": 0.8774113059043884
+      }
+    }
+  },
+  "conclusion": {
+    "page_mapping_or_placement_error": false,
+    "evidence": "Every failing stage is downstream of a non-zero attention difference; legacy gather + identical HF SDPA passes all stages, while an independent HF attention implementation also establishes implementation-dependent stage variance.",
+    "strict_hf_sdpa_identity_restored": false,
+    "reason_not_fixed_by_threshold_change": "The original tolerances are retained. Production direct-paged attention uses a different FP32 reduction tree and therefore cannot promise identity with the private HF SDPA reduction.",
+    "all_failed_stages_attributed": true
+  }
+}

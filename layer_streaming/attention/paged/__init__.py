@@ -4,7 +4,7 @@ from .abi import (
     PagedAttentionOutput,
     PagedKVAppendInput,
 )
-from .base import PagedAttentionProvider
+from .base import PagedAttentionBackend, PagedAttentionProvider
 from .capability import PagedAttentionCapability
 from .dispatcher import (
     PagedAttentionDispatcher,
@@ -18,16 +18,20 @@ from .numerical_contract import (
     default_paged_numerical_contract,
 )
 from .reference import (
+    LegacyGatherSDPAReferenceBackend,
     LegacyGatherSDPAReferenceProvider,
+    ReferencePagedExactBackend,
     ReferencePagedExactProvider,
 )
 from .workspace import PagedWorkspaceEstimate
 
 __all__ = [
     "LegacyGatherSDPAReferenceProvider",
+    "LegacyGatherSDPAReferenceBackend",
     "PAGED_ATTENTION_ABI_VERSION",
     "PAGED_NUMERICAL_CONTRACT_VERSION",
     "PagedAttentionCapability",
+    "PagedAttentionBackend",
     "PagedAttentionDispatcher",
     "PagedAttentionInput",
     "PagedAttentionOutput",
@@ -38,6 +42,7 @@ __all__ = [
     "default_paged_numerical_contract",
     "PagedWorkspaceEstimate",
     "ReferencePagedExactProvider",
+    "ReferencePagedExactBackend",
     "default_paged_registry",
     "detected_architecture",
 ]

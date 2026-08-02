@@ -11,6 +11,12 @@ from .errors import (
     KVUnsupportedError,
 )
 from .metrics import KVMetrics
+from .kernel_backend import (
+    PAGED_KV_KERNEL_ABI_VERSION,
+    PagedKVKernelBackend,
+    PagedKVKernelCapability,
+    TorchPagedKVKernelBackend,
+)
 from .page_pool import KVPagePoolV1
 from .page_view import SelectedPageView
 from .policy import (
@@ -53,17 +59,21 @@ __all__ = [
     "KVSelectionPolicy",
     "KVStoragePolicy",
     "PAGED_BATCH_ABI_VERSION",
+    "PAGED_KV_KERNEL_ABI_VERSION",
     "PageCOWOperation",
     "PageDescriptor",
     "PageHandle",
     "PageState",
     "PendingAppend",
     "PagedBatchView",
+    "PagedKVKernelBackend",
+    "PagedKVKernelCapability",
     "PagedKVRuntime",
     "RequestKVCacheV1",
     "RequestKVState",
     "RequestLifecycleState",
     "SelectedPageView",
     "SlotMapping",
+    "TorchPagedKVKernelBackend",
     "build_paged_batch_view",
 ]

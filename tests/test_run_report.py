@@ -97,6 +97,9 @@ class RunReportTest(unittest.TestCase):
                     "attention_calls": 2,
                     "materialize_calls": 0,
                     "materialized_bytes": 0,
+                    "paged_attention_provider": "sm86",
+                    "paged_kv_kernel_backend": "sm86_kv_kernel",
+                    "paged_provider_bundle": "sm86",
                     "policy": {
                         "accuracy": "exact",
                         "storage": "gpu",
@@ -121,6 +124,14 @@ class RunReportTest(unittest.TestCase):
             payload["runtime_config"]["kv_policy"]["accuracy"], "exact"
         )
         self.assertEqual(payload["pipeline"]["kv"]["materialized_bytes"], 0)
+        self.assertEqual(
+            payload["pipeline"]["kv"]["paged_attention_provider"],
+            "sm86",
+        )
+        self.assertEqual(
+            payload["pipeline"]["kv"]["paged_kv_kernel_backend"],
+            "sm86_kv_kernel",
+        )
         self.assertEqual(payload["timings"]["kv_attention_time_ms"], 1.5)
         with tempfile.TemporaryDirectory() as directory:
             path = report.write(Path(directory) / "run_report.json")

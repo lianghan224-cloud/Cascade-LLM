@@ -1,4 +1,5 @@
 import math
+import inspect
 import unittest
 
 import torch
@@ -9,12 +10,21 @@ from layer_streaming import (
     KVLifecycleError,
     KVPolicy,
     KVUnsupportedError,
+    KVPagePoolV1,
     PageState,
+    PagedAttentionBackend,
     PagedKVRuntime,
+    PagedKVKernelBackend,
+    PagedProviderBundle,
+    ReferencePagedExactProvider,
     SelectedPageView,
+    TorchPagedKVKernelBackend,
     default_paged_registry,
 )
 from layer_streaming.providers.generic_cuda import deterministic_lm_head
+from layer_streaming.providers.generic_cuda import (
+    GenericCUDAPagedAttentionBackend,
+)
 
 
 def make_policy(backend="reference_paged_exact", dtype="bf16", reuse="request_only"):
@@ -27,6 +37,156 @@ def make_policy(backend="reference_paged_exact", dtype="bf16", reuse="request_on
 
 
 class KVFrameworkV1CPUTest(unittest.TestCase):
+    def test_provider_bundle_has_no_lifecycle_ownership(self):
+        self.assertFalse(hasattr(PagedAttentionBackend, "append_kv"))
+        self.assertFalse(hasattr(PagedAttentionBackend, "copy_pages"))
+        for item in (
+            PagedAttentionBackend,
+            PagedKVKernelBackend,
+            PagedProviderBundle,
+        ):
+            for name in (
+                "allocate",
+                "release",
+                "fork",
+                "retain",
+                "pin",
+                "unpin",
+            ):
+                self.assertFalse(hasattr(item, name), (item, name))
+
+        pool = KVPagePoolV1(
+            page_count=2,
+            store_id="boundary-test",
+            dtype="bf16",
+        )
+        handle = pool.allocate(owner_hint=1)
+        pool.activate(handle, 3)
+        pool.seal(handle, 3)
+        pool.retain(handle)
+        self.assertEqual(pool.descriptor(handle).ref_count, 2)
+        pool.release(handle)
+        pool.release(handle)
+        self.assertEqual(pool.allocated_pages, 0)
+
+        class InvalidAttention(ReferencePagedExactProvider):
+            def append_kv(self, append_input):
+                del append_input
+
+        with self.assertRaisesRegex(TypeError, "page kernel methods"):
+            PagedProviderBundle(
+                name="invalid_attention_boundary",
+                attention_backend=InvalidAttention(),
+                kv_kernel_backend=TorchPagedKVKernelBackend(),
+            )
+
+        class InvalidKernel(TorchPagedKVKernelBackend):
+            def allocate(self):
+                return None
+
+        with self.assertRaisesRegex(TypeError, "lifecycle methods"):
+            PagedProviderBundle(
+                name="invalid_lifecycle_boundary",
+                attention_backend=ReferencePagedExactProvider(),
+                kv_kernel_backend=InvalidKernel(),
+            )
+
+    def test_production_attention_has_no_hidden_gather_or_sdpa(self):
+        source = inspect.getsource(GenericCUDAPagedAttentionBackend)
+        self.assertNotIn("scaled_dot_product_attention", source)
+        self.assertNotIn("torch.cat", source)
+        self.assertNotIn("LegacyGather", source)
+
+    def test_backend_replacement_preserves_block_table_and_cow_semantics(self):
+        class CountingKernelBackend(TorchPagedKVKernelBackend):
+            name = "counting_torch_paged_kv"
+
+            def __init__(self):
+                self.append_calls = 0
+                self.copy_calls = 0
+
+            def append_kv(self, append_input):
+                self.append_calls += 1
+                return super().append_kv(append_input)
+
+            def copy_pages(
+                self,
+                store,
+                source_page_ids,
+                target_page_ids,
+                valid_tokens,
+            ):
+                self.copy_calls += len(source_page_ids)
+                return super().copy_pages(
+                    store,
+                    source_page_ids,
+                    target_page_ids,
+                    valid_tokens,
+                )
+
+        class AlternateAttentionBackend(ReferencePagedExactProvider):
+            name = "alternate_reference_attention"
+
+        registry = default_paged_registry(load_cuda=False)
+        registry.register(
+            PagedProviderBundle(
+                name="boundary_test",
+                attention_backend=ReferencePagedExactProvider(),
+                kv_kernel_backend=TorchPagedKVKernelBackend(),
+            )
+        )
+        runtime = PagedKVRuntime(
+            layer_count=1,
+            num_query_heads=4,
+            num_kv_heads=2,
+            head_dim=8,
+            page_count=8,
+            page_size=16,
+            dtype=torch.bfloat16,
+            device="cpu",
+            policy=make_policy("boundary_test"),
+            provider_registry=registry,
+            allow_reference=True,
+        )
+        parent = runtime.create_request(64, request_id=41)
+        key = torch.randn(3, 2, 8, dtype=torch.bfloat16)
+        value = torch.randn_like(key)
+        runtime.append((parent,), 0, key, value, (3,))
+        original = parent.block_table.handles[0]
+        branch = runtime.fork(parent, request_id=42)
+        self.assertEqual(runtime.page_pool.descriptor(original).ref_count, 2)
+
+        counter = CountingKernelBackend()
+        registry.register(
+            PagedProviderBundle(
+                name="boundary_test",
+                attention_backend=AlternateAttentionBackend(),
+                kv_kernel_backend=counter,
+            ),
+            replace=True,
+        )
+        extension = torch.randn(1, 2, 8, dtype=torch.bfloat16)
+        runtime.append((branch,), 0, extension, extension, (1,))
+        self.assertEqual(counter.copy_calls, 1)
+        self.assertEqual(counter.append_calls, 1)
+        self.assertEqual(parent.block_table.handles[0], original)
+        self.assertNotEqual(branch.block_table.handles[0], original)
+        self.assertEqual(runtime.page_pool.descriptor(original).ref_count, 1)
+
+        before = tuple(
+            (item.identity(), runtime.page_pool.descriptor(item).ref_count)
+            for item in branch.block_table.handles
+        )
+        query = torch.randn(1, 4, 8, dtype=torch.bfloat16)
+        runtime.attend((branch,), 0, query, (1,), phase="decode")
+        after = tuple(
+            (item.identity(), runtime.page_pool.descriptor(item).ref_count)
+            for item in branch.block_table.handles
+        )
+        self.assertEqual(before, after)
+        self.assertEqual(runtime.attention_backend.name, "alternate_reference_attention")
+        runtime.close()
+
     def test_architecture_providers_are_independent_and_unqualified(self):
         registry = default_paged_registry()
         capabilities = registry.capabilities()

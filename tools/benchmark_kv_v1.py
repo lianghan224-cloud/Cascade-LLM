@@ -128,6 +128,9 @@ def run_case(args, provider, context_length, page_size, phase, tensors):
             "gpu_peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
             "requires_full_kv_workspace": runtime.provider.capability().requires_full_kv_workspace,
             "qualification_status": runtime.provider.capability().qualification_status,
+            "attention_backend": runtime.attention_backend.name,
+            "kv_kernel_backend": runtime.kv_kernel_backend.name,
+            "provider_bundle": runtime.provider_bundle.name,
             "output": output.detach(),
         }
     except Exception as error:

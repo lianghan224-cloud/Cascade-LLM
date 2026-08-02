@@ -10,7 +10,7 @@ from layer_streaming import (
 
 
 FIXTURE = Path(__file__).parent / "fixtures/kv_framework_v1.json"
-EXPECTED_SHA256 = "0c8e71323062c7d21a18c1cd8703f549421b7b713abef6df796317f6010837dd"
+EXPECTED_SHA256 = "c1b8e8cad65c0d0d1779703e24129a832100efbd5024a6cfad38841f8e30c0ed"
 
 
 class KVFrameworkContractTest(unittest.TestCase):

@@ -1,7 +1,7 @@
 # Cascade-LLM KV Framework V1
 
-KV Framework V1 将页面、请求、Batch、Store、Selection、Reuse 和 Paged
-Attention Provider 的边界冻结为版本化合同。它取代 D0/D1 中以
+KV Framework V1 将页面、请求、Batch、Store、Selection、Reuse、Paged
+Attention Backend、Paged KV Kernel Backend 和 Provider Bundle 的边界冻结为版本化合同。它取代 D0/D1 中以
 `layer_streaming/kv_cache.py` 为主的旧 reference 架构；旧模块只保留兼容和消融。
 
 ## 1. 当前可执行范围
@@ -42,7 +42,7 @@ tests/fixtures/kv_framework_v1.json
 合同 SHA-256：
 
 ```text
-0c8e71323062c7d21a18c1cd8703f549421b7b713abef6df796317f6010837dd
+c1b8e8cad65c0d0d1779703e24129a832100efbd5024a6cfad38841f8e30c0ed
 ```
 
 冻结项包括：
@@ -54,8 +54,10 @@ tests/fixtures/kv_framework_v1.json
 5. `PagedBatchView`、flat block table、逻辑块位置、页内有效长度和 `SlotMapping`；
 6. Store `read_pages/write_pages/copy_page`、Selection、Reuse
    `fork/register_prefix/lookup_prefix` ABI；
-7. Batch-first `PagedAttentionInput/Output` 和 Provider ABI；
-8. Provider Capability 和 architecture-specific Numerical Contract。
+7. Batch-first `PagedAttentionInput/Output` 和 `PagedAttentionBackend` ABI；
+8. 只含 `append_kv/copy_pages` 的 `PagedKVKernelBackend` ABI；
+9. 聚合两者但不拥有生命周期的 `PagedProviderBundle`；
+10. Provider Capability 和 architecture-specific Numerical Contract。
 
 不兼容变更必须升级 ABI/format version，不能只更新 fixture。
 
@@ -81,7 +83,29 @@ begin append
 逻辑位置和 token IDs 的链式 SHA-256。Namespace 应由调用方包含 model、tokenizer、
 RoPE、权重量化、KV format/layout、adapter/LoRA 和 tenant salt。
 
-## 4. Paged Attention Provider
+## 4. Provider Bundle 与边界
+
+冻结后的硬件 Bundle 结构是：
+
+```text
+KV Runtime / Page Pool
+  allocate / release / fork / COW / ref_count / pin_count
+
+PagedProviderBundle
+├── PagedAttentionBackend
+│   ├── prefill
+│   ├── decode
+│   └── estimate_workspace
+└── PagedKVKernelBackend
+    ├── append_kv
+    └── copy_pages
+```
+
+Attention/Kernel Backend 均禁止暴露 allocate、release、fork、retain、pin 或 unpin。
+替换任一 Backend 后，Block Table、PageHandle generation 和引用计数语义保持不变；
+这些边界由无 Provider PagePool 测试和 Backend 热替换 COW 测试门禁。
+
+## 5. Paged Attention Backend
 
 ### `reference_paged_exact`
 
@@ -96,11 +120,11 @@ CUDA kernel 直接读取 HND page 和 flat block table，使用两遍 FP32 softm
 workspace 为 0。支持 SM80/86/89/90、BF16/FP16、page size 16/32、MHA/GQA/MQA、
 ragged prefill/decode 和 partial tail。
 
-Provider 同时消费 Selection 输出的物理页 ID、原逻辑块 ID 和页内有效 token 数；因此
-Quest 将来可以返回非连续历史页而不修改 Batch/Provider ABI。当前用“第一页 + 尾页”的
+Attention Backend 消费 Selection 输出的物理页 ID、原逻辑块 ID 和页内有效 token 数；因此
+Quest 将来可以返回非连续历史页而不修改 Batch/Backend ABI。当前用“第一页 + 尾页”的
 非连续选择做了 Generic CUDA 接口验证，但这不代表 Quest 评分算法已经实现。
 
-### Architecture Provider
+### Architecture Provider Bundle
 
 | Provider | 真实硬件状态 | 实现 |
 |---|---|---|
@@ -112,7 +136,7 @@ Quest 将来可以返回非连续历史页而不修改 Batch/Provider ABI。当�
 `sm80/sm89/sm90` 不能描述为已兼容；它们必须在对应真实硬件上完成模型、长稳和性能
 资格验证后才能提升状态。
 
-## 5. LM Head 数值路径
+## 6. LM Head 数值路径
 
 Streamed 和 resident LM Head 现在都使用
 `deterministic_cuda_fp32_accum_native_output`。每个 vocab row 使用固定 256-thread FP32 reduction
@@ -124,7 +148,7 @@ PyTorch `linear` 的输出 dtype 语义一致。
 它当前优先数值可复现性，尚未证明比 cuBLAS 更快；LM Head 性能必须独立报告，不能把
 这一正确性修复描述为性能提升。
 
-## 6. CLI
+## 7. CLI
 
 Production：
 
@@ -152,21 +176,21 @@ Reference 诊断：
 --kv-attention-backend reference_paged_exact --allow-kv-reference
 ```
 
-## 7. 扩展规则
+## 8. 扩展规则
 
 后续能力只能按以下方式增加：
 
 ```text
-KV 量化        → Format + Provider
+KV 量化        → Format + Attention/KV Kernel Backend
 CPU/NVMe       → Store
 Prefix 持久化  → Store + Reuse Policy
 Quest          → Selection Policy
-Split Attention → Provider
+Split Attention → Attention Backend
 ```
 
 不得再建立第二套 Page Pool、Block Table、Request State 或单请求 Kernel ABI。
 
-## 8. 当前缺陷
+## 9. 当前缺陷
 
 1. Llama Executor 仍是单请求 adapter；KV Runtime/Provider 已支持 ragged Batch，完整
    continuous batching scheduler 尚未接入。
@@ -177,8 +201,8 @@ Split Attention → Provider
    替代模型 Golden。
 4. Prefix Index 尚无容量上限、LRU、tenant API 和 partial-block reuse。
 5. CUDA Graph 未实现；Batch metadata 当前会在 host 构造并有少量同步点。
-6. SM86 只有 RTX 3080 Ti smoke/性能消融，尚未完成真实 8B 1000-token 长稳，状态不是
-   `qualified`。
+6. SM86 已完成 RTX 3080 Ti kernel smoke、性能矩阵和真实 8B 1000-token 长稳，但严格
+   HF-SDPA 阶段 Golden 仍失败，因此状态仍不是 `qualified`。
 7. SM80/SM89/SM90 没有真实硬件结果，必须保持 `unqualified`。
 8. Quantized KV、CPU/NVMe Store 和 sparse selection 都是明确的 unsupported 接口。
 

@@ -1,6 +1,6 @@
 {
   "contract_version": 1,
-  "abi_versions": {"framework": 1, "page_format": 1, "paged_attention": 1, "store": 1, "selection": 1, "reuse": 1},
+  "abi_versions": {"framework": 1, "page_format": 1, "paged_attention": 1, "paged_kv_kernel": 1, "store": 1, "selection": 1, "reuse": 1},
   "page_layout": "layer,page,kv_head,page_token,head_dim (HND per layer)",
   "page_handle_fields": ["page_id", "generation", "store_id", "format_id", "state"],
   "page_states": ["free", "allocated", "active", "sealed", "shared", "copying", "migrating", "evict_pending", "releasing"],
@@ -14,15 +14,20 @@
     "PagedKVAppendInput": ["key", "value", "key_pool_view", "value_pool_view", "slot_mapping", "page_size", "num_kv_heads", "head_dim"],
     "PagedAttentionInput": ["query", "key_pool_view", "value_pool_view", "batch_view", "page_size", "num_query_heads", "num_kv_heads", "head_dim", "softmax_scale", "causal", "kv_dtype", "output_dtype", "selected_pages", "workspace", "return_logsumexp"],
     "PagedAttentionOutput": ["output", "logsumexp", "provider_metrics"],
-    "PagedAttentionCapability": ["provider_name", "provider_version", "provider_abi", "architectures", "dtypes", "page_sizes", "head_dims", "supports_mha", "supports_gqa", "supports_mqa", "supports_decode", "supports_prefill", "supports_ragged_batch", "supports_partial_tail", "supports_cuda_graph", "numerical_contract_version", "requires_full_kv_workspace", "requires_full_score_matrix", "qualification_status"]
+    "PagedAttentionCapability": ["provider_name", "provider_version", "provider_abi", "architectures", "dtypes", "page_sizes", "head_dims", "supports_mha", "supports_gqa", "supports_mqa", "supports_decode", "supports_prefill", "supports_ragged_batch", "supports_partial_tail", "supports_cuda_graph", "numerical_contract_version", "requires_full_kv_workspace", "requires_full_score_matrix", "qualification_status"],
+    "PagedKVKernelCapability": ["backend_name", "backend_version", "backend_abi", "architectures", "dtypes", "page_sizes", "head_dims", "supports_append", "supports_copy", "qualification_status"]
   },
-  "provider_methods": {
+  "provider_bundle_fields": ["name", "attention_backend", "kv_kernel_backend"],
+  "attention_backend_methods": {
     "capability": ["self"],
     "estimate_workspace": ["self", "request"],
-    "append_kv": ["self", "append_input"],
-    "copy_pages": ["self", "store", "source_page_ids", "target_page_ids", "valid_tokens"],
     "decode": ["self", "request"],
     "prefill": ["self", "request"]
+  },
+  "page_kernel_backend_methods": {
+    "capability": ["self"],
+    "append_kv": ["self", "append_input"],
+    "copy_pages": ["self", "store", "source_page_ids", "target_page_ids", "valid_tokens"]
   },
   "store_methods": {
     "capability": ["self"],

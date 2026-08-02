@@ -118,10 +118,12 @@ class PagedKVRuntime:
             allow_reference=allow_reference,
         )
         # Resolve static capability before allocating the GPU page arena.
-        provider = self.dispatcher.provider
-        if provider.is_reference and not allow_reference:
+        attention_backend = self.dispatcher.attention_backend
+        kv_kernel_backend = self.dispatcher.kv_kernel_backend
+        if attention_backend.is_reference and not allow_reference:
             raise ValueError("reference provider requires allow_reference=True")
-        capability = provider.capability()
+        capability = attention_backend.capability()
+        kernel_capability = kv_kernel_backend.capability()
         architecture = detected_architecture(self.device)
         static_errors = []
         if architecture not in capability.architectures:
@@ -140,10 +142,27 @@ class PagedKVRuntime:
                 static_errors.append("MHA")
         elif not capability.supports_gqa:
             static_errors.append("GQA")
+        if architecture not in kernel_capability.architectures:
+            static_errors.append("KV kernel architecture {}".format(architecture))
+        if self.policy.dtype.value not in kernel_capability.dtypes:
+            static_errors.append(
+                "KV kernel dtype {}".format(self.policy.dtype.value)
+            )
+        if self.page_size not in kernel_capability.page_sizes:
+            static_errors.append("KV kernel page size {}".format(self.page_size))
+        if (
+            kernel_capability.head_dims
+            and self.head_dim not in kernel_capability.head_dims
+        ):
+            static_errors.append("KV kernel head dim {}".format(self.head_dim))
+        if not kernel_capability.supports_append:
+            static_errors.append("KV append")
+        if not kernel_capability.supports_copy:
+            static_errors.append("KV page copy")
         if static_errors:
             raise KVUnsupportedError(
                 "provider {} rejected runtime before allocation: {}".format(
-                    provider.name,
+                    self.dispatcher.bundle.name,
                     ", ".join(static_errors),
                 )
             )
@@ -214,7 +233,20 @@ class PagedKVRuntime:
 
     @property
     def provider(self):
-        return self.dispatcher.provider
+        """Compatibility alias for the attention-only backend."""
+        return self.attention_backend
+
+    @property
+    def provider_bundle(self):
+        return self.dispatcher.bundle
+
+    @property
+    def attention_backend(self):
+        return self.dispatcher.attention_backend
+
+    @property
+    def kv_kernel_backend(self):
+        return self.dispatcher.kv_kernel_backend
 
     def capacity(self, max_length=None):
         requested_pages = (
@@ -340,7 +372,7 @@ class PagedKVRuntime:
         valid = state.sequence_length % self.page_size
         self.page_pool.begin_copy(source, target)
         try:
-            self.provider.copy_pages(
+            self.kv_kernel_backend.copy_pages(
                 self.store,
                 (source.page_id,),
                 (target.page_id,),
@@ -506,7 +538,7 @@ class PagedKVRuntime:
                     for handle in append_handles:
                         self.page_pool.pin(handle)
                 try:
-                    self.provider.append_kv(
+                    self.kv_kernel_backend.append_kv(
                         PagedKVAppendInput(
                             key=key,
                             value=value,
@@ -893,7 +925,7 @@ class PagedKVRuntime:
             {
                 "abi_version": self.abi_version,
                 "kv_policy_resolved": self.policy.as_dict(),
-                "attention_backend": self.provider.name,
+                "attention_backend": self.attention_backend.name,
                 "attention_accuracy": self.policy.accuracy.value,
                 "layout": "hnd",
                 "kv_store": self.store.store_id,
@@ -905,7 +937,9 @@ class PagedKVRuntime:
                 "kv_pool_allocated_pages": pool["allocated_pages"],
                 "active_requests": len(self._requests),
                 "prefix_index_entries": len(self.prefix_index),
-                "paged_attention_provider": self.provider.name,
+                "paged_attention_provider": self.attention_backend.name,
+                "paged_kv_kernel_backend": self.kv_kernel_backend.name,
+                "paged_provider_bundle": self.provider_bundle.name,
                 "provider_fallback_reason": (
                     None
                     if self.dispatcher.last_decision is None
@@ -916,12 +950,25 @@ class PagedKVRuntime:
                 "page_state_counts": pool["state_counts"],
                 "page_allocations": pool["allocation_count"],
                 "page_releases": pool["release_count"],
+                "total_ref_count": pool["total_ref_count"],
+                "max_ref_count": pool["max_ref_count"],
+                "total_pin_count": pool["total_pin_count"],
+                "max_pin_count": pool["max_pin_count"],
                 "cuda_event_count": (
                     len(self._attention_events) + len(self._append_events)
                 ),
             }
         )
         return result
+
+    def quiesce(self):
+        """Wait for bounded page kernels and release all transient page pins."""
+        with self._lock:
+            self._check_open()
+            for layer in range(self.layer_count):
+                self._drain_layer_append(layer)
+                self._drain_layer_use(layer)
+            return self.profile_stats()
 
     def close(self):
         with self._lock:

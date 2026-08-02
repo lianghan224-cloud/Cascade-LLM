@@ -29,11 +29,12 @@ a699bcda404c8f3eeb9a4b297373dd3e8434c305f126acb4b3dc14a12ff70325
 ```
 
 KV Framework 另有独立 V1 合同，冻结 Page Handle/Descriptor、HND layout、
-Request/Batch/Slot Mapping、Store/Selection/Reuse 和 Paged Attention Provider ABI：
+Request/Batch/Slot Mapping、Store/Selection/Reuse、Paged Attention Backend、
+Paged KV Kernel Backend 和 Provider Bundle ABI：
 
 ```text
 fixture: tests/fixtures/kv_framework_v1.json
-sha256: 0c8e71323062c7d21a18c1cd8703f549421b7b713abef6df796317f6010837dd
+sha256: c1b8e8cad65c0d0d1779703e24129a832100efbd5024a6cfad38841f8e30c0ed
 ```
 
 `tests/test_api_contract.py` 同时验证：

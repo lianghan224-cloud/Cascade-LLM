@@ -1,0 +1,716 @@
+{
+  "schema_version": 1,
+  "hardware": {
+    "device": "NVIDIA GeForce RTX 3080 Ti",
+    "architecture": "sm86",
+    "torch": "2.4.1+cu121",
+    "cuda": "12.1"
+  },
+  "configuration": {
+    "device": "cuda:0",
+    "providers": [
+      "generic_cuda",
+      "sm86"
+    ],
+    "lengths": [
+      4096,
+      8192,
+      32768
+    ],
+    "page_sizes": [
+      16,
+      32
+    ],
+    "phases": [
+      "decode",
+      "prefill"
+    ],
+    "batch_size": 1,
+    "prefill_query_length": 4,
+    "query_heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "dtype": "bf16",
+    "warmup": 1,
+    "runs": 3
+  },
+  "results": [
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 4096,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 10.618222683357695,
+      "p50_ms": 10.558171896263957,
+      "p95_ms": 10.74398506898433,
+      "samples_ms": [
+        10.74398506898433,
+        10.558171896263957,
+        10.5525110848248
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17039360,
+      "gpu_peak_allocated_bytes": 33890816,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "attention_backend": "generic_cuda",
+      "kv_kernel_backend": "generic_cuda_kv_kernel",
+      "provider_bundle": "generic_cuda",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 4096,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 9.372014979210993,
+      "p50_ms": 9.362526936456561,
+      "p95_ms": 9.3923129606992,
+      "samples_ms": [
+        9.3923129606992,
+        9.362526936456561,
+        9.361205040477216
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17039360,
+      "gpu_peak_allocated_bytes": 33899008,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "speedup_vs_generic": 1.1277053692792804
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 4096,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        4
+      ],
+      "mean_ms": 11.221248346070448,
+      "p50_ms": 11.217201012186706,
+      "p95_ms": 11.236798018217087,
+      "samples_ms": [
+        11.236798018217087,
+        11.217201012186706,
+        11.209746007807553
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17039360,
+      "gpu_peak_allocated_bytes": 33930752,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "attention_backend": "generic_cuda",
+      "kv_kernel_backend": "generic_cuda_kv_kernel",
+      "provider_bundle": "generic_cuda",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 4096,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        4
+      ],
+      "mean_ms": 9.390837357689938,
+      "p50_ms": 9.383136057294905,
+      "p95_ms": 9.410448023118079,
+      "samples_ms": [
+        9.410448023118079,
+        9.383136057294905,
+        9.378927992656827
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17039360,
+      "gpu_peak_allocated_bytes": 33963520,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "speedup_vs_generic": 1.195463962548631
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 4096,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 10.254310327582061,
+      "p50_ms": 10.248746955767274,
+      "p95_ms": 10.269506019540131,
+      "samples_ms": [
+        10.244678007438779,
+        10.269506019540131,
+        10.248746955767274
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17301504,
+      "gpu_peak_allocated_bytes": 34185728,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "attention_backend": "generic_cuda",
+      "kv_kernel_backend": "generic_cuda_kv_kernel",
+      "provider_bundle": "generic_cuda",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 4096,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 9.073058686529597,
+      "p50_ms": 9.073038003407419,
+      "p95_ms": 9.07458201982081,
+      "samples_ms": [
+        9.071556036360562,
+        9.07458201982081,
+        9.073038003407419
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17301504,
+      "gpu_peak_allocated_bytes": 34193920,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "speedup_vs_generic": 1.1295827210156413
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 4096,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        4
+      ],
+      "mean_ms": 9.751927961284915,
+      "p50_ms": 9.625264909118414,
+      "p95_ms": 10.012738988734782,
+      "samples_ms": [
+        10.012738988734782,
+        9.617779986001551,
+        9.625264909118414
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17301504,
+      "gpu_peak_allocated_bytes": 34191360,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "attention_backend": "generic_cuda",
+      "kv_kernel_backend": "generic_cuda_kv_kernel",
+      "provider_bundle": "generic_cuda",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 4096,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        4
+      ],
+      "mean_ms": 8.12859604290376,
+      "p50_ms": 8.122197003103793,
+      "p95_ms": 8.146293112076819,
+      "samples_ms": [
+        8.117298013530672,
+        8.122197003103793,
+        8.146293112076819
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17301504,
+      "gpu_peak_allocated_bytes": 34224128,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "speedup_vs_generic": 1.1850568147313152
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 8192,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 18.374710033337276,
+      "p50_ms": 18.376754014752805,
+      "p95_ms": 18.383878050372005,
+      "samples_ms": [
+        18.383878050372005,
+        18.376754014752805,
+        18.363498034887016
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 33816576,
+      "gpu_peak_allocated_bytes": 67543552,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "attention_backend": "generic_cuda",
+      "kv_kernel_backend": "generic_cuda_kv_kernel",
+      "provider_bundle": "generic_cuda",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 8192,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 16.35880795462678,
+      "p50_ms": 16.366975964047015,
+      "p95_ms": 16.37212699279189,
+      "samples_ms": [
+        16.37212699279189,
+        16.366975964047015,
+        16.33732090704143
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 33816576,
+      "gpu_peak_allocated_bytes": 67551744,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "speedup_vs_generic": 1.1227947089994283
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 8192,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        4
+      ],
+      "mean_ms": 19.55960865598172,
+      "p50_ms": 19.551590899936855,
+      "p95_ms": 19.584040972404182,
+      "samples_ms": [
+        19.551590899936855,
+        19.584040972404182,
+        19.54319409560412
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 33816576,
+      "gpu_peak_allocated_bytes": 67543552,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "attention_backend": "generic_cuda",
+      "kv_kernel_backend": "generic_cuda_kv_kernel",
+      "provider_bundle": "generic_cuda",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 8192,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        4
+      ],
+      "mean_ms": 16.478645033203065,
+      "p50_ms": 16.478165984153748,
+      "p95_ms": 16.488207038491964,
+      "samples_ms": [
+        16.488207038491964,
+        16.478165984153748,
+        16.469562076963484
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 33816576,
+      "gpu_peak_allocated_bytes": 67576320,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "speedup_vs_generic": 1.1865149870888951
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 8192,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 17.79313536826521,
+      "p50_ms": 17.793980077840388,
+      "p95_ms": 17.79626403003931,
+      "samples_ms": [
+        17.793980077840388,
+        17.789161996915936,
+        17.79626403003931
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 34078720,
+      "gpu_peak_allocated_bytes": 67805696,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "attention_backend": "generic_cuda",
+      "kv_kernel_backend": "generic_cuda_kv_kernel",
+      "provider_bundle": "generic_cuda",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 8192,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 15.768262363659838,
+      "p50_ms": 15.769495046697557,
+      "p95_ms": 15.771878999657929,
+      "samples_ms": [
+        15.769495046697557,
+        15.771878999657929,
+        15.76341304462403
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 34078720,
+      "gpu_peak_allocated_bytes": 67813888,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "speedup_vs_generic": 1.1283798260596047
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 8192,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        4
+      ],
+      "mean_ms": 18.95998934439073,
+      "p50_ms": 18.94903799984604,
+      "p95_ms": 18.989784992299974,
+      "samples_ms": [
+        18.989784992299974,
+        18.941145041026175,
+        18.94903799984604
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 34078720,
+      "gpu_peak_allocated_bytes": 67805696,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "attention_backend": "generic_cuda",
+      "kv_kernel_backend": "generic_cuda_kv_kernel",
+      "provider_bundle": "generic_cuda",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 8192,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        4
+      ],
+      "mean_ms": 15.925834653899074,
+      "p50_ms": 15.901095001026988,
+      "p95_ms": 15.975565998815,
+      "samples_ms": [
+        15.901095001026988,
+        15.900842961855233,
+        15.975565998815
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 34078720,
+      "gpu_peak_allocated_bytes": 67838464,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "speedup_vs_generic": 1.1916813275200355
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 32768,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 72.55889766383916,
+      "p50_ms": 72.55538390018046,
+      "p95_ms": 72.57195503916591,
+      "samples_ms": [
+        72.57195503916591,
+        72.54935405217111,
+        72.55538390018046
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 134479872,
+      "gpu_peak_allocated_bytes": 269263360,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "attention_backend": "generic_cuda",
+      "kv_kernel_backend": "generic_cuda_kv_kernel",
+      "provider_bundle": "generic_cuda",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 32768,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 64.4080633840834,
+      "p50_ms": 64.40684804692864,
+      "p95_ms": 64.45105106104165,
+      "samples_ms": [
+        64.40684804692864,
+        64.36629104427993,
+        64.45105106104165
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 134479872,
+      "gpu_peak_allocated_bytes": 269271552,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "speedup_vs_generic": 1.126516606546474
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 32768,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        4
+      ],
+      "mean_ms": 77.4715783384939,
+      "p50_ms": 77.47374195605516,
+      "p95_ms": 77.48679805081338,
+      "samples_ms": [
+        77.45419500861317,
+        77.47374195605516,
+        77.48679805081338
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 134479872,
+      "gpu_peak_allocated_bytes": 269263360,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "attention_backend": "generic_cuda",
+      "kv_kernel_backend": "generic_cuda_kv_kernel",
+      "provider_bundle": "generic_cuda",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 32768,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        4
+      ],
+      "mean_ms": 64.95022994931787,
+      "p50_ms": 64.95020689908415,
+      "p95_ms": 64.96541493106633,
+      "samples_ms": [
+        64.95020689908415,
+        64.96541493106633,
+        64.93506801780313
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 134479872,
+      "gpu_peak_allocated_bytes": 269296128,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "speedup_vs_generic": 1.1928174774936338
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 32768,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 70.24852869411309,
+      "p50_ms": 70.24609006475657,
+      "p95_ms": 70.28092804830521,
+      "samples_ms": [
+        70.2185679692775,
+        70.24609006475657,
+        70.28092804830521
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 134742016,
+      "gpu_peak_allocated_bytes": 269525504,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "attention_backend": "generic_cuda",
+      "kv_kernel_backend": "generic_cuda_kv_kernel",
+      "provider_bundle": "generic_cuda",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 32768,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 62.11249095698198,
+      "p50_ms": 62.11627903394401,
+      "p95_ms": 62.12742789648473,
+      "samples_ms": [
+        62.11627903394401,
+        62.12742789648473,
+        62.09376594051719
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 134742016,
+      "gpu_peak_allocated_bytes": 269533696,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "speedup_vs_generic": 1.1308805220990452
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 32768,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        4
+      ],
+      "mean_ms": 75.09891362860799,
+      "p50_ms": 75.09672897867858,
+      "p95_ms": 75.13414102140814,
+      "samples_ms": [
+        75.06587088573724,
+        75.09672897867858,
+        75.13414102140814
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 134742016,
+      "gpu_peak_allocated_bytes": 269525504,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "attention_backend": "generic_cuda",
+      "kv_kernel_backend": "generic_cuda_kv_kernel",
+      "provider_bundle": "generic_cuda",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 32768,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        4
+      ],
+      "mean_ms": 62.692406005226076,
+      "p50_ms": 62.68872204236686,
+      "p95_ms": 62.70574498921633,
+      "samples_ms": [
+        62.68872204236686,
+        62.68275098409504,
+        62.70574498921633
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 134742016,
+      "gpu_peak_allocated_bytes": 269558272,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "speedup_vs_generic": 1.1979304495619807
+    }
+  ],
+  "acceptance": {
+    "production_numerics_pass": null,
+    "production_has_zero_full_kv_workspace": true,
+    "production_faster_than_reference": null
+  }
+}

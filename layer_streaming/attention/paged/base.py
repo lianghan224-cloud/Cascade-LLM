@@ -1,9 +1,12 @@
-"""Paged Attention Provider protocol."""
+"""Paged Attention compute backend protocol.
+
+This ABI deliberately excludes page append/copy and every lifecycle operation.
+"""
 
 from ...kv.errors import KVUnsupportedError
 
 
-class PagedAttentionProvider:
+class PagedAttentionBackend:
     name = "abstract"
     is_reference = False
 
@@ -13,21 +16,13 @@ class PagedAttentionProvider:
     def estimate_workspace(self, request):
         raise NotImplementedError
 
-    def append_kv(self, append_input):
-        raise NotImplementedError
-
-    def copy_pages(self, store, source_page_ids, target_page_ids, valid_tokens):
-        if not (
-            len(source_page_ids) == len(target_page_ids) == len(valid_tokens)
-        ):
-            raise ValueError("copy page lists must have equal length")
-        for source, target, valid in zip(
-            source_page_ids, target_page_ids, valid_tokens
-        ):
-            store.copy_page(source, target, valid)
-
     def decode(self, request):
         raise KVUnsupportedError("{} does not implement decode".format(self.name))
 
     def prefill(self, request):
         raise KVUnsupportedError("{} does not implement prefill".format(self.name))
+
+
+# Import compatibility only.  The frozen V1 contract names the interface
+# PagedAttentionBackend and contains no append/copy/lifecycle methods.
+PagedAttentionProvider = PagedAttentionBackend

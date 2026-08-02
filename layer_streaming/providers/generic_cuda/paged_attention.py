@@ -9,57 +9,29 @@ import torch
 from ...attention.paged import (
     PAGED_ATTENTION_ABI_VERSION,
     PagedAttentionCapability,
+    PagedAttentionBackend,
     PagedAttentionOutput,
-    PagedAttentionProvider,
     PagedWorkspaceEstimate,
 )
 from ...kv.errors import KVProviderError
+from ...kv.kernel_backend import (
+    PAGED_KV_KERNEL_ABI_VERSION,
+    PagedKVKernelBackend,
+    PagedKVKernelCapability,
+)
 from .cuda_source import PAGED_ATTENTION_CUDA_SOURCE
 from .nvrtc import CUDAKernelModule
 
 
-class GenericCUDAPagedAttentionProvider(PagedAttentionProvider):
-    """Direct HND-page CUDA provider compiled by NVRTC on first use.
-
-    NVRTC compiles device PTX and the CUDA driver launches it directly. No
-    Python extension, host compiler, Python headers, nvcc, or full CUDA toolkit
-    is required in the runtime image.
-    """
+class _GenericCUDAKernelSupport:
+    """Shared NVRTC module/launch support; it owns no page lifecycle."""
 
     name = "generic_cuda"
-    is_reference = False
     architectures = ("sm80", "sm86", "sm89", "sm90")
     qualification_status = "compiled"
     supported_head_dims = ()
     _modules = {}
     _module_lock = threading.RLock()
-
-    def capability(self):
-        return PagedAttentionCapability(
-            provider_name=self.name,
-            provider_version="1",
-            provider_abi=PAGED_ATTENTION_ABI_VERSION,
-            architectures=self.architectures,
-            dtypes=("bf16", "fp16"),
-            page_sizes=(16, 32),
-            head_dims=self.supported_head_dims,
-            supports_mha=True,
-            supports_gqa=True,
-            supports_mqa=True,
-            supports_decode=True,
-            supports_prefill=True,
-            supports_ragged_batch=True,
-            supports_partial_tail=True,
-            supports_cuda_graph=False,
-            numerical_contract_version=1,
-            requires_full_kv_workspace=False,
-            requires_full_score_matrix=False,
-            qualification_status=self.qualification_status,
-        )
-
-    def estimate_workspace(self, request):
-        del request
-        return PagedWorkspaceEstimate(0, "register_and_shared_only", False, False, False)
 
     @staticmethod
     def _architecture(device):
@@ -101,6 +73,29 @@ class GenericCUDAPagedAttentionProvider(PagedAttentionProvider):
                 self._modules[key] = module
             return module
 
+
+class GenericCUDAPagedKVKernelBackend(
+    _GenericCUDAKernelSupport,
+    PagedKVKernelBackend,
+):
+    """Append/copy kernel backend; allocation and references stay in runtime."""
+
+    name = "generic_cuda_kv_kernel"
+
+    def capability(self):
+        return PagedKVKernelCapability(
+            backend_name=self.name,
+            backend_version="1",
+            backend_abi=PAGED_KV_KERNEL_ABI_VERSION,
+            architectures=self.architectures,
+            dtypes=("bf16", "fp16"),
+            page_sizes=(16, 32),
+            head_dims=self.supported_head_dims,
+            supports_append=True,
+            supports_copy=True,
+            qualification_status=self.qualification_status,
+        )
+
     def append_kv(self, append_input):
         append_input.validate()
         if not append_input.key.is_cuda:
@@ -131,6 +126,64 @@ class GenericCUDAPagedAttentionProvider(PagedAttentionProvider):
                 (ctypes.c_int, int(append_input.page_size)),
                 (ctypes.c_int, int(append_input.head_dim)),
             ),
+        )
+
+    def copy_pages(self, store, source_page_ids, target_page_ids, valid_tokens):
+        if not (
+            len(source_page_ids) == len(target_page_ids) == len(valid_tokens)
+        ):
+            raise ValueError("copy page lists must have equal length")
+        for source, target, valid in zip(
+            source_page_ids, target_page_ids, valid_tokens
+        ):
+            store.copy_page(source, target, valid)
+
+
+class GenericCUDAPagedAttentionBackend(
+    _GenericCUDAKernelSupport,
+    PagedAttentionBackend,
+):
+    """Direct HND-page CUDA attention backend compiled by NVRTC on first use.
+
+    NVRTC compiles device PTX and the CUDA driver launches it directly. No
+    Python extension, host compiler, Python headers, nvcc, or full CUDA toolkit
+    is required in the runtime image.
+    """
+
+    name = "generic_cuda"
+    is_reference = False
+
+    def capability(self):
+        return PagedAttentionCapability(
+            provider_name=self.name,
+            provider_version="1",
+            provider_abi=PAGED_ATTENTION_ABI_VERSION,
+            architectures=self.architectures,
+            dtypes=("bf16", "fp16"),
+            page_sizes=(16, 32),
+            head_dims=self.supported_head_dims,
+            supports_mha=True,
+            supports_gqa=True,
+            supports_mqa=True,
+            supports_decode=True,
+            supports_prefill=True,
+            supports_ragged_batch=True,
+            supports_partial_tail=True,
+            supports_cuda_graph=False,
+            numerical_contract_version=1,
+            requires_full_kv_workspace=False,
+            requires_full_score_matrix=False,
+            qualification_status=self.qualification_status,
+        )
+
+    def estimate_workspace(self, request):
+        del request
+        return PagedWorkspaceEstimate(
+            0,
+            "register_and_shared_only",
+            False,
+            False,
+            False,
         )
 
     def _execute(self, request, phase):
@@ -218,3 +271,7 @@ class GenericCUDAPagedAttentionProvider(PagedAttentionProvider):
 
     def prefill(self, request):
         return self._execute(request, "prefill")
+
+
+# Compatibility alias.  It is attention-only and no longer exposes append/copy.
+GenericCUDAPagedAttentionProvider = GenericCUDAPagedAttentionBackend

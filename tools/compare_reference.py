@@ -218,7 +218,10 @@ def reference_outputs(
     decode_ids,
     policy,
     device_map="single",
+    attn_implementation=None,
 ):
+    if attn_implementation is not None:
+        config._attn_implementation = str(attn_implementation)
     if device_map == "single":
         model = explicit_reference_model(checkpoint, config, policy)
         model = model.to(device).eval()
@@ -233,13 +236,18 @@ def reference_outputs(
             if policy.weight_format == WeightFormat.BF16
             else torch.float16
         )
+        load_kwargs = {
+            "config": config,
+            "torch_dtype": compute_dtype,
+            "device_map": "balanced",
+            "low_cpu_mem_usage": True,
+            "local_files_only": True,
+        }
+        if attn_implementation is not None:
+            load_kwargs["attn_implementation"] = attn_implementation
         model = LlamaForCausalLM.from_pretrained(
             checkpoint,
-            config=config,
-            torch_dtype=compute_dtype,
-            device_map="balanced",
-            low_cpu_mem_usage=True,
-            local_files_only=True,
+            **load_kwargs
         ).eval()
     input_device = model.model.embed_tokens.weight.device
     prefill_ids = prefill_ids.to(input_device)

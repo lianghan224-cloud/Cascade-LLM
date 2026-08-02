@@ -266,6 +266,9 @@ class KVPagePoolV1:
         return result
 
     def profile(self):
+        allocated = [
+            item for item in self.descriptors if item.state != PageState.FREE
+        ]
         return {
             "total_pages": self.page_count,
             "free_pages": self.free_pages,
@@ -277,5 +280,13 @@ class KVPagePoolV1:
             ),
             "allocation_count": self._allocation_count,
             "release_count": self._release_count,
+            "total_ref_count": sum(item.ref_count for item in allocated),
+            "max_ref_count": max(
+                (item.ref_count for item in allocated), default=0
+            ),
+            "total_pin_count": sum(item.pin_count for item in allocated),
+            "max_pin_count": max(
+                (item.pin_count for item in allocated), default=0
+            ),
             "state_counts": self.state_counts(),
         }
