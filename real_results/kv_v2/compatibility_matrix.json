@@ -15,10 +15,10 @@
       "architecture": "sm86",
       "physical_hardware": true,
       "provider_loaded": true,
-      "status": "performance_qualified",
+      "status": "production",
       "numerical": "passed",
       "performance": "passed",
-      "production": "not_passed"
+      "production": "passed"
     },
     {
       "architecture": "sm89",

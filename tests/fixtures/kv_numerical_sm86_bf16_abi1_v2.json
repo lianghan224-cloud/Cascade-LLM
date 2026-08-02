@@ -23,7 +23,11 @@
     "perplexity_relative_degradation_max": 0.001,
     "short_accuracy_drop_pp_max": 0.2,
     "long_hit_rate_drop_pp_max": 0.2,
-    "dialogue_accuracy_drop_pp_max": 0.2
+    "dialogue_accuracy_drop_pp_max": 0.2,
+    "perplexity_min_tokens": 64,
+    "short_min_examples": 8,
+    "long_min_examples": 4,
+    "dialogue_min_examples": 6
   },
   "stability": {
     "minimum_generated_tokens": 1000,

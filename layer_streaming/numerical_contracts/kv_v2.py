@@ -182,7 +182,18 @@ def evaluate_model_quality(contract, quality_report=None):
             ],
         }
     values = quality_report.get("metrics", {})
+    coverage = quality_report.get("coverage", {})
     checks = {
+        "finite": bool(quality_report.get("all_finite", False)),
+        "perplexity_coverage": int(coverage.get("perplexity_tokens", 0))
+        >= int(rules.get("perplexity_min_tokens", 1)),
+        "short_coverage": int(coverage.get("short_examples", 0))
+        >= int(rules.get("short_min_examples", 1)),
+        "long_context_coverage": int(
+            coverage.get("long_context_examples", 0)
+        ) >= int(rules.get("long_min_examples", 1)),
+        "dialogue_coverage": int(coverage.get("dialogue_examples", 0))
+        >= int(rules.get("dialogue_min_examples", 1)),
         "perplexity": float(values.get("perplexity_relative_degradation", 1.0))
         <= float(rules["perplexity_relative_degradation_max"]),
         "short_text": float(values.get("short_accuracy_drop_pp", 100.0))
@@ -198,6 +209,7 @@ def evaluate_model_quality(contract, quality_report=None):
         "status": "complete",
         "checks": checks,
         "metrics": values,
+        "coverage": coverage,
     }
 
 
@@ -264,4 +276,8 @@ def evaluate_production_stability(
         "tokens": int(soak_report.get("decode_tokens_per_cycle", 0)),
         "latency_ms": soak_report.get("latency_ms", {}),
         "resource_drift": soak_report.get("resource_drift", {}),
+        "ownership_resource_drift": ownership_drift,
+        "ownership_allocator_cache_before_trim": ownership_report.get(
+            "allocator_cache_before_trim", {}
+        ),
     }

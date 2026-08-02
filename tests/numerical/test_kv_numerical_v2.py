@@ -133,6 +133,13 @@ class ModelNumericalContractV2Test(unittest.TestCase):
         quality = evaluate_model_quality(
             self.contract,
             {
+                "all_finite": True,
+                "coverage": {
+                    "perplexity_tokens": 64,
+                    "short_examples": 8,
+                    "long_context_examples": 4,
+                    "dialogue_examples": 6,
+                },
                 "metrics": {
                     "perplexity_relative_degradation": 0.0005,
                     "short_accuracy_drop_pp": 0.1,
@@ -142,6 +149,10 @@ class ModelNumericalContractV2Test(unittest.TestCase):
             },
         )
         self.assertTrue(quality["passed"])
+        quality["coverage"]["perplexity_tokens"] = 63
+        self.assertFalse(
+            evaluate_model_quality(self.contract, quality)["passed"]
+        )
 
     def test_l5_requires_zero_drift_and_ownership(self):
         soak = {
@@ -162,11 +173,17 @@ class ModelNumericalContractV2Test(unittest.TestCase):
                 "cuda_allocated_bytes": 0,
                 "cuda_reserved_bytes": 0,
             },
+            "allocator_cache_before_trim": {
+                "cuda_allocated_bytes": 0,
+                "cuda_reserved_bytes": 2 * 1024 * 1024,
+                "steady_cycle_reserved_span_bytes": 0,
+            },
             "acceptance": {
                 "fork": True,
                 "cow": True,
                 "prefix": True,
                 "speculative": True,
+                "allocator_cache_released_after_trim": True,
             }
         }
         performance = [{

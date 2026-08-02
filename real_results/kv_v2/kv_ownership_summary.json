@@ -2,8 +2,9 @@
   "architecture": "sm86",
   "checks": {
     "all_pages_released_after_close": true,
+    "allocator_cache_released_after_trim": true,
     "cuda_allocated_returned": true,
-    "cuda_reserved_bounded": true,
+    "cuda_reserved_steady_during_cycles": true,
     "ownership_graph_exact_every_sample": true,
     "quiescent_pin_count_zero": true,
     "thread_count_stable": true
@@ -13,5 +14,5 @@
   },
   "provider": "sm86",
   "schema_version": 1,
-  "status": "performance_qualified"
+  "status": "production"
 }

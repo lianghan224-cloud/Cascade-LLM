@@ -196,7 +196,7 @@ class KVFrameworkV1CPUTest(unittest.TestCase):
         self.assertEqual(capabilities["sm90"]["architectures"], ("sm90",))
         self.assertEqual(
             capabilities["sm86"]["qualification_status"],
-            "performance_qualified",
+            "production",
         )
         for name in ("sm80", "sm89", "sm90"):
             self.assertEqual(

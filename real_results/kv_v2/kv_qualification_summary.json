@@ -3,10 +3,7 @@
   "evidence": {
     "automated_tests_passed": true,
     "contract_name": "llama31_8b_sm86_bf16_hnd_abi1_v2",
-    "missing_production_levels": [
-      "L4",
-      "L5"
-    ]
+    "missing_production_levels": []
   },
   "levels": {
     "L0": {
@@ -22,14 +19,14 @@
       "passed": true
     },
     "L4": {
-      "passed": false
+      "passed": true
     },
     "L5": {
-      "passed": false
+      "passed": true
     }
   },
-  "production_passed": false,
+  "production_passed": true,
   "provider": "sm86",
   "schema_version": 1,
-  "status": "performance_qualified"
+  "status": "production"
 }

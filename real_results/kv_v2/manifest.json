@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "qualification_status": "performance_qualified",
-  "production_passed": false,
+  "qualification_status": "production",
+  "production_passed": true,
   "inputs": [
     {
       "path": "tests/fixtures/kv_numerical_sm86_bf16_abi1_v2.json",
-      "sha256": "0bebf95a22c985ec94797ff84b421c6053f77b21bc817b1ebceea807e38f575b"
+      "sha256": "2364848a55d23fe4043b881aaf8ffbab2c9542fd904d4357103c435977db9e04"
     },
     {
       "path": "real_results/kv_v2/artifacts/hardware_provider_v2_sm86.json",
-      "sha256": "ab22133a8a4e54f7a3041aa9aa66cc429223037a3f826e8969b0694e1a6b01c6"
+      "sha256": "89227e0146b31362988dde875e95c64ee50ecd4e58960b293696468f16a807bf"
     },
     {
       "path": "real_results/kv_v1/real8b_sm86_multipage.json",
@@ -28,20 +28,32 @@
       "sha256": "442776ffb931372c7d123c21a608f2438ba60768c7b96d19aee429fc7ef226a3"
     },
     {
-      "path": "real_results/kv_v1/lifecycle_fork_cow_prefix_1000.json",
-      "sha256": "1fe2b4311cb803b9e32745720e154d2b2854981cc6e1c24345cf1993cb887cf8"
+      "path": "real_results/kv_v2/artifacts/lifecycle_fork_cow_prefix_1000_v2.json",
+      "sha256": "637184730fd307914145c5c95a30e3cdc74cffeb3827d25c020a2f80753befaf"
     },
     {
       "path": "real_results/kv_v2/test_summary.json",
-      "sha256": "b323da19535b25018593e7d043890e2ecc0bf8edcca3c60b0b3a814c470eb38e"
+      "sha256": "56865428d74e479b86b5678e52cd68615c7b5c08bbe28db9fdfa2ca804842ee9"
     },
     {
-      "path": "real_results/kv_v1/production_matrix_short_medium.json",
-      "sha256": "f5c69e1cfb30696f8b1e6b19816ab0494521748e2882703802e2f6d64ab84510"
+      "path": "real_results/kv_v2/artifacts/performance_short_bf16.json",
+      "sha256": "13310320d931c4f61c005bd9d51192be2695cefa55ad9404bc11e8ee8bb907ab"
     },
     {
-      "path": "real_results/kv_v1/production_matrix_long.json",
-      "sha256": "f6a7cba39b5625cc38750a9480f9551165e5d0cb0de9ec95ce802a18e254e812"
+      "path": "real_results/kv_v2/artifacts/performance_short_fp16.json",
+      "sha256": "7c6d67d7e8ee2f55d88f3ef0479852d9dba28f1e8a4992428d516cf11a6b1e44"
+    },
+    {
+      "path": "real_results/kv_v2/artifacts/performance_long_bf16.json",
+      "sha256": "1a12f189113fe3336d595be6fc46fbd8d348a4d987220406dcc210b1f17ce8ab"
+    },
+    {
+      "path": "real_results/kv_v2/artifacts/performance_long_fp16.json",
+      "sha256": "8a03cc3a4bedee09e5c93ae20a6db274bcdee81abd470c6a96f80d4209667e4f"
+    },
+    {
+      "path": "real_results/kv_v2/artifacts/quality_sm86_bf16_v1.json",
+      "sha256": "f67faef9610a71bb79bb31dcd780bf178230ce8ac02e5fdfccc1a6ad27ae1920"
     }
   ],
   "summaries": {

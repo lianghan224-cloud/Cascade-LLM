@@ -1,0 +1,637 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "Cascade-LLM KV Mode Performance Qualification",
+    "description": "SM86 Numerical Contract V2, quality, stability and mode performance evidence",
+    "generatedAt": "2026-08-02T14:57:06.889641+00:00",
+    "sources": [
+      {
+        "id": "summary",
+        "label": "KV mode benchmark aggregate",
+        "path": "real_results/kv_v2/kv_mode_performance_summary.json"
+      }
+    ],
+    "cards": [
+      {
+        "id": "kernel_speedup",
+        "dataset": "headline",
+        "sourceId": "summary",
+        "metrics": [
+          {
+            "label": "SM86 median kernel speedup",
+            "field": "sm86_kernel_median_speedup",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "decode_latency",
+        "dataset": "headline",
+        "sourceId": "summary",
+        "metrics": [
+          {
+            "label": "Real 8B median decode, ms",
+            "field": "real8b_decode_median_ms_all_modes",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "quality_drop",
+        "dataset": "headline",
+        "sourceId": "summary",
+        "metrics": [
+          {
+            "label": "Maximum accuracy drop, pp",
+            "field": "quality_max_accuracy_drop_pp",
+            "format": "number"
+          }
+        ]
+      },
+      {
+        "id": "reserved_drift",
+        "dataset": "headline",
+        "sourceId": "summary",
+        "metrics": [
+          {
+            "label": "Reserved drift after trim, bytes",
+            "field": "ownership_reserved_drift_after_trim_bytes",
+            "format": "number"
+          }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "id": "kernel_decode",
+        "title": "BF16 Page-16 Decode kernel latency",
+        "subtitle": "Synchronized P50 by context length; lower is better",
+        "intent": "comparison",
+        "type": "bar",
+        "dataset": "kernel_decode",
+        "sourceId": "summary",
+        "encodings": {
+          "x": {
+            "field": "context_label",
+            "type": "ordinal",
+            "label": "Context tokens"
+          },
+          "y": {
+            "fields": [
+              "generic_ms",
+              "sm86_ms"
+            ],
+            "type": "quantitative",
+            "label": "P50 latency",
+            "unit": "ms"
+          }
+        },
+        "valueFormat": "number",
+        "layout": "full"
+      },
+      {
+        "id": "real_ttft",
+        "title": "Real 8B TTFT by Attention mode",
+        "subtitle": "Transformer streamed, Embedding and LM Head resident; lower is better",
+        "intent": "comparison",
+        "type": "bar",
+        "dataset": "real_chart",
+        "sourceId": "summary",
+        "encodings": {
+          "x": {
+            "field": "context_label",
+            "type": "ordinal",
+            "label": "Prompt tokens"
+          },
+          "y": {
+            "fields": [
+              "legacy_ttft_ms",
+              "generic_ttft_ms",
+              "sm86_ttft_ms"
+            ],
+            "type": "quantitative",
+            "label": "TTFT",
+            "unit": "ms"
+          }
+        },
+        "valueFormat": "number",
+        "layout": "full"
+      },
+      {
+        "id": "real_decode",
+        "title": "Real 8B single-token Decode latency",
+        "subtitle": "All modes remain weight-transfer bound",
+        "intent": "comparison",
+        "type": "bar",
+        "dataset": "real_chart",
+        "sourceId": "summary",
+        "encodings": {
+          "x": {
+            "field": "context_label",
+            "type": "ordinal",
+            "label": "Context tokens"
+          },
+          "y": {
+            "fields": [
+              "legacy_decode_ms",
+              "generic_decode_ms",
+              "sm86_decode_ms"
+            ],
+            "type": "quantitative",
+            "label": "P50 latency",
+            "unit": "ms/token"
+          }
+        },
+        "valueFormat": "number",
+        "layout": "full"
+      }
+    ],
+    "tables": [
+      {
+        "id": "real_matrix",
+        "title": "Real 8B exact results",
+        "subtitle": "One warmup and three measured runs per provider/context",
+        "dataset": "real_rows",
+        "sourceId": "summary",
+        "density": "dense",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "context",
+            "label": "Context",
+            "type": "number"
+          },
+          {
+            "field": "provider",
+            "label": "Provider",
+            "type": "text"
+          },
+          {
+            "field": "ttft_ms",
+            "label": "TTFT ms",
+            "type": "number"
+          },
+          {
+            "field": "decode_ms",
+            "label": "Decode ms",
+            "type": "number"
+          },
+          {
+            "field": "workspace_mib",
+            "label": "Workspace MiB",
+            "type": "number"
+          },
+          {
+            "field": "top1_matches_legacy",
+            "label": "Top-1 match",
+            "type": "text"
+          }
+        ]
+      },
+      {
+        "id": "mode_support",
+        "title": "Mode execution boundary",
+        "subtitle": "Only executable modes were benchmarked",
+        "dataset": "mode_support",
+        "sourceId": "summary",
+        "density": "spacious",
+        "layout": "full",
+        "columns": [
+          {
+            "field": "mode",
+            "label": "Mode",
+            "type": "text"
+          },
+          {
+            "field": "status",
+            "label": "Status",
+            "type": "text"
+          },
+          {
+            "field": "measured",
+            "label": "Measured",
+            "type": "text"
+          },
+          {
+            "field": "note",
+            "label": "Boundary",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "blocks": [
+      {
+        "id": "technical_summary",
+        "type": "markdown",
+        "layout": "full",
+        "sourceId": "summary",
+        "body": "## Technical summary\n\nSM86 passes the L4 provider non-regression suite and the corrected L5 ownership gate. Its kernel is materially faster than Generic CUDA at long context, but real 8B Decode remains weight-transfer bound and 2048-token Prefill is still slower than gather+SDPA."
+      },
+      {
+        "id": "headline_metrics",
+        "type": "metric-strip",
+        "layout": "full",
+        "cardIds": [
+          "kernel_speedup",
+          "decode_latency",
+          "quality_drop",
+          "reserved_drift"
+        ]
+      },
+      {
+        "id": "kernel_finding",
+        "type": "markdown",
+        "layout": "full",
+        "sourceId": "summary",
+        "body": "## SM86 improves the direct paged kernel at long context\n\nThe architecture-specific 128-thread reduction produces a stable long-context gain over Generic CUDA. Short-context differences below 1% are treated as timing-equivalent rather than as a regression."
+      },
+      {
+        "id": "kernel_chart_block",
+        "type": "chart",
+        "layout": "full",
+        "chartId": "kernel_decode"
+      },
+      {
+        "id": "prefill_finding",
+        "type": "markdown",
+        "layout": "full",
+        "sourceId": "summary",
+        "body": "## Full Prefill exposes the remaining production-kernel gap\n\nSM86 leads at 512 tokens, but at 2048 tokens the optimized SDPA reference is substantially faster. The production kernel avoids linear full-KV workspace, yet it needs a dedicated high-throughput Prefill implementation."
+      },
+      {
+        "id": "ttft_chart_block",
+        "type": "chart",
+        "layout": "full",
+        "chartId": "real_ttft"
+      },
+      {
+        "id": "decode_finding",
+        "type": "markdown",
+        "layout": "full",
+        "sourceId": "summary",
+        "body": "## Decode mode choice is hidden by streamed Transformer weights\n\nAll three Attention modes remain near 1.36 seconds per token. Reducing weight H2D is the next system-level priority; kernel-only gains cannot be presented as end-to-end Decode gains."
+      },
+      {
+        "id": "decode_chart_block",
+        "type": "chart",
+        "layout": "full",
+        "chartId": "real_decode"
+      },
+      {
+        "id": "definitions",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## Scope, data and metric definitions\n\nKernel cases use synchronized P50 wall time. Real-8B TTFT includes streamed Transformer execution and resident vocabulary operations. The quality suite is a deterministic provider non-regression check, not a broad capability benchmark."
+      },
+      {
+        "id": "real_table_block",
+        "type": "table",
+        "layout": "full",
+        "tableId": "real_matrix"
+      },
+      {
+        "id": "method",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## Methodology\n\nMicrobenchmarks cover BF16/FP16, Page 16/32, Decode/Prefill and 16–32K contexts with seven measured runs. The real-model matrix covers 8–2048 prompt tokens with one warmup and three measured runs. Candidate Top-1 is checked against the explicit legacy reference."
+      },
+      {
+        "id": "limitations",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## Limitations and robustness\n\nEvidence comes from one RTX 3080 Ti. Sub-percent real-model differences are noise-level. Quantized KV, sparse selection, active offload and non-SM86 GPUs were not executable and are not represented as performance results."
+      },
+      {
+        "id": "mode_table_block",
+        "type": "table",
+        "layout": "full",
+        "tableId": "mode_support"
+      },
+      {
+        "id": "next_steps",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## Recommended next steps\n\n1. Add a mature paged/Flash Prefill provider and keep phase selection explicit.\n2. Prioritize resident or INT8 streamed Transformer weights for Decode.\n3. Expand L4 to public datasets and qualify each GPU architecture independently."
+      },
+      {
+        "id": "questions",
+        "type": "markdown",
+        "layout": "full",
+        "body": "## Further questions\n\nWhere is the Prefill crossover across batch and chunk sizes? Can a mature paged provider match SDPA while retaining zero full-KV workspace? When weight H2D falls, how much of the local SM86 Decode gain becomes end-to-end?"
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-08-02T14:57:06.889641+00:00",
+    "status": "ready",
+    "datasets": {
+      "headline": [
+        {
+          "sm86_kernel_median_speedup": 1.1294,
+          "sm86_kernel_min_speedup": 0.9949,
+          "sm86_kernel_max_speedup": 1.7514,
+          "page16_vs_page32_median_latency_ratio": 1.0356,
+          "bf16_vs_fp16_median_latency_ratio": 1.0021,
+          "real8b_decode_median_ms_all_modes": 1358.882,
+          "real8b_2048_sm86_ttft_ms": 9337.059,
+          "real8b_2048_legacy_ttft_ms": 4919.526,
+          "real8b_2048_sm86_vs_legacy_ttft_ratio": 1.898,
+          "quality_perplexity_relative_change": -0.000875,
+          "quality_max_accuracy_drop_pp": 0.0,
+          "ownership_reserved_drift_after_trim_bytes": 0,
+          "ownership_reserved_cache_before_trim_bytes": 2097152
+        }
+      ],
+      "kernel_decode": [
+        {
+          "context": 16,
+          "context_label": "16",
+          "generic_ms": 0.4963,
+          "sm86_ms": 0.4883,
+          "speedup": 1.0164
+        },
+        {
+          "context": 128,
+          "context_label": "128",
+          "generic_ms": 0.7109,
+          "sm86_ms": 0.6722,
+          "speedup": 1.0576
+        },
+        {
+          "context": 512,
+          "context_label": "512",
+          "generic_ms": 1.5471,
+          "sm86_ms": 1.3987,
+          "speedup": 1.1061
+        },
+        {
+          "context": 4096,
+          "context_label": "4096",
+          "generic_ms": 10.5324,
+          "sm86_ms": 9.3491,
+          "speedup": 1.1266
+        },
+        {
+          "context": 8192,
+          "context_label": "8192",
+          "generic_ms": 18.2715,
+          "sm86_ms": 16.249,
+          "speedup": 1.1245
+        },
+        {
+          "context": 32768,
+          "context_label": "32768",
+          "generic_ms": 71.697,
+          "sm86_ms": 63.6509,
+          "speedup": 1.1264
+        }
+      ],
+      "real_chart": [
+        {
+          "context": 8,
+          "context_label": "8",
+          "legacy_ttft_ms": 1357.318,
+          "generic_ttft_ms": 1359.272,
+          "sm86_ttft_ms": 1359.239,
+          "legacy_decode_ms": 1355.169,
+          "generic_decode_ms": 1357.378,
+          "sm86_decode_ms": 1358.675,
+          "legacy_workspace_mib": 0.141
+        },
+        {
+          "context": 128,
+          "context_label": "128",
+          "legacy_ttft_ms": 1359.534,
+          "generic_ttft_ms": 1357.561,
+          "sm86_ttft_ms": 1355.026,
+          "legacy_decode_ms": 1354.294,
+          "generic_decode_ms": 1355.948,
+          "sm86_decode_ms": 1360.353,
+          "legacy_workspace_mib": 2.016
+        },
+        {
+          "context": 512,
+          "context_label": "512",
+          "legacy_ttft_ms": 1895.119,
+          "generic_ttft_ms": 1718.841,
+          "sm86_ttft_ms": 1367.266,
+          "legacy_decode_ms": 1357.368,
+          "generic_decode_ms": 1360.914,
+          "sm86_decode_ms": 1361.352,
+          "legacy_workspace_mib": 8.016
+        },
+        {
+          "context": 2048,
+          "context_label": "2048",
+          "legacy_ttft_ms": 4919.526,
+          "generic_ttft_ms": 17950.631,
+          "sm86_ttft_ms": 9337.059,
+          "legacy_decode_ms": 1359.089,
+          "generic_decode_ms": 1360.548,
+          "sm86_decode_ms": 1359.796,
+          "legacy_workspace_mib": 32.016
+        }
+      ],
+      "real_rows": [
+        {
+          "context": 8,
+          "context_label": "8",
+          "provider": "legacy_gather_sdpa_reference",
+          "ttft_ms": 1357.318,
+          "decode_ms": 1355.169,
+          "decode_tps": 0.7379,
+          "workspace_mib": 0.141,
+          "gpu_peak_mib": 2464.7,
+          "top1_matches_legacy": true
+        },
+        {
+          "context": 8,
+          "context_label": "8",
+          "provider": "generic_cuda",
+          "ttft_ms": 1359.272,
+          "decode_ms": 1357.378,
+          "decode_tps": 0.7367,
+          "workspace_mib": 0.0,
+          "gpu_peak_mib": 2464.7,
+          "top1_matches_legacy": true
+        },
+        {
+          "context": 8,
+          "context_label": "8",
+          "provider": "sm86",
+          "ttft_ms": 1359.239,
+          "decode_ms": 1358.675,
+          "decode_tps": 0.736,
+          "workspace_mib": 0.0,
+          "gpu_peak_mib": 2464.7,
+          "top1_matches_legacy": true
+        },
+        {
+          "context": 128,
+          "context_label": "128",
+          "provider": "legacy_gather_sdpa_reference",
+          "ttft_ms": 1359.534,
+          "decode_ms": 1354.294,
+          "decode_tps": 0.7384,
+          "workspace_mib": 2.016,
+          "gpu_peak_mib": 2493.1,
+          "top1_matches_legacy": true
+        },
+        {
+          "context": 128,
+          "context_label": "128",
+          "provider": "generic_cuda",
+          "ttft_ms": 1357.561,
+          "decode_ms": 1355.948,
+          "decode_tps": 0.7375,
+          "workspace_mib": 0.0,
+          "gpu_peak_mib": 2493.1,
+          "top1_matches_legacy": true
+        },
+        {
+          "context": 128,
+          "context_label": "128",
+          "provider": "sm86",
+          "ttft_ms": 1355.026,
+          "decode_ms": 1360.353,
+          "decode_tps": 0.7351,
+          "workspace_mib": 0.0,
+          "gpu_peak_mib": 2493.1,
+          "top1_matches_legacy": true
+        },
+        {
+          "context": 512,
+          "context_label": "512",
+          "provider": "legacy_gather_sdpa_reference",
+          "ttft_ms": 1895.119,
+          "decode_ms": 1357.368,
+          "decode_tps": 0.7367,
+          "workspace_mib": 8.016,
+          "gpu_peak_mib": 2586.6,
+          "top1_matches_legacy": true
+        },
+        {
+          "context": 512,
+          "context_label": "512",
+          "provider": "generic_cuda",
+          "ttft_ms": 1718.841,
+          "decode_ms": 1360.914,
+          "decode_tps": 0.7348,
+          "workspace_mib": 0.0,
+          "gpu_peak_mib": 2586.6,
+          "top1_matches_legacy": true
+        },
+        {
+          "context": 512,
+          "context_label": "512",
+          "provider": "sm86",
+          "ttft_ms": 1367.266,
+          "decode_ms": 1361.352,
+          "decode_tps": 0.7346,
+          "workspace_mib": 0.0,
+          "gpu_peak_mib": 2586.6,
+          "top1_matches_legacy": true
+        },
+        {
+          "context": 2048,
+          "context_label": "2048",
+          "provider": "legacy_gather_sdpa_reference",
+          "ttft_ms": 4919.526,
+          "decode_ms": 1359.089,
+          "decode_tps": 0.7358,
+          "workspace_mib": 32.016,
+          "gpu_peak_mib": 2952.7,
+          "top1_matches_legacy": true
+        },
+        {
+          "context": 2048,
+          "context_label": "2048",
+          "provider": "generic_cuda",
+          "ttft_ms": 17950.631,
+          "decode_ms": 1360.548,
+          "decode_tps": 0.735,
+          "workspace_mib": 0.0,
+          "gpu_peak_mib": 2952.7,
+          "top1_matches_legacy": true
+        },
+        {
+          "context": 2048,
+          "context_label": "2048",
+          "provider": "sm86",
+          "ttft_ms": 9337.059,
+          "decode_ms": 1359.796,
+          "decode_tps": 0.7354,
+          "workspace_mib": 0.0,
+          "gpu_peak_mib": 2952.7,
+          "top1_matches_legacy": true
+        }
+      ],
+      "mode_support": [
+        {
+          "mode": "exact / GPU / BF16 / dense",
+          "status": "production path",
+          "measured": true,
+          "note": "Generic CUDA and SM86"
+        },
+        {
+          "mode": "exact / GPU / FP16 / dense",
+          "status": "production path",
+          "measured": true,
+          "note": "Kernel microbenchmark"
+        },
+        {
+          "mode": "exact / GPU / BF16 / gather+SDPA",
+          "status": "experimental",
+          "measured": true,
+          "note": "Linear full-KV workspace"
+        },
+        {
+          "mode": "exact / session reuse",
+          "status": "implemented",
+          "measured": false,
+          "note": "Same attention kernel; lifecycle covered by soak"
+        },
+        {
+          "mode": "exact / prefix_memory",
+          "status": "implemented",
+          "measured": false,
+          "note": "1000-cycle ownership soak"
+        },
+        {
+          "mode": "quantized / INT8 or FP8",
+          "status": "unsupported",
+          "measured": false,
+          "note": "Interface only"
+        },
+        {
+          "mode": "sparse / Quest",
+          "status": "unsupported",
+          "measured": false,
+          "note": "Experimental interface only"
+        },
+        {
+          "mode": "GPU+CPU/NVMe active KV",
+          "status": "unsupported",
+          "measured": false,
+          "note": "No active offload implementation"
+        }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "summary",
+      "label": "KV mode benchmark aggregate",
+      "path": "real_results/kv_v2/kv_mode_performance_summary.json",
+      "query": {
+        "engine": "duckdb",
+        "sql": "SELECT * FROM read_json_auto('real_results/kv_v2/kv_mode_performance_summary.json')",
+        "description": "Reads the deterministic benchmark aggregate generated by tools/build_kv_mode_report.py."
+      }
+    }
+  ]
+}

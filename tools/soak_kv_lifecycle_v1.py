@@ -95,6 +95,12 @@ def main():
     device = torch.device(args.device)
     torch.cuda.set_device(device)
     torch.manual_seed(913)
+    # Establish an allocator-neutral boundary.  PyTorch intentionally keeps
+    # freed segments in its caching allocator; without trimming, a released
+    # 1.3 MiB KV store appears as a 2 MiB "reserved leak" even though every
+    # tensor and page has been released.
+    torch.cuda.synchronize(device)
+    torch.cuda.empty_cache()
     head_dim = 128
     query_heads = 8
     kv_heads = 1
@@ -189,9 +195,19 @@ def main():
         runtime.close()
     torch.cuda.synchronize(device)
     post_close_profile = runtime.page_pool.profile()
+    pre_trim_allocated = torch.cuda.memory_allocated(device)
+    pre_trim_reserved = torch.cuda.memory_reserved(device)
+    torch.cuda.empty_cache()
+    torch.cuda.synchronize(device)
     final_allocated = torch.cuda.memory_allocated(device)
     final_reserved = torch.cuda.memory_reserved(device)
     final_threads = len(threading.enumerate())
+    snapshot_reserved = [item["cuda_reserved_bytes"] for item in snapshots]
+    steady_reserved_span = (
+        max(snapshot_reserved) - min(snapshot_reserved)
+        if snapshot_reserved
+        else 0
+    )
     acceptance = {
         "ownership_graph_exact_every_sample": True,
         "quiescent_pin_count_zero": all(
@@ -202,10 +218,11 @@ def main():
         ),
         "thread_count_stable": final_threads == baseline_threads,
         "cuda_allocated_returned": (
-            final_allocated - baseline_allocated <= 8 * 1024 * 1024
+            pre_trim_allocated - baseline_allocated == 0
         ),
-        "cuda_reserved_bounded": (
-            final_reserved - baseline_reserved <= 64 * 1024 * 1024
+        "cuda_reserved_steady_during_cycles": steady_reserved_span == 0,
+        "allocator_cache_released_after_trim": (
+            final_reserved - baseline_reserved == 0
         ),
     }
     report = {
@@ -227,6 +244,15 @@ def main():
             "cuda_allocated_bytes": final_allocated - baseline_allocated,
             "cuda_reserved_bytes": final_reserved - baseline_reserved,
             "thread_count": final_threads - baseline_threads,
+        },
+        "allocator_cache_before_trim": {
+            "cuda_allocated_bytes": pre_trim_allocated - baseline_allocated,
+            "cuda_reserved_bytes": pre_trim_reserved - baseline_reserved,
+            "steady_cycle_reserved_span_bytes": steady_reserved_span,
+            "interpretation": (
+                "reserved bytes retained before trim belong to the PyTorch "
+                "CUDA caching allocator, not live KV pages or tensors"
+            ),
         },
         "acceptance": acceptance,
         "all_acceptance_passed": all(acceptance.values()),

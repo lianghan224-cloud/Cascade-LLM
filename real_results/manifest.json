@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "artifact_count": 74,
-  "artifact_bytes": 15269341,
+  "artifact_count": 82,
+  "artifact_bytes": 15523428,
   "policy": "payloads are untracked; Git stores summaries and this content manifest only",
   "artifacts": [
     {
@@ -438,8 +438,56 @@
     },
     {
       "path": "kv_v2/artifacts/hardware_provider_v2_sm86.json",
-      "bytes": 22632,
-      "sha256": "ab22133a8a4e54f7a3041aa9aa66cc429223037a3f826e8969b0694e1a6b01c6",
+      "bytes": 22995,
+      "sha256": "89227e0146b31362988dde875e95c64ee50ecd4e58960b293696468f16a807bf",
+      "git_policy": "ci_or_release_artifact"
+    },
+    {
+      "path": "kv_v2/artifacts/lifecycle_before_fix.json",
+      "bytes": 8683,
+      "sha256": "a7139c815c6013a6d4987e3ca102fc39e2b036a3073eececee1ce0427d30d946",
+      "git_policy": "ci_or_release_artifact"
+    },
+    {
+      "path": "kv_v2/artifacts/lifecycle_fork_cow_prefix_1000_v2.json",
+      "bytes": 9024,
+      "sha256": "637184730fd307914145c5c95a30e3cdc74cffeb3827d25c020a2f80753befaf",
+      "git_policy": "ci_or_release_artifact"
+    },
+    {
+      "path": "kv_v2/artifacts/performance_long_bf16.json",
+      "bytes": 22717,
+      "sha256": "1a12f189113fe3336d595be6fc46fbd8d348a4d987220406dcc210b1f17ce8ab",
+      "git_policy": "ci_or_release_artifact"
+    },
+    {
+      "path": "kv_v2/artifacts/performance_long_fp16.json",
+      "bytes": 22725,
+      "sha256": "8a03cc3a4bedee09e5c93ae20a6db274bcdee81abd470c6a96f80d4209667e4f",
+      "git_policy": "ci_or_release_artifact"
+    },
+    {
+      "path": "kv_v2/artifacts/performance_real8b_modes.json",
+      "bytes": 17303,
+      "sha256": "527005b4f8d57d4b7b9341d0b9b3021fe37c6055a9414d3c8d16b227cd83fc8d",
+      "git_policy": "ci_or_release_artifact"
+    },
+    {
+      "path": "kv_v2/artifacts/performance_short_bf16.json",
+      "bytes": 78876,
+      "sha256": "13310320d931c4f61c005bd9d51192be2695cefa55ad9404bc11e8ee8bb907ab",
+      "git_policy": "ci_or_release_artifact"
+    },
+    {
+      "path": "kv_v2/artifacts/performance_short_fp16.json",
+      "bytes": 78837,
+      "sha256": "7c6d67d7e8ee2f55d88f3ef0479852d9dba28f1e8a4992428d516cf11a6b1e44",
+      "git_policy": "ci_or_release_artifact"
+    },
+    {
+      "path": "kv_v2/artifacts/quality_sm86_bf16_v1.json",
+      "bytes": 15559,
+      "sha256": "f67faef9610a71bb79bb31dcd780bf178230ce8ac02e5fdfccc1a6ad27ae1920",
       "git_policy": "ci_or_release_artifact"
     },
     {

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "name": "cascade_kv_quality_micro_suite_v1",
+  "description": "Deterministic provider non-regression suite; it is not a general model capability benchmark.",
+  "perplexity_eval_tokens_per_passage": 16,
+  "perplexity_passages": [
+    "Large language model inference requires careful coordination between memory transfers, attention kernels, and cache management. A reliable runtime must preserve numerical behavior while keeping resource use stable across long decoding sessions.",
+    "重庆位于中国西南地区，长江和嘉陵江在城市中心交汇。山地地形塑造了独特的交通系统、建筑形态和城市景观，也让这座城市拥有鲜明的地域文化。",
+    "The observatory recorded clear skies throughout the night. Engineers calibrated the instrument before each exposure, archived the measurements, and compared the resulting spectra with the previous week's reference data.",
+    "软件系统的性能结论必须建立在可复现测试之上。测试报告需要同时记录硬件、输入规模、精度、延迟分位数、显存占用以及尚未覆盖的限制条件。"
+  ],
+  "short_text": [
+    {"prompt": "2 + 3 等于多少？\nA. 4\nB. 5\nC. 6\nD. 7", "answer": "B"},
+    {"prompt": "法国的首都是哪座城市？\nA. 柏林\nB. 马德里\nC. 巴黎\nD. 罗马", "answer": "C"},
+    {"prompt": "标准大气压下，水的冰点是多少摄氏度？\nA. 0\nB. 10\nC. 50\nD. 100", "answer": "A"},
+    {"prompt": "重庆在中国的行政区划类型是什么？\nA. 自治区\nB. 省\nC. 直辖市\nD. 特别行政区", "answer": "C"},
+    {"prompt": "数列 2、4、6、8 的下一项最可能是？\nA. 9\nB. 10\nC. 11\nD. 12", "answer": "B"},
+    {"prompt": "英文单词 cat 通常指哪种动物？\nA. 猫\nB. 狗\nC. 鸟\nD. 鱼", "answer": "A"},
+    {"prompt": "如果所有玫瑰都是花，那么下面哪项必然正确？\nA. 所有花都是玫瑰\nB. 有些花不是植物\nC. 玫瑰属于花\nD. 玫瑰不是植物", "answer": "C"},
+    {"prompt": "太阳从哪个方向升起？\nA. 东\nB. 西\nC. 南\nD. 北", "answer": "A"}
+  ],
+  "long_context": [
+    {"filler_repetitions": 16, "record": "R-17", "value": "蓝色", "distractors": ["红色", "绿色", "黄色"]},
+    {"filler_repetitions": 32, "record": "K-204", "value": "7319", "distractors": ["7139", "7391", "3719"]},
+    {"filler_repetitions": 64, "record": "Q-88", "value": "玉兰", "distractors": ["海棠", "杜鹃", "桂花"]},
+    {"filler_repetitions": 96, "record": "Z-501", "value": "北门", "distractors": ["南门", "东门", "西门"]}
+  ],
+  "dialogue": [
+    {"messages": [{"role": "user", "content": "请记住我的名字是 Alice。现在告诉我，我的名字是什么？\nA. Bob\nB. Alice\nC. Carol\nD. David"}], "answer": "B"},
+    {"messages": [{"role": "user", "content": "请只选择 hot 的反义词。\nA. warm\nB. bright\nC. cold\nD. high"}], "answer": "C"},
+    {"messages": [{"role": "user", "content": "记住验证码 7319。验证码是什么？\nA. 7139\nB. 7319\nC. 7391\nD. 3719"}], "answer": "B"},
+    {"messages": [{"role": "user", "content": "用户说：谢谢你的帮助。下面哪种回应最礼貌？\nA. 不客气\nB. 不知道\nC. 走开\nD. 沉默"}], "answer": "A"},
+    {"messages": [{"role": "user", "content": "我们约定今天的项目代号是 Cascade。项目代号是什么？\nA. River\nB. Mountain\nC. Cascade\nD. Cloud"}], "answer": "C"},
+    {"messages": [{"role": "user", "content": "请根据规则回答：如果开关打开选择 A，如果开关关闭选择 B。当前开关关闭。\nA. 打开\nB. 关闭\nC. 未知\nD. 损坏"}], "answer": "B"}
+  ]
+}

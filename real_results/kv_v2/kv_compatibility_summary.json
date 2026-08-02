@@ -32,7 +32,7 @@
         16,
         32
       ],
-      "qualification_status": "performance_qualified",
+      "qualification_status": "production",
       "supports_append": true,
       "supports_copy": true
     },
@@ -44,7 +44,7 @@
     "provider_abi": 1,
     "provider_name": "sm86",
     "provider_version": "1",
-    "qualification_status": "performance_qualified",
+    "qualification_status": "production",
     "requires_full_kv_workspace": false,
     "requires_full_score_matrix": false,
     "supports_cuda_graph": false,
@@ -58,7 +58,7 @@
   },
   "evidence": {
     "automated_tests": {
-      "duration_seconds": 23.26021993206814,
+      "duration_seconds": 23.065720031037927,
       "errors": 0,
       "expected_failures": 0,
       "failures": 0,
@@ -67,7 +67,7 @@
       "schema_version": 1,
       "skipped": 0,
       "start_dir": "tests",
-      "tests_run": 146,
+      "tests_run": 148,
       "unexpected_successes": 0
     },
     "bundle_load_path_present": true,
@@ -81,5 +81,5 @@
   },
   "provider": "sm86",
   "schema_version": 1,
-  "status": "performance_qualified"
+  "status": "production"
 }

@@ -1,0 +1,414 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-02T14:57:06.889641+00:00",
+  "hardware": {
+    "device": "NVIDIA GeForce RTX 3080 Ti",
+    "architecture": "sm86",
+    "torch": "2.4.1+cu121",
+    "cuda": "12.1"
+  },
+  "headline": {
+    "sm86_kernel_median_speedup": 1.1294,
+    "sm86_kernel_min_speedup": 0.9949,
+    "sm86_kernel_max_speedup": 1.7514,
+    "page16_vs_page32_median_latency_ratio": 1.0356,
+    "bf16_vs_fp16_median_latency_ratio": 1.0021,
+    "real8b_decode_median_ms_all_modes": 1358.882,
+    "real8b_2048_sm86_ttft_ms": 9337.059,
+    "real8b_2048_legacy_ttft_ms": 4919.526,
+    "real8b_2048_sm86_vs_legacy_ttft_ratio": 1.898,
+    "quality_perplexity_relative_change": -0.000875,
+    "quality_max_accuracy_drop_pp": 0.0,
+    "ownership_reserved_drift_after_trim_bytes": 0,
+    "ownership_reserved_cache_before_trim_bytes": 2097152
+  },
+  "quality": {
+    "coverage": {
+      "perplexity_tokens": 64,
+      "short_examples": 8,
+      "long_context_examples": 4,
+      "dialogue_examples": 6
+    },
+    "metrics": {
+      "perplexity_relative_degradation": 0.0,
+      "perplexity_relative_change": -0.0008750005790326698,
+      "short_accuracy_drop_pp": 0.0,
+      "long_hit_rate_drop_pp": 0.0,
+      "dialogue_accuracy_drop_pp": 0.0
+    },
+    "reference": "legacy_gather_sdpa_reference",
+    "candidate": "sm86"
+  },
+  "ownership": {
+    "cycles": 1000,
+    "resource_drift": {
+      "cuda_allocated_bytes": 0,
+      "cuda_reserved_bytes": 0,
+      "thread_count": 0
+    },
+    "allocator_cache_before_trim": {
+      "cuda_allocated_bytes": 0,
+      "cuda_reserved_bytes": 2097152,
+      "steady_cycle_reserved_span_bytes": 0,
+      "interpretation": "reserved bytes retained before trim belong to the PyTorch CUDA caching allocator, not live KV pages or tensors"
+    },
+    "acceptance": {
+      "ownership_graph_exact_every_sample": true,
+      "quiescent_pin_count_zero": true,
+      "all_pages_released_after_close": true,
+      "thread_count_stable": true,
+      "cuda_allocated_returned": true,
+      "cuda_reserved_steady_during_cycles": true,
+      "allocator_cache_released_after_trim": true
+    }
+  },
+  "kernel_decode_bf16_page16": [
+    {
+      "context": 16,
+      "context_label": "16",
+      "generic_ms": 0.4963,
+      "sm86_ms": 0.4883,
+      "speedup": 1.0164
+    },
+    {
+      "context": 128,
+      "context_label": "128",
+      "generic_ms": 0.7109,
+      "sm86_ms": 0.6722,
+      "speedup": 1.0576
+    },
+    {
+      "context": 512,
+      "context_label": "512",
+      "generic_ms": 1.5471,
+      "sm86_ms": 1.3987,
+      "speedup": 1.1061
+    },
+    {
+      "context": 4096,
+      "context_label": "4096",
+      "generic_ms": 10.5324,
+      "sm86_ms": 9.3491,
+      "speedup": 1.1266
+    },
+    {
+      "context": 8192,
+      "context_label": "8192",
+      "generic_ms": 18.2715,
+      "sm86_ms": 16.249,
+      "speedup": 1.1245
+    },
+    {
+      "context": 32768,
+      "context_label": "32768",
+      "generic_ms": 71.697,
+      "sm86_ms": 63.6509,
+      "speedup": 1.1264
+    }
+  ],
+  "kernel_matrix_summary": [
+    {
+      "matrix": "short_bf16",
+      "dtype": "bf16",
+      "contexts": [
+        16,
+        128,
+        512
+      ],
+      "page_sizes": [
+        16,
+        32
+      ],
+      "phases": [
+        "decode",
+        "prefill"
+      ],
+      "batch_size": 2,
+      "prefill_query_length": 8,
+      "warmup": 2,
+      "runs": 7,
+      "sm86_case_count": 12,
+      "sm86_speedup_vs_generic_min": 0.9949,
+      "sm86_speedup_vs_generic_median": 1.1068,
+      "sm86_speedup_vs_generic_max": 1.7511,
+      "sm86_workspace_peak_bytes": 0
+    },
+    {
+      "matrix": "short_fp16",
+      "dtype": "fp16",
+      "contexts": [
+        16,
+        128,
+        512
+      ],
+      "page_sizes": [
+        16,
+        32
+      ],
+      "phases": [
+        "decode",
+        "prefill"
+      ],
+      "batch_size": 2,
+      "prefill_query_length": 8,
+      "warmup": 2,
+      "runs": 7,
+      "sm86_case_count": 12,
+      "sm86_speedup_vs_generic_min": 0.9985,
+      "sm86_speedup_vs_generic_median": 1.0834,
+      "sm86_speedup_vs_generic_max": 1.7514,
+      "sm86_workspace_peak_bytes": 0
+    },
+    {
+      "matrix": "long_bf16",
+      "dtype": "bf16",
+      "contexts": [
+        4096,
+        8192,
+        32768
+      ],
+      "page_sizes": [
+        16,
+        32
+      ],
+      "phases": [
+        "decode",
+        "prefill"
+      ],
+      "batch_size": 1,
+      "prefill_query_length": 4,
+      "warmup": 2,
+      "runs": 7,
+      "sm86_case_count": 12,
+      "sm86_speedup_vs_generic_min": 1.1245,
+      "sm86_speedup_vs_generic_median": 1.155,
+      "sm86_speedup_vs_generic_max": 1.1976,
+      "sm86_workspace_peak_bytes": 0
+    },
+    {
+      "matrix": "long_fp16",
+      "dtype": "fp16",
+      "contexts": [
+        4096,
+        8192,
+        32768
+      ],
+      "page_sizes": [
+        16,
+        32
+      ],
+      "phases": [
+        "decode",
+        "prefill"
+      ],
+      "batch_size": 1,
+      "prefill_query_length": 4,
+      "warmup": 2,
+      "runs": 7,
+      "sm86_case_count": 12,
+      "sm86_speedup_vs_generic_min": 1.124,
+      "sm86_speedup_vs_generic_median": 1.1776,
+      "sm86_speedup_vs_generic_max": 1.271,
+      "sm86_workspace_peak_bytes": 0
+    }
+  ],
+  "real8b": [
+    {
+      "context": 8,
+      "context_label": "8",
+      "provider": "legacy_gather_sdpa_reference",
+      "ttft_ms": 1357.318,
+      "decode_ms": 1355.169,
+      "decode_tps": 0.7379,
+      "workspace_mib": 0.141,
+      "gpu_peak_mib": 2464.7,
+      "top1_matches_legacy": true
+    },
+    {
+      "context": 8,
+      "context_label": "8",
+      "provider": "generic_cuda",
+      "ttft_ms": 1359.272,
+      "decode_ms": 1357.378,
+      "decode_tps": 0.7367,
+      "workspace_mib": 0.0,
+      "gpu_peak_mib": 2464.7,
+      "top1_matches_legacy": true
+    },
+    {
+      "context": 8,
+      "context_label": "8",
+      "provider": "sm86",
+      "ttft_ms": 1359.239,
+      "decode_ms": 1358.675,
+      "decode_tps": 0.736,
+      "workspace_mib": 0.0,
+      "gpu_peak_mib": 2464.7,
+      "top1_matches_legacy": true
+    },
+    {
+      "context": 128,
+      "context_label": "128",
+      "provider": "legacy_gather_sdpa_reference",
+      "ttft_ms": 1359.534,
+      "decode_ms": 1354.294,
+      "decode_tps": 0.7384,
+      "workspace_mib": 2.016,
+      "gpu_peak_mib": 2493.1,
+      "top1_matches_legacy": true
+    },
+    {
+      "context": 128,
+      "context_label": "128",
+      "provider": "generic_cuda",
+      "ttft_ms": 1357.561,
+      "decode_ms": 1355.948,
+      "decode_tps": 0.7375,
+      "workspace_mib": 0.0,
+      "gpu_peak_mib": 2493.1,
+      "top1_matches_legacy": true
+    },
+    {
+      "context": 128,
+      "context_label": "128",
+      "provider": "sm86",
+      "ttft_ms": 1355.026,
+      "decode_ms": 1360.353,
+      "decode_tps": 0.7351,
+      "workspace_mib": 0.0,
+      "gpu_peak_mib": 2493.1,
+      "top1_matches_legacy": true
+    },
+    {
+      "context": 512,
+      "context_label": "512",
+      "provider": "legacy_gather_sdpa_reference",
+      "ttft_ms": 1895.119,
+      "decode_ms": 1357.368,
+      "decode_tps": 0.7367,
+      "workspace_mib": 8.016,
+      "gpu_peak_mib": 2586.6,
+      "top1_matches_legacy": true
+    },
+    {
+      "context": 512,
+      "context_label": "512",
+      "provider": "generic_cuda",
+      "ttft_ms": 1718.841,
+      "decode_ms": 1360.914,
+      "decode_tps": 0.7348,
+      "workspace_mib": 0.0,
+      "gpu_peak_mib": 2586.6,
+      "top1_matches_legacy": true
+    },
+    {
+      "context": 512,
+      "context_label": "512",
+      "provider": "sm86",
+      "ttft_ms": 1367.266,
+      "decode_ms": 1361.352,
+      "decode_tps": 0.7346,
+      "workspace_mib": 0.0,
+      "gpu_peak_mib": 2586.6,
+      "top1_matches_legacy": true
+    },
+    {
+      "context": 2048,
+      "context_label": "2048",
+      "provider": "legacy_gather_sdpa_reference",
+      "ttft_ms": 4919.526,
+      "decode_ms": 1359.089,
+      "decode_tps": 0.7358,
+      "workspace_mib": 32.016,
+      "gpu_peak_mib": 2952.7,
+      "top1_matches_legacy": true
+    },
+    {
+      "context": 2048,
+      "context_label": "2048",
+      "provider": "generic_cuda",
+      "ttft_ms": 17950.631,
+      "decode_ms": 1360.548,
+      "decode_tps": 0.735,
+      "workspace_mib": 0.0,
+      "gpu_peak_mib": 2952.7,
+      "top1_matches_legacy": true
+    },
+    {
+      "context": 2048,
+      "context_label": "2048",
+      "provider": "sm86",
+      "ttft_ms": 9337.059,
+      "decode_ms": 1359.796,
+      "decode_tps": 0.7354,
+      "workspace_mib": 0.0,
+      "gpu_peak_mib": 2952.7,
+      "top1_matches_legacy": true
+    }
+  ],
+  "mode_support": [
+    {
+      "mode": "exact / GPU / BF16 / dense",
+      "status": "production path",
+      "measured": true,
+      "note": "Generic CUDA and SM86"
+    },
+    {
+      "mode": "exact / GPU / FP16 / dense",
+      "status": "production path",
+      "measured": true,
+      "note": "Kernel microbenchmark"
+    },
+    {
+      "mode": "exact / GPU / BF16 / gather+SDPA",
+      "status": "experimental",
+      "measured": true,
+      "note": "Linear full-KV workspace"
+    },
+    {
+      "mode": "exact / session reuse",
+      "status": "implemented",
+      "measured": false,
+      "note": "Same attention kernel; lifecycle covered by soak"
+    },
+    {
+      "mode": "exact / prefix_memory",
+      "status": "implemented",
+      "measured": false,
+      "note": "1000-cycle ownership soak"
+    },
+    {
+      "mode": "quantized / INT8 or FP8",
+      "status": "unsupported",
+      "measured": false,
+      "note": "Interface only"
+    },
+    {
+      "mode": "sparse / Quest",
+      "status": "unsupported",
+      "measured": false,
+      "note": "Experimental interface only"
+    },
+    {
+      "mode": "GPU+CPU/NVMe active KV",
+      "status": "unsupported",
+      "measured": false,
+      "note": "No active offload implementation"
+    }
+  ],
+  "source_artifacts": [
+    "real_results/kv_v2/artifacts/performance_short_bf16.json",
+    "real_results/kv_v2/artifacts/performance_short_fp16.json",
+    "real_results/kv_v2/artifacts/performance_long_bf16.json",
+    "real_results/kv_v2/artifacts/performance_long_fp16.json",
+    "real_results/kv_v2/artifacts/performance_real8b_modes.json",
+    "real_results/kv_v2/artifacts/quality_sm86_bf16_v1.json",
+    "real_results/kv_v2/artifacts/lifecycle_fork_cow_prefix_1000_v2.json"
+  ],
+  "limitations": [
+    "Single RTX 3080 Ti (SM86), batch 1 or 2 only.",
+    "Real-8B repeats are 3 after one warmup; sub-percent decode differences are noise-level.",
+    "The L4 suite is a deterministic non-regression micro-suite, not a population-level capability benchmark.",
+    "INT8/FP8 KV, sparse selection, CPU/NVMe active offload and other GPU architectures were not executable."
+  ]
+}
