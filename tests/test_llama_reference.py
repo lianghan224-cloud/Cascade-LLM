@@ -53,6 +53,7 @@ class LlamaReferenceTest(unittest.TestCase):
             return_full_logits=True,
             max_cache_length=16,
             kv_block_size=16,
+            allow_kv_reference=True,
         )
 
     def streamed_step(self, input_ids):

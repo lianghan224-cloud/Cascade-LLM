@@ -39,7 +39,10 @@ class KVSelectionPolicy(str, Enum):
 
 
 class KVReusePolicy(str, Enum):
-    NONE = "none"
+    REQUEST_ONLY = "request_only"
+    # Compatibility alias for the D0/D1 spelling. New reports serialize the
+    # canonical `request_only` value.
+    NONE = "request_only"
     SESSION = "session"
     PREFIX_MEMORY = "prefix_memory"
     PREFIX_PERSISTENT = "prefix_persistent"
@@ -62,13 +65,27 @@ def normalize_selection(value):
     return KVSelectionPolicy(value)
 
 
+def normalize_reuse(value):
+    if isinstance(value, KVReusePolicy):
+        return value
+    value = _normalize(value)
+    if value in {"none", "off", "request", "request_only"}:
+        return KVReusePolicy.REQUEST_ONLY
+    if value in {"memory", "prefix_memory"}:
+        return KVReusePolicy.PREFIX_MEMORY
+    if value in {"persistent", "prefix_persistent"}:
+        return KVReusePolicy.PREFIX_PERSISTENT
+    return KVReusePolicy(value)
+
+
 @dataclass(frozen=True)
 class KVPolicy:
     accuracy: KVAccuracy = KVAccuracy.EXACT
     storage: KVStoragePolicy = KVStoragePolicy.GPU
     dtype: KVDataType = KVDataType.BF16
     selection: KVSelectionPolicy = KVSelectionPolicy.DENSE
-    reuse: KVReusePolicy = KVReusePolicy.NONE
+    reuse: KVReusePolicy = KVReusePolicy.REQUEST_ONLY
+    attention_backend: str = "generic_cuda"
     page_size: int = 16
     cpu_budget_bytes: int = 0
     nvme_budget_bytes: int = 0
@@ -82,7 +99,12 @@ class KVPolicy:
         object.__setattr__(
             self, "selection", normalize_selection(self.selection)
         )
-        object.__setattr__(self, "reuse", KVReusePolicy(self.reuse))
+        object.__setattr__(self, "reuse", normalize_reuse(self.reuse))
+        object.__setattr__(
+            self,
+            "attention_backend",
+            _normalize(self.attention_backend),
+        )
         for name in (
             "page_size",
             "cpu_budget_bytes",
@@ -93,6 +115,8 @@ class KVPolicy:
             object.__setattr__(self, name, int(getattr(self, name)))
         if self.page_size <= 0:
             raise ValueError("KV page_size must be positive")
+        if not self.attention_backend:
+            raise ValueError("attention_backend must be explicit")
         for name in (
             "cpu_budget_bytes",
             "nvme_budget_bytes",
@@ -157,8 +181,12 @@ class KVPolicy:
             errors.append("D1 implements BF16/FP16 KV only")
         if self.selection != KVSelectionPolicy.DENSE:
             errors.append("D1 implements dense page selection only")
-        if self.reuse not in {KVReusePolicy.NONE, KVReusePolicy.SESSION}:
-            errors.append("D1 does not implement cross-request prefix reuse")
+        if self.reuse not in {
+            KVReusePolicy.REQUEST_ONLY,
+            KVReusePolicy.SESSION,
+            KVReusePolicy.PREFIX_MEMORY,
+        }:
+            errors.append("V1 does not implement persistent prefix reuse")
         return tuple(errors)
 
     def require_d1_supported(self):
@@ -174,12 +202,29 @@ class KVPolicy:
             "dtype": self.dtype.value,
             "selection": self.selection.value,
             "reuse": self.reuse.value,
+            "attention_backend": self.attention_backend,
             "page_size": self.page_size,
             "cpu_budget_bytes": self.cpu_budget_bytes,
             "nvme_budget_bytes": self.nvme_budget_bytes,
             "page_budget": self.page_budget,
             "recent_window": self.recent_window,
         }
+
+    @property
+    def storage_policy(self):
+        return self.storage
+
+    @property
+    def format_policy(self):
+        return self.dtype
+
+    @property
+    def selection_policy(self):
+        return self.selection
+
+    @property
+    def reuse_policy(self):
+        return self.reuse
 
 
 _PRESETS = {

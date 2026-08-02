@@ -4,9 +4,9 @@ import math
 import time
 
 import torch
-import torch.nn.functional as F
 
 from .multi_dtype_store import MultiDtypeStoreMode
+from .providers.generic_cuda import deterministic_lm_head
 from .specs import DTYPE_BYTES
 from .vocab import merge_topk
 
@@ -184,7 +184,7 @@ class MixedVocabStreamingRuntime:
                 weight = self.device_slots[slot_index][:byte_count].view(
                     _TORCH_DTYPES[self.lm_spec.storage_dtype]
                 ).view(rows, self.plan.geometry.hidden_size)
-                partial = F.linear(hidden_states.to(weight.dtype), weight).float()
+                partial = deterministic_lm_head(hidden_states, weight)
                 local_k = min(top_k, rows)
                 values, indices = torch.topk(partial, local_k, dim=-1)
                 global_values, global_indices = merge_topk(
@@ -205,6 +205,7 @@ class MixedVocabStreamingRuntime:
             "chunk_count": self.chunk_count,
             "chunk_rows": self.vocab.chunk_rows,
             "embedding_wall_ms": self.last_embedding_wall_ms,
+            "lm_head_backend": "deterministic_cuda_fp32_accum_native_output",
         }
         return {
             "values": global_values,

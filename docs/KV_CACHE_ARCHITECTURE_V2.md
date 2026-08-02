@@ -1,5 +1,9 @@
 # Cascade-LLM KV Cache Architecture V2
 
+> 本文记录 D0/D1 历史设计。最终 V1 模块/ABI 与当前执行状态已迁移到
+> `docs/KV_FRAMEWORK_V1.md`；验证结果见 `docs/KV_FRAMEWORK_V1_VALIDATION.md`。
+> 下文关于“默认 materialized SDPA”和 Prefix Memory 未实现的描述已被 V1 取代。
+
 本文档冻结 KV Cache V2 的正交策略接口，并记录当前代码的真实实现边界。
 Paged KV 是唯一主线；精确、量化和稀疏是不同准确性等级，运行时不得静默跨级切换。
 

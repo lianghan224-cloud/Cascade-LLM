@@ -52,6 +52,7 @@ class KVPolicyTest(unittest.TestCase):
         self.assertEqual(policy.selection, KVSelectionPolicy.QUEST_FLAT)
         self.assertEqual(set(policy.as_dict()), {
             "accuracy", "storage", "dtype", "selection", "reuse",
+            "attention_backend",
             "page_size", "cpu_budget_bytes", "nvme_budget_bytes",
             "page_budget", "recent_window",
         })

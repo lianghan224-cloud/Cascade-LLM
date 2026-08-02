@@ -200,18 +200,64 @@ def build_inference_report(
             if profile.get("backend_phase") is not None
         ],
         "kv": {
-            "attention_backend": kv_profile.get("attention_backend"),
+            "attention_backend": kv_profile.get(
+                "paged_attention_provider",
+                kv_profile.get("attention_backend"),
+            ),
             "attention_accuracy": kv_profile.get("attention_accuracy"),
             "layout": kv_profile.get("layout"),
             "append_calls": kv_profile.get("append_calls", 0),
-            "appended_tokens": kv_profile.get("appended_tokens", 0),
+            "appended_tokens": kv_profile.get(
+                "appended_tokens",
+                kv_profile.get(
+                    "committed_tokens", kv_profile.get("append_tokens", 0)
+                ),
+            ),
+            "layer_token_writes": kv_profile.get("append_tokens", 0),
             "attention_calls": kv_profile.get("attention_calls", 0),
             "materialize_calls": kv_profile.get("materialize_calls", 0),
             "materialized_bytes": kv_profile.get("materialized_bytes", 0),
-            "fork_calls": kv_profile.get("fork_calls", 0),
-            "cow_page_copies": kv_profile.get("cow_page_copies", 0),
+            "fork_calls": kv_profile.get(
+                "fork_calls", kv_profile.get("fork_count", 0)
+            ),
+            "cow_page_copies": kv_profile.get(
+                "cow_page_copies", kv_profile.get("cow_count", 0)
+            ),
             "page_allocations": kv_profile.get("page_allocations", 0),
             "page_releases": kv_profile.get("page_releases", 0),
+            "cuda_event_count": kv_profile.get("cuda_event_count", 0),
+            "kv_policy_resolved": kv_profile.get(
+                "kv_policy_resolved", kv_profile.get("policy")
+            ),
+            "kv_store": kv_profile.get("kv_store"),
+            "kv_dtype": kv_profile.get("kv_dtype"),
+            "kv_selection": kv_profile.get("kv_selection"),
+            "kv_reuse": kv_profile.get("kv_reuse"),
+            "kv_page_size": kv_profile.get("kv_page_size"),
+            "kv_pool_total_pages": kv_profile.get("kv_pool_total_pages", 0),
+            "kv_pool_peak_pages": kv_profile.get("pool_peak_pages", 0),
+            "kv_shared_pages": kv_profile.get("shared_pages", 0),
+            "kv_cow_count": kv_profile.get(
+                "cow_count", kv_profile.get("cow_page_copies", 0)
+            ),
+            "kv_fork_count": kv_profile.get(
+                "fork_count", kv_profile.get("fork_calls", 0)
+            ),
+            "kv_workspace_peak_bytes": kv_profile.get(
+                "workspace_peak_bytes", 0
+            ),
+            "paged_attention_provider": kv_profile.get(
+                "paged_attention_provider"
+            ),
+            "provider_fallback_reason": kv_profile.get(
+                "provider_fallback_reason"
+            ),
+            "decode_attention_ms": kv_profile.get(
+                "decode_attention_ms", 0.0
+            ),
+            "prefill_attention_ms": kv_profile.get(
+                "prefill_attention_ms", 0.0
+            ),
         },
     }
     timings = {
@@ -241,7 +287,11 @@ def build_inference_report(
             vocab_profiles, "embedding_h2d_ms"
         ),
         "lm_head_time_ms": _sum(vocab_profiles, "wall_ms"),
-        "kv_attention_time_ms": _sum(kv_profiles, "attention_wall_ms"),
+        "kv_attention_time_ms": (
+            (_sum(kv_profiles, "attention_wall_ms") or 0.0)
+            + (_sum(kv_profiles, "decode_attention_ms") or 0.0)
+            + (_sum(kv_profiles, "prefill_attention_ms") or 0.0)
+        ),
     }
     return RunReport(
         model={
@@ -292,10 +342,24 @@ def build_inference_report(
             "cpu_weight_mode": policy.cpu_weight_mode,
             "embedding_mode": policy.embedding_mode.value,
             "lm_head_mode": policy.lm_head_mode.value,
+            "lm_head_backend": next(
+                (
+                    profile.get("lm_head_backend")
+                    for profile in vocab_profiles
+                    if profile.get("lm_head_backend") is not None
+                ),
+                (
+                    "deterministic_cuda_fp32_accum_native_output"
+                    if policy.lm_head_mode.value == "resident"
+                    else None
+                ),
+            ),
             "slot_count": policy.slot_count,
             "prefetch_depth": policy.prefetch_depth,
             "vocab_chunk_bytes": policy.vocab_chunk_bytes,
-            "kv_policy": kv_profile.get("policy"),
+            "kv_policy": kv_profile.get(
+                "kv_policy_resolved", kv_profile.get("policy")
+            ),
         },
         timings=timings,
         throughput={
@@ -333,6 +397,12 @@ def build_inference_report(
                     "kv_attention_workspace_bytes",
                     0,
                 )
+            ),
+            "kv_block_table_bytes": int(
+                getattr(preflight.estimate, "kv_block_table_bytes", 0)
+            ),
+            "kv_reserved_page_bytes": int(
+                getattr(preflight.estimate, "kv_reserved_page_bytes", 0)
             ),
             "checkpoint_read_bytes": int(plan.host_arena_bytes),
             "dequant_workspace_bytes": int(

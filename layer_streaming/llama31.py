@@ -6,7 +6,9 @@ import math
 import torch
 import torch.nn.functional as F
 
-from .kv_cache import KVCacheManager, SimpleKVCache
+from .kv_cache import SimpleKVCache
+from .kv.runtime import PagedKVRuntime, RequestKVCacheV1
+from .providers.generic_cuda import deterministic_lm_head
 
 
 MATRIX_ORDER = (
@@ -69,6 +71,7 @@ class Llama31DecodeExecutor:
         trace_callback=None,
         kv_dtype=None,
         kv_policy=None,
+        allow_kv_reference=False,
         linear_trace_callback=None,
     ):
         try:
@@ -112,22 +115,30 @@ class Llama31DecodeExecutor:
             cache_dtype = kv_dtype or getattr(config, "torch_dtype", None)
             if cache_dtype not in {torch.bfloat16, torch.float16}:
                 cache_dtype = torch.bfloat16
-            self._owned_kv_manager = KVCacheManager(
+            if int(max_batch_size) != 1:
+                raise ValueError(
+                    "Llama31DecodeExecutor is a single-request adapter; "
+                    "use PagedKVRuntime directly for ragged request batches"
+                )
+            self._owned_kv_manager = PagedKVRuntime(
                 layer_count=config.num_hidden_layers,
-                num_key_value_heads=config.num_key_value_heads,
+                num_query_heads=config.num_attention_heads,
+                num_kv_heads=config.num_key_value_heads,
                 head_dim=config.hidden_size // config.num_attention_heads,
-                total_blocks=block_count,
-                block_size=kv_block_size,
-                max_batch_size=max_batch_size,
+                page_count=block_count,
+                page_size=kv_block_size,
                 dtype=cache_dtype,
                 device=resident.device,
                 policy=kv_policy,
+                allow_reference=allow_kv_reference,
             )
-            handle = self._owned_kv_manager.allocate(
-                max_cache_length,
-                batch_size=max_batch_size,
+            request_state = self._owned_kv_manager.create_request(
+                max_cache_length
             )
-            kv_cache = self._owned_kv_manager.bind(handle)
+            kv_cache = RequestKVCacheV1(
+                self._owned_kv_manager,
+                request_state,
+            )
         self.kv_cache = kv_cache
         self.trace_callback = trace_callback
         self.linear_trace_callback = linear_trace_callback
@@ -440,10 +451,16 @@ class Llama31DecodeExecutor:
                     if self.return_full_logits
                     else normalized[:, -1:, :]
                 )
-                state.logits = _linear(
-                    lm_head_input,
-                    self.resident["lm_head.weight"],
-                ).float()
+                if lm_head_input.is_cuda:
+                    state.logits = deterministic_lm_head(
+                        lm_head_input,
+                        self.resident["lm_head.weight"],
+                    )
+                else:
+                    state.logits = _linear(
+                        lm_head_input,
+                        self.resident["lm_head.weight"],
+                    ).float()
                 state.topk_values, state.topk_indices = torch.topk(
                     state.logits[:, -1:, :],
                     k=min(self.top_k, self.config.vocab_size),

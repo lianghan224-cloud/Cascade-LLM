@@ -3,8 +3,8 @@
 import time
 
 import torch
-import torch.nn.functional as F
 
+from .providers.generic_cuda import deterministic_lm_head
 from .weight_store import WeightStoreMode
 
 
@@ -297,7 +297,7 @@ class VocabStreamingRuntime:
                     rows,
                     self.vocab.hidden_size,
                 )
-                partial_logits = F.linear(hidden_states, weight).float()
+                partial_logits = deterministic_lm_head(hidden_states, weight)
                 local_k = min(top_k, rows)
                 local_values, local_indices = torch.topk(
                     partial_logits,
@@ -345,6 +345,7 @@ class VocabStreamingRuntime:
                 "chunk_count": chunk_count,
                 "chunk_rows": self.vocab.chunk_rows,
                 "requested_top_k": int(top_k),
+                "lm_head_backend": "deterministic_cuda_fp32_accum_native_output",
                 "embedding_wall_ms": self.last_embedding_wall_ms,
                 "embedding_h2d_ms": (
                     self.embedding_copy_events[0].elapsed_time(

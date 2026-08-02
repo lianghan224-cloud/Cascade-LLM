@@ -1,5 +1,11 @@
 # Cascade-LLM 开发文档（本地）
 
+> 2026-08-02 KV Framework V1 更新：Batch-first Page/Request/Store/Selection/
+> Reuse/Provider ABI 已冻结，Generic CUDA 与 SM86 direct paged prefill/decode 已接入，
+> production 路径不再拼接完整 K/V；详细状态、消融和未通过的真实模型门禁见
+> `docs/KV_FRAMEWORK_V1.md` 与 `docs/KV_FRAMEWORK_V1_VALIDATION.md`。下方旧 D0/D1
+> 描述保留为历史背景，不代表当前默认实现。
+
 > 2026-08-02 更新：KV Cache V2 已完成 D0 和 D1 reference：正交策略、HND 非连续页池、请求页表、Fork/COW/ref/pin 和 exact MHA/GQA attention 已接入，120 项回归通过。默认多页 SDPA reference 仍复制当前层连续 K/V；无完整 K/V 临时区的 online reference 在真实 8B 中存在误差传播且性能较差，因此 D1 生产后端尚未验收。D2～D8 仍明确标记为未实现。详见 `docs/KV_CACHE_ARCHITECTURE_V2.md` 和 `docs/KV_CACHE_D1_VALIDATION.md`。
 
 > 本文档只保存在本地，不上传 GitHub。它描述当前源码状态，重点记录设计边界、已知问题和下一阶段实现顺序。

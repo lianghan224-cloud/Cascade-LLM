@@ -43,6 +43,28 @@ class MemoryPlannerTest(unittest.TestCase):
         self.assertGreater(estimate.pinned_staging_bytes, 0)
         self.assertGreater(estimate.estimated_gpu_peak_bytes, expected)
 
+    def test_batch_kv_page_count_and_descriptor_budget_are_explicit(self):
+        single = self.make_planner().estimate()
+        batched = self.make_planner(
+            batch_size=3,
+            kv_reserved_free_pages=2,
+        ).estimate()
+        self.assertEqual(batched.kv_page_count, 3 * single.kv_page_count)
+        self.assertEqual(batched.kv_page_bytes, single.kv_page_bytes)
+        self.assertEqual(batched.kv_cache_bytes, 3 * single.kv_cache_bytes)
+        self.assertEqual(
+            batched.kv_reserved_page_bytes,
+            2 * single.kv_page_bytes,
+        )
+        pages_per_request = 3
+        expected_metadata = (
+            3 * pages_per_request * 4
+            + (3 + 1) * 4 * 2
+            + 3 * 4 * 3
+            + 3 * 8 * 2 * 4
+        )
+        self.assertEqual(batched.kv_block_table_bytes, expected_metadata)
+
     def test_preflight_reports_all_capacity_failures(self):
         planner = self.make_planner()
         result = planner.preflight(

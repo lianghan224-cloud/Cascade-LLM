@@ -1,0 +1,1881 @@
+{
+  "schema_version": 1,
+  "hardware": {
+    "device": "NVIDIA GeForce RTX 3080 Ti",
+    "architecture": "sm86",
+    "torch": "2.4.1+cu121",
+    "cuda": "12.1"
+  },
+  "configuration": {
+    "device": "cuda:0",
+    "providers": [
+      "reference_paged_exact",
+      "generic_cuda",
+      "sm86"
+    ],
+    "lengths": [
+      16,
+      128,
+      512
+    ],
+    "page_sizes": [
+      16,
+      32
+    ],
+    "phases": [
+      "decode",
+      "prefill"
+    ],
+    "batch_size": 2,
+    "prefill_query_length": 8,
+    "query_heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "dtype": "bf16",
+    "warmup": 2,
+    "runs": 5
+  },
+  "results": [
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 16,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 26.405475405044854,
+      "p50_ms": 26.41397900879383,
+      "p95_ms": 26.43042104318738,
+      "samples_ms": [
+        26.43042104318738,
+        26.428616954945028,
+        26.41397900879383,
+        26.351319975219667,
+        26.403040043078363
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 393216,
+      "gpu_peak_allocated_bytes": 9110016,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "qualified_reference",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1.0,
+      "speedup_vs_generic": 0.018752987734132757
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 16,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 0.49367521423846483,
+      "p50_ms": 0.4953410243615508,
+      "p95_ms": 0.5011010216549039,
+      "samples_ms": [
+        0.5011010216549039,
+        0.4967530257999897,
+        0.48796599730849266,
+        0.4953410243615508,
+        0.4872150020673871
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 393216,
+      "gpu_peak_allocated_bytes": 9099776,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0009765625,
+        "mean_abs_error": 1.4901161193847656e-07,
+        "relative_l2_error": 2.8916812558611873e-05,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "generic_cuda",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 53.32483624355368,
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 16,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 0.48942083958536386,
+      "p50_ms": 0.4915030440315604,
+      "p95_ms": 0.49266498535871506,
+      "samples_ms": [
+        0.49266498535871506,
+        0.4875750746577978,
+        0.4830670077353716,
+        0.4915030440315604,
+        0.49229408614337444
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 393216,
+      "gpu_peak_allocated_bytes": 9116160,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0009765625,
+        "mean_abs_error": 1.4901161193847656e-07,
+        "relative_l2_error": 2.8916812558611873e-05,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 53.74123177779899,
+      "speedup_vs_generic": 1.00780866034625
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 16,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 206.3277716282755,
+      "p50_ms": 206.31213893648237,
+      "p95_ms": 206.68627705890685,
+      "samples_ms": [
+        206.31213893648237,
+        206.24711306300014,
+        206.42482198309153,
+        206.68627705890685,
+        205.96850709989667
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 393216,
+      "gpu_peak_allocated_bytes": 9486848,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "qualified_reference",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1.0,
+      "speedup_vs_generic": 0.0023614945434679755
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 16,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 0.4873508121818304,
+      "p50_ms": 0.48720499034971,
+      "p95_ms": 0.48824597615748644,
+      "samples_ms": [
+        0.48824597615748644,
+        0.4877460887655616,
+        0.48720499034971,
+        0.4865929950028658,
+        0.48696401063352823
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 393216,
+      "gpu_peak_allocated_bytes": 9592832,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "generic_cuda",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 423.4606439240164,
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 16,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 0.45984298922121525,
+      "p50_ms": 0.45953202061355114,
+      "p95_ms": 0.4617370432242751,
+      "samples_ms": [
+        0.4617370432242751,
+        0.45925192534923553,
+        0.45996299013495445,
+        0.45953202061355114,
+        0.45873096678406
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 393216,
+      "gpu_peak_allocated_bytes": 9723904,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 448.9613991665294,
+      "speedup_vs_generic": 1.060219894359507
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 16,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 26.252541388384998,
+      "p50_ms": 26.259406004101038,
+      "p95_ms": 26.28895197995007,
+      "samples_ms": [
+        26.23637195210904,
+        26.278112083673477,
+        26.28895197995007,
+        26.199864922091365,
+        26.259406004101038
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 786432,
+      "gpu_peak_allocated_bytes": 9765376,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "qualified_reference",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1.0,
+      "speedup_vs_generic": 0.018360472548725967
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 16,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 0.48354780301451683,
+      "p50_ms": 0.482135103084147,
+      "p95_ms": 0.49222400411963463,
+      "samples_ms": [
+        0.49222400411963463,
+        0.4829870304092765,
+        0.480511924251914,
+        0.482135103084147,
+        0.47988095320761204
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 786432,
+      "gpu_peak_allocated_bytes": 9755136,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.000244140625,
+        "mean_abs_error": 2.9802322387695312e-08,
+        "relative_l2_error": 7.0859167404782995e-06,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "generic_cuda",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 54.46482912387731,
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 16,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 0.4986284067854285,
+      "p50_ms": 0.4849510733038187,
+      "p95_ms": 0.5609740037471056,
+      "samples_ms": [
+        0.4878459731116891,
+        0.5609740037471056,
+        0.4849510733038187,
+        0.4810530226677656,
+        0.4783179610967636
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 786432,
+      "gpu_peak_allocated_bytes": 9771520,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.000244140625,
+        "mean_abs_error": 2.9802322387695312e-08,
+        "relative_l2_error": 7.0859167404782995e-06,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 54.148567659009366,
+      "speedup_vs_generic": 0.9941932900560723
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 16,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 207.27432621642947,
+      "p50_ms": 206.17531694006175,
+      "p95_ms": 211.7367450846359,
+      "samples_ms": [
+        206.22305001597852,
+        206.17531694006175,
+        206.0890250140801,
+        206.14749402739108,
+        211.7367450846359
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 786432,
+      "gpu_peak_allocated_bytes": 9880064,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "qualified_reference",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1.0,
+      "speedup_vs_generic": 0.0024291462926732863
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 16,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 0.5021528108045459,
+      "p50_ms": 0.5008300067856908,
+      "p95_ms": 0.508915982209146,
+      "samples_ms": [
+        0.502633978612721,
+        0.508915982209146,
+        0.5008300067856908,
+        0.49861602019518614,
+        0.4997680662199855
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 786432,
+      "gpu_peak_allocated_bytes": 9986048,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 6.103515625e-05,
+        "mean_abs_error": 1.281421191379195e-09,
+        "relative_l2_error": 5.528463899047265e-07,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "generic_cuda",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 411.66726064056667,
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 16,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 0.4781473893672228,
+      "p50_ms": 0.4740799777209759,
+      "p95_ms": 0.49673300236463547,
+      "samples_ms": [
+        0.47541200183331966,
+        0.49673300236463547,
+        0.47266692854464054,
+        0.4718450363725424,
+        0.4740799777209759
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 786432,
+      "gpu_peak_allocated_bytes": 10117120,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 6.103515625e-05,
+        "mean_abs_error": 1.281421191379195e-09,
+        "relative_l2_error": 5.528463899047265e-07,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 434.89564341274104,
+      "speedup_vs_generic": 1.0564251398958233
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 128,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 123.57338040601462,
+      "p50_ms": 123.511693906039,
+      "p95_ms": 123.83345409762114,
+      "samples_ms": [
+        123.83345409762114,
+        123.511693906039,
+        123.62530897371471,
+        123.42803506180644,
+        123.46840999089181
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 1179648,
+      "gpu_peak_allocated_bytes": 10961408,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "qualified_reference",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1.0,
+      "speedup_vs_generic": 0.00569245679363638
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 128,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 0.7064313860610127,
+      "p50_ms": 0.7030849810689688,
+      "p95_ms": 0.71984704118222,
+      "samples_ms": [
+        0.7030849810689688,
+        0.7025540107861161,
+        0.7042569341138005,
+        0.7024139631539583,
+        0.71984704118222
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 1179648,
+      "gpu_peak_allocated_bytes": 10951168,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 1.4901161193847656e-08,
+        "mean_abs_error": 1.8189894035458565e-12,
+        "relative_l2_error": 1.0955475964071367e-09,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "generic_cuda",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 175.6710742394925,
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 128,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 0.6642805878072977,
+      "p50_ms": 0.6633689627051353,
+      "p95_ms": 0.6678679492324591,
+      "samples_ms": [
+        0.6633689627051353,
+        0.6626970134675503,
+        0.6678679492324591,
+        0.6628280971199274,
+        0.6646409165114164
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 1179648,
+      "gpu_peak_allocated_bytes": 10967552,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 1.4901161193847656e-08,
+        "mean_abs_error": 1.8189894035458565e-12,
+        "relative_l2_error": 1.0955475964071367e-09,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 186.1885328526282,
+      "speedup_vs_generic": 1.0598701787341338
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 128,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 1002.1430375985801,
+      "p50_ms": 985.792119987309,
+      "p95_ms": 1039.2576499143615,
+      "samples_ms": [
+        985.792119987309,
+        984.8388900281861,
+        984.0627469820902,
+        1016.7637810809538,
+        1039.2576499143615
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 1179648,
+      "gpu_peak_allocated_bytes": 11076096,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "qualified_reference",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1.0,
+      "speedup_vs_generic": 0.0010753402772895216
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 128,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 1.0589698096737266,
+      "p50_ms": 1.0600619716569781,
+      "p95_ms": 1.0677360696718097,
+      "samples_ms": [
+        1.0600619716569781,
+        1.061926013790071,
+        1.0677360696718097,
+        1.053769956342876,
+        1.051355036906898
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 1179648,
+      "gpu_peak_allocated_bytes": 11182080,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.001953125,
+        "mean_abs_error": 6.756044967914931e-08,
+        "relative_l2_error": 6.0764966623781556e-05,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "generic_cuda",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 929.9381982795041,
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 128,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 0.7628904189914465,
+      "p50_ms": 0.7590509485453367,
+      "p95_ms": 0.7747909985482693,
+      "samples_ms": [
+        0.7588010048493743,
+        0.7646620506420732,
+        0.757147092372179,
+        0.7747909985482693,
+        0.7590509485453367
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 1179648,
+      "gpu_peak_allocated_bytes": 11313152,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.001953125,
+        "mean_abs_error": 6.756044967914931e-08,
+        "relative_l2_error": 6.0764966623781556e-05,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1298.7166696471488,
+      "speedup_vs_generic": 1.396562343658889
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 128,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 70.93924479559064,
+      "p50_ms": 70.00756007619202,
+      "p95_ms": 74.51284292619675,
+      "samples_ms": [
+        70.29857207089663,
+        70.00756007619202,
+        74.51284292619675,
+        69.88597894087434,
+        69.99126996379346
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 1441792,
+      "gpu_peak_allocated_bytes": 11248128,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "qualified_reference",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1.0,
+      "speedup_vs_generic": 0.00986637692625308
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 128,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 0.6902523804455996,
+      "p50_ms": 0.6907209753990173,
+      "p95_ms": 0.691442983224988,
+      "samples_ms": [
+        0.6907209753990173,
+        0.6885069888085127,
+        0.691442983224988,
+        0.689759966917336,
+        0.6908309878781438
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 1441792,
+      "gpu_peak_allocated_bytes": 11213312,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "generic_cuda",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 101.35432768021832,
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 128,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 0.6554222200065851,
+      "p50_ms": 0.6573570426553488,
+      "p95_ms": 0.6584699731320143,
+      "samples_ms": [
+        0.6573570426553488,
+        0.6584699731320143,
+        0.6577189778909087,
+        0.6535110296681523,
+        0.6500540766865015
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 1441792,
+      "gpu_peak_allocated_bytes": 11229696,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 106.49853205101641,
+      "speedup_vs_generic": 1.0507546593079724
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 128,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 558.4482220234349,
+      "p50_ms": 559.4339759554714,
+      "p95_ms": 564.9487540358678,
+      "samples_ms": [
+        564.9487540358678,
+        557.9683120595291,
+        549.1359570296481,
+        559.4339759554714,
+        560.7541110366583
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 1441792,
+      "gpu_peak_allocated_bytes": 11362816,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "qualified_reference",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1.0,
+      "speedup_vs_generic": 0.0018512031346960033
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 128,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 1.0394289856776595,
+      "p50_ms": 1.0356259299442172,
+      "p95_ms": 1.0564349358901381,
+      "samples_ms": [
+        1.051947008818388,
+        1.0564349358901381,
+        1.0356259299442172,
+        1.0263980366289616,
+        1.0267390171065927
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 1441792,
+      "gpu_peak_allocated_bytes": 11444224,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.000244140625,
+        "mean_abs_error": 3.969034878537059e-09,
+        "relative_l2_error": 6.149443368513854e-06,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "generic_cuda",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 540.1892322120639,
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 128,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 0.7327454164624214,
+      "p50_ms": 0.7295859977602959,
+      "p95_ms": 0.745816039852798,
+      "samples_ms": [
+        0.7301360601559281,
+        0.7289939094334841,
+        0.7295859977602959,
+        0.745816039852798,
+        0.729195075109601
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 1441792,
+      "gpu_peak_allocated_bytes": 11575296,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.000244140625,
+        "mean_abs_error": 3.969034878537059e-09,
+        "relative_l2_error": 6.149443368513854e-06,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 766.7827749886071,
+      "speedup_vs_generic": 1.4194706766898098
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 512,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 491.37520557269454,
+      "p50_ms": 489.63854694738984,
+      "p95_ms": 496.13251502159983,
+      "samples_ms": [
+        494.4079499691725,
+        487.3572869691998,
+        489.3397289561108,
+        496.13251502159983,
+        489.63854694738984
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 3932160,
+      "gpu_peak_allocated_bytes": 16466432,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "qualified_reference",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1.0,
+      "speedup_vs_generic": 0.0031379188811959265
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 512,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 1.5395184280350804,
+      "p50_ms": 1.5364460414275527,
+      "p95_ms": 1.5520959859713912,
+      "samples_ms": [
+        1.5408049803227186,
+        1.534193055704236,
+        1.5520959859713912,
+        1.5340520767495036,
+        1.5364460414275527
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 3932160,
+      "gpu_peak_allocated_bytes": 16456192,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "generic_cuda",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 318.68255294696434,
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 512,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 1.3908782042562962,
+      "p50_ms": 1.3922329526394606,
+      "p95_ms": 1.3939959462732077,
+      "samples_ms": [
+        1.3928840635344386,
+        1.3897280441597104,
+        1.3939959462732077,
+        1.3922329526394606,
+        1.3855500146746635
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 3932160,
+      "gpu_peak_allocated_bytes": 16472576,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 351.69297352078195,
+      "speedup_vs_generic": 1.1035840219948005
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 512,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 3715.4351440025494,
+      "p50_ms": 3715.7801230205223,
+      "p95_ms": 3724.842653959058,
+      "samples_ms": [
+        3715.9900550032035,
+        3706.3668010523543,
+        3724.842653959058,
+        3715.7801230205223,
+        3714.1960869776085
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 3932160,
+      "gpu_peak_allocated_bytes": 16581120,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "qualified_reference",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1.0,
+      "speedup_vs_generic": 0.0007953888354292277
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 512,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 2.9583353782072663,
+      "p50_ms": 2.9554900247603655,
+      "p95_ms": 2.965989988297224,
+      "samples_ms": [
+        2.965989988297224,
+        2.960258978419006,
+        2.954697934910655,
+        2.9552399646490812,
+        2.9554900247603655
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 3932160,
+      "gpu_peak_allocated_bytes": 16687104,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.00048828125,
+        "mean_abs_error": 3.10634504785412e-08,
+        "relative_l2_error": 4.465644458896033e-05,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "generic_cuda",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1257.2467143826013,
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 512,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 1.7117652110755444,
+      "p50_ms": 1.7104860162362456,
+      "p95_ms": 1.7200249712914228,
+      "samples_ms": [
+        1.7126509919762611,
+        1.708734082058072,
+        1.7200249712914228,
+        1.7104860162362456,
+        1.70692999381572
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 3932160,
+      "gpu_peak_allocated_bytes": 16818176,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.00048828125,
+        "mean_abs_error": 3.10634504785412e-08,
+        "relative_l2_error": 4.465644458896033e-05,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 2172.353405844689,
+      "speedup_vs_generic": 1.7278656456155235
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 512,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 237.31683562509716,
+      "p50_ms": 237.385364016518,
+      "p95_ms": 237.54822206683457,
+      "samples_ms": [
+        237.30088397860527,
+        236.9065050734207,
+        237.44320299010724,
+        237.54822206683457,
+        237.385364016518
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 4194304,
+      "gpu_peak_allocated_bytes": 16753152,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "qualified_reference",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1.0,
+      "speedup_vs_generic": 0.006262062681550013
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 512,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 1.5194340143352747,
+      "p50_ms": 1.4865220291540027,
+      "p95_ms": 1.6544800018891692,
+      "samples_ms": [
+        1.4865220291540027,
+        1.6544800018891692,
+        1.496640034019947,
+        1.4792479341849685,
+        1.480280072428286
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 4194304,
+      "gpu_peak_allocated_bytes": 16718336,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.000244140625,
+        "mean_abs_error": 3.0740920919924974e-08,
+        "relative_l2_error": 3.3756703331811316e-05,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "generic_cuda",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 159.69179020617463,
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 512,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 1.3396329944953322,
+      "p50_ms": 1.3356750132516026,
+      "p95_ms": 1.358077977783978,
+      "samples_ms": [
+        1.3359358999878168,
+        1.3351549860090017,
+        1.333321095444262,
+        1.358077977783978,
+        1.3356750132516026
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 4194304,
+      "gpu_peak_allocated_bytes": 16734720,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.000244140625,
+        "mean_abs_error": 3.0740920919924974e-08,
+        "relative_l2_error": 3.3756703331811316e-05,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 177.72688839826446,
+      "speedup_vs_generic": 1.1129369153467759
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 512,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 1987.965315580368,
+      "p50_ms": 1992.6934560062364,
+      "p95_ms": 2006.519929971546,
+      "samples_ms": [
+        1953.989423927851,
+        2006.519929971546,
+        2003.7012309767306,
+        1982.9225370194763,
+        1992.6934560062364
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 4194304,
+      "gpu_peak_allocated_bytes": 16867840,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "qualified_reference",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.0,
+        "mean_abs_error": 0.0,
+        "relative_l2_error": 0.0,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1.0,
+      "speedup_vs_generic": 0.0014527798885922555
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 512,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 2.8951558051630855,
+      "p50_ms": 2.894944977015257,
+      "p95_ms": 2.9010670259594917,
+      "samples_ms": [
+        2.89065798278898,
+        2.8950159903615713,
+        2.9010670259594917,
+        2.8940930496901274,
+        2.894944977015257
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 4194304,
+      "gpu_peak_allocated_bytes": 16949248,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.00048828125,
+        "mean_abs_error": 2.3454049369320273e-08,
+        "relative_l2_error": 3.686464323991294e-05,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "generic_cuda",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 688.3355199589116,
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 512,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 2,
+      "query_lengths": [
+        8,
+        8
+      ],
+      "mean_ms": 1.6541180200874805,
+      "p50_ms": 1.6529379645362496,
+      "p95_ms": 1.6583880642428994,
+      "samples_ms": [
+        1.6528470441699028,
+        1.6583880642428994,
+        1.6537400661036372,
+        1.6529379645362496,
+        1.6526769613847136
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 4194304,
+      "gpu_peak_allocated_bytes": 17080320,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "numerical_contract": {
+        "passed": true,
+        "max_abs_error": 0.00048828125,
+        "mean_abs_error": 2.3454049369320273e-08,
+        "relative_l2_error": 3.686464323991294e-05,
+        "limits": {
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_l2_error": 0.003
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "max_abs_error": 0.017,
+          "mean_abs_error": 0.0015,
+          "relative_error": 0.003,
+          "version": 1
+        }
+      },
+      "speedup_vs_reference": 1205.546426278199,
+      "speedup_vs_generic": 1.751393602861234
+    }
+  ],
+  "acceptance": {
+    "production_numerics_pass": true,
+    "production_has_zero_full_kv_workspace": true,
+    "production_faster_than_reference": true
+  }
+}

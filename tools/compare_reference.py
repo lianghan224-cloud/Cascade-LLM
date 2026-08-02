@@ -21,6 +21,7 @@ from layer_streaming import (  # noqa: E402
     BackendSelection,
     CheckpointManifest,
     ExecutionPolicy,
+    KVPolicy,
     Llama31DecodeExecutor,
     MixedDtypeRuntime,
     MixedResidentDeviceArena,
@@ -123,6 +124,24 @@ def parse_args():
     )
     parser.add_argument("--slots", type=int, choices=(1, 2, 3, 4), default=2)
     parser.add_argument("--block-size", type=int, choices=(16, 32), default=16)
+    parser.add_argument(
+        "--kv-attention-backend",
+        choices=(
+            "generic_cuda",
+            "sm80",
+            "sm86",
+            "sm89",
+            "sm90",
+            "reference_paged_exact",
+            "legacy_gather_sdpa_reference",
+        ),
+        default="generic_cuda",
+    )
+    parser.add_argument(
+        "--allow-kv-reference",
+        action="store_true",
+        help="Explicitly permit a diagnostic reference paged provider.",
+    )
     parser.add_argument("--atol", type=float, default=5e-2)
     parser.add_argument("--rtol", type=float, default=5e-2)
     parser.add_argument("--top-k", type=int, default=10)
@@ -380,6 +399,21 @@ def streaming_outputs(args, config, device, prefill_ids, decode_ids):
             return_full_logits=True,
             max_cache_length=max_length,
             kv_block_size=args.block_size,
+            kv_policy=KVPolicy(
+                attention_backend=args.kv_attention_backend,
+                page_size=args.block_size,
+                dtype=(
+                    "bf16"
+                    if next(
+                        spec.compute_dtype
+                        for spec in plan.weights.values()
+                        if spec.role == "attention_q"
+                    )
+                    == "bfloat16"
+                    else "fp16"
+                ),
+            ),
+            allow_kv_reference=args.allow_kv_reference,
             trace_callback=capture,
             linear_trace_callback=getattr(
                 args, "linear_trace_callback", None
@@ -417,8 +451,12 @@ def compare(reference, candidate, atol, rtol, top_k):
             continue
         difference = (expected - actual).abs()
         relative = difference / expected.abs().clamp_min(1.0e-8)
+        elementwise_ok = bool(
+            torch.allclose(expected, actual, atol=atol, rtol=rtol)
+        )
         item = {
-            "ok": bool(torch.allclose(expected, actual, atol=atol, rtol=rtol)),
+            "ok": elementwise_ok,
+            "elementwise_ok": elementwise_ok,
             "shape": list(expected.shape),
             "max_abs_error": float(difference.max().item()),
             "mean_abs_error": float(difference.mean().item()),
@@ -486,11 +524,18 @@ def main():
     ok, comparisons = compare(
         reference, candidate, args.atol, args.rtol, args.top_k
     )
+    logits_comparisons = [
+        value
+        for key, value in comparisons.items()
+        if key.endswith("/logits")
+    ]
     report = {
         "ok": ok,
         "checkpoint": str(args.checkpoint),
         "weight_format": inferred_policy.weight_format.value,
         "backend_requested": args.backend,
+        "kv_attention_backend": args.kv_attention_backend,
+        "lm_head_backend": "deterministic_cuda_fp32_accum_native_output",
         "reference_device_map": args.reference_device_map,
         "gpu_resident_weight_budget_bytes": (
             args.gpu_resident_weight_budget
@@ -499,6 +544,22 @@ def main():
         "decode_ids": args.decode_ids,
         "atol": args.atol,
         "rtol": args.rtol,
+        "acceptance": {
+            "strict_hf_elementwise_and_ordered_topk": bool(ok),
+            "greedy_token_all_equal": bool(logits_comparisons) and all(
+                item.get("top1_equal", False) for item in logits_comparisons
+            ),
+            "minimum_topk_set_consistency": (
+                min(item["topk_consistency"] for item in logits_comparisons)
+                if logits_comparisons
+                else None
+            ),
+            "note": (
+                "HF elementwise gate remains diagnostic for alternative "
+                "paged-attention reduction paths; it is not rewritten when "
+                "the architecture-specific kernel contract passes."
+            ),
+        },
         "comparisons": comparisons,
     }
     rendered = json.dumps(report, indent=2, ensure_ascii=False)

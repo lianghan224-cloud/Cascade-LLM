@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "hardware": {
+    "device": "NVIDIA GeForce RTX 3080 Ti",
+    "architecture": "sm86",
+    "torch": "2.4.1+cu121",
+    "cuda": "12.1"
+  },
+  "configuration": {
+    "device": "cuda:0",
+    "providers": [
+      "generic_cuda",
+      "sm86"
+    ],
+    "lengths": [
+      4096
+    ],
+    "page_sizes": [
+      16,
+      32
+    ],
+    "phases": [
+      "decode",
+      "prefill"
+    ],
+    "batch_size": 1,
+    "prefill_query_length": 8,
+    "query_heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "dtype": "bf16",
+    "warmup": 2,
+    "runs": 5
+  },
+  "results": [
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 4096,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 10.544560221023858,
+      "p50_ms": 10.529288090765476,
+      "p95_ms": 10.604748968034983,
+      "samples_ms": [
+        10.546450968831778,
+        10.604748968034983,
+        10.529288090765476,
+        10.522313066758215,
+        10.520000010728836
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17039360,
+      "gpu_peak_allocated_bytes": 33890816,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 4096,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 9.3443320132792,
+      "p50_ms": 9.34244494419545,
+      "p95_ms": 9.352863999083638,
+      "samples_ms": [
+        9.343827026896179,
+        9.341964032500982,
+        9.352863999083638,
+        9.34244494419545,
+        9.34056006371975
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17039360,
+      "gpu_peak_allocated_bytes": 33899008,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "speedup_vs_generic": 1.1270377458640979
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 4096,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        8
+      ],
+      "mean_ms": 12.746329582296312,
+      "p50_ms": 13.482442940585315,
+      "p95_ms": 13.492563040927052,
+      "samples_ms": [
+        13.492563040927052,
+        13.490887940861285,
+        13.482442940585315,
+        11.72087003942579,
+        11.544883949682117
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17039360,
+      "gpu_peak_allocated_bytes": 34029568,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 4096,
+      "page_size": 16,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        8
+      ],
+      "mean_ms": 8.812309824861586,
+      "p50_ms": 8.81841010414064,
+      "p95_ms": 8.825624012388289,
+      "samples_ms": [
+        8.77637998200953,
+        8.8246000232175,
+        8.81841010414064,
+        8.816535002551973,
+        8.825624012388289
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17039360,
+      "gpu_peak_allocated_bytes": 34095104,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "speedup_vs_generic": 1.5288972480713618
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 4096,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 9.035906009376049,
+      "p50_ms": 9.035279974341393,
+      "p95_ms": 9.039620053954422,
+      "samples_ms": [
+        9.035279974341393,
+        9.033147944137454,
+        9.037915035150945,
+        9.039620053954422,
+        9.033567039296031
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17301504,
+      "gpu_peak_allocated_bytes": 34218496,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 4096,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 1,
+      "query_lengths": [
+        1
+      ],
+      "mean_ms": 8.031363622285426,
+      "p50_ms": 8.030635071918368,
+      "p95_ms": 8.036566083319485,
+      "samples_ms": [
+        8.035142906010151,
+        8.036566083319485,
+        8.02822900004685,
+        8.030635071918368,
+        8.026245050132275
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17301504,
+      "gpu_peak_allocated_bytes": 34226688,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "speedup_vs_generic": 1.1251015509266609
+    },
+    {
+      "supported": true,
+      "provider": "generic_cuda",
+      "context_length": 4096,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        8
+      ],
+      "mean_ms": 11.353435623459518,
+      "p50_ms": 11.353192036040127,
+      "p95_ms": 11.364212026819587,
+      "samples_ms": [
+        11.361476965248585,
+        11.353192036040127,
+        11.341698002070189,
+        11.346599087119102,
+        11.364212026819587
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17301504,
+      "gpu_peak_allocated_bytes": 34290176,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "compiled",
+      "speedup_vs_generic": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 4096,
+      "page_size": 32,
+      "phase": "prefill",
+      "batch_size": 1,
+      "query_lengths": [
+        8
+      ],
+      "mean_ms": 8.54937476105988,
+      "p50_ms": 8.55016999412328,
+      "p95_ms": 8.553525898605585,
+      "samples_ms": [
+        8.55016999412328,
+        8.553525898605585,
+        8.546684985049069,
+        8.543877978809178,
+        8.55261494871229
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 17301504,
+      "gpu_peak_allocated_bytes": 34355712,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "smoke_passed",
+      "speedup_vs_generic": 1.3278323172338593
+    }
+  ],
+  "acceptance": {
+    "production_numerics_pass": null,
+    "production_has_zero_full_kv_workspace": true,
+    "production_faster_than_reference": null
+  }
+}

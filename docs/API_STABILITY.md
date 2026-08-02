@@ -28,6 +28,14 @@ RunReport (schema v2)
 a699bcda404c8f3eeb9a4b297373dd3e8434c305f126acb4b3dc14a12ff70325
 ```
 
+KV Framework 另有独立 V1 合同，冻结 Page Handle/Descriptor、HND layout、
+Request/Batch/Slot Mapping、Store/Selection/Reuse 和 Paged Attention Provider ABI：
+
+```text
+fixture: tests/fixtures/kv_framework_v1.json
+sha256: 0c8e71323062c7d21a18c1cd8703f549421b7b713abef6df796317f6010837dd
+```
+
 `tests/test_api_contract.py` 同时验证：
 
 - frozen dataclass 字段快照；

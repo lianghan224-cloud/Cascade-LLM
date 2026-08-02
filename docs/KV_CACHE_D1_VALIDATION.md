@@ -1,5 +1,8 @@
 # KV Cache V2 D0/D1 验证与消融报告
 
+> 历史报告：保留用于对比提交 `368e7f5`。KV Framework V1 新结果见
+> `docs/KV_FRAMEWORK_V1_VALIDATION.md`，不得用本文的 D1 reference 状态描述当前默认路径。
+
 ## 1. 验证范围
 
 本轮只验收 D0 和 D1 reference，不宣称 D2～D8 已实现，也不把 synthetic

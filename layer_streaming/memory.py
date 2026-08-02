@@ -73,6 +73,8 @@ class MemoryEstimate:
     kv_page_count: int = 0
     kv_page_bytes: int = 0
     kv_attention_workspace_bytes: int = 0
+    kv_block_table_bytes: int = 0
+    kv_reserved_page_bytes: int = 0
 
     def as_dict(self):
         return {
@@ -141,6 +143,8 @@ class PreflightResult:
             "  KV NVMe budget:       {}".format(gib(estimate.kv_nvme_budget_bytes)),
             "  KV sparse index:      {}".format(gib(estimate.kv_index_bytes)),
             "  KV attention work:    {}".format(gib(estimate.kv_attention_workspace_bytes)),
+            "  KV block tables:      {}".format(gib(estimate.kv_block_table_bytes)),
+            "  KV reserved pages:    {}".format(gib(estimate.kv_reserved_page_bytes)),
             "Embedding buffer:        {}".format(gib(estimate.embedding_buffer_bytes)),
             "LM Head buffer:          {}".format(gib(estimate.lm_head_buffer_bytes)),
             "Top-k workspace:         {}".format(gib(estimate.topk_bytes)),
@@ -236,6 +240,7 @@ class MemoryPlanner:
         cuda_safety_margin_bytes=512 * 1024 ** 2,
         transformer_placement=None,
         kv_policy=None,
+        kv_reserved_free_pages=0,
     ):
         if not isinstance(geometry, ModelGeometry):
             raise TypeError("geometry must be a ModelGeometry")
@@ -270,6 +275,9 @@ class MemoryPlanner:
         )
         if self.kv_policy.page_size != self.kv_block_size:
             raise ValueError("KV policy page size does not match kv_block_size")
+        self.kv_reserved_free_pages = int(kv_reserved_free_pages)
+        if self.kv_reserved_free_pages < 0:
+            raise ValueError("kv_reserved_free_pages must not be negative")
         for name in (
             "max_context",
             "max_prefill_tokens",
@@ -354,16 +362,17 @@ class MemoryPlanner:
         else:
             pinned = slot_count * staging_slot_bytes + pinned_vocab
 
-        kv_page_count = int(
+        kv_pages_per_request = int(
             math.ceil(self.max_context / float(self.kv_block_size))
         )
+        kv_page_count = self.batch_size * kv_pages_per_request
         kv_cache = kv_page_pool_bytes(
             layer_count=self.geometry.num_hidden_layers,
             page_count=kv_page_count,
             num_key_value_heads=self.geometry.num_key_value_heads,
             page_size=self.kv_block_size,
             head_dim=self.geometry.head_dim,
-            batch_size=self.batch_size,
+            batch_size=1,
             dtype=self.kv_policy.dtype,
         )
         kv_page_bytes = kv_page_pool_bytes(
@@ -372,16 +381,30 @@ class MemoryPlanner:
             num_key_value_heads=self.geometry.num_key_value_heads,
             page_size=self.kv_block_size,
             head_dim=self.geometry.head_dim,
-            batch_size=self.batch_size,
+            batch_size=1,
             dtype=self.kv_policy.dtype,
         )
         kv_groups = (
             self.geometry.num_attention_heads
             // self.geometry.num_key_value_heads
         )
-        kv_attention_workspace = (
-            kv_cache // self.geometry.num_hidden_layers
-        ) * (1 + kv_groups)
+        if self.kv_policy.attention_backend == "legacy_gather_sdpa_reference":
+            kv_attention_workspace = (
+                kv_cache // self.geometry.num_hidden_layers
+            ) * (1 + kv_groups)
+        else:
+            # reference_paged_exact and every production V1 provider keep only
+            # fixed page-local/register state and request no global workspace.
+            kv_attention_workspace = 0
+        kv_block_table_bytes = (
+            self.batch_size * kv_pages_per_request * 4
+            + (self.batch_size + 1) * 4 * 2
+            + self.batch_size * 4 * 3
+            + self.batch_size * self.max_prefill_tokens * 2 * 4
+        )
+        if self.kv_reserved_free_pages > kv_page_count:
+            raise ValueError("reserved KV pages exceed the page pool")
+        kv_reserved_page_bytes = self.kv_reserved_free_pages * kv_page_bytes
         kv_cpu_pool = (
             int(self.kv_policy.cpu_budget_bytes)
             if self.kv_policy.storage
@@ -444,6 +467,7 @@ class MemoryPlanner:
                 kv_cache,
                 kv_index_bytes,
                 kv_attention_workspace,
+                kv_block_table_bytes,
                 embedding_buffer,
                 lm_head_buffer,
                 topk_bytes,
@@ -537,6 +561,8 @@ class MemoryPlanner:
             kv_page_count=kv_page_count,
             kv_page_bytes=kv_page_bytes,
             kv_attention_workspace_bytes=kv_attention_workspace,
+            kv_block_table_bytes=kv_block_table_bytes,
+            kv_reserved_page_bytes=kv_reserved_page_bytes,
         )
 
     @classmethod

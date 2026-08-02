@@ -182,6 +182,24 @@ def parse_args():
     parser.add_argument("--kv-nvme-budget", type=parse_byte_size, default=0)
     parser.add_argument("--kv-page-budget", type=int, default=0)
     parser.add_argument("--kv-recent-window", type=int, default=0)
+    parser.add_argument(
+        "--kv-attention-backend",
+        choices=(
+            "generic_cuda",
+            "sm80",
+            "sm86",
+            "sm89",
+            "sm90",
+            "reference_paged_exact",
+            "legacy_gather_sdpa_reference",
+        ),
+        default="generic_cuda",
+    )
+    parser.add_argument(
+        "--allow-kv-reference",
+        action="store_true",
+        help="Explicitly permit a diagnostic reference paged provider.",
+    )
     parser.add_argument("--return-full-logits", action="store_true")
     parser.add_argument(
         "--no-profile",
@@ -424,7 +442,7 @@ def main():
         else args.kv_dtype
     )
     kv_reuse = {
-        "off": "none",
+        "off": "request_only",
         "session": "session",
         "memory": "prefix_memory",
         "persistent": "prefix_persistent",
@@ -436,6 +454,7 @@ def main():
             dtype=kv_dtype_name,
             selection=args.kv_index.replace("-", "_"),
             reuse=kv_reuse,
+            attention_backend=args.kv_attention_backend,
             page_size=args.kv_block_size,
             cpu_budget_bytes=args.kv_cpu_budget,
             nvme_budget_bytes=args.kv_nvme_budget,
@@ -443,6 +462,14 @@ def main():
             recent_window=args.kv_recent_window,
         )
         kv_policy.require_d1_supported()
+        if (
+            kv_policy.attention_backend
+            in {"reference_paged_exact", "legacy_gather_sdpa_reference"}
+            and not args.allow_kv_reference
+        ):
+            raise ValueError(
+                "reference KV backend requires --allow-kv-reference"
+            )
     except (ValueError, NotImplementedError) as error:
         raise SystemExit("KV policy rejected before allocation: {}".format(error))
     print(
@@ -623,6 +650,7 @@ def main():
             kv_block_size=args.kv_block_size,
             kv_dtype=kv_dtype,
             kv_policy=kv_policy,
+            allow_kv_reference=args.allow_kv_reference,
         ))
         input_ids = encoded.input_ids.to(device)
         generated = []

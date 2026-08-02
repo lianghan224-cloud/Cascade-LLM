@@ -1,0 +1,45 @@
+{
+  "contract_version": 1,
+  "abi_versions": {"framework": 1, "page_format": 1, "paged_attention": 1, "store": 1, "selection": 1, "reuse": 1},
+  "page_layout": "layer,page,kv_head,page_token,head_dim (HND per layer)",
+  "page_handle_fields": ["page_id", "generation", "store_id", "format_id", "state"],
+  "page_states": ["free", "allocated", "active", "sealed", "shared", "copying", "migrating", "evict_pending", "releasing"],
+  "dataclass_fields": {
+    "PageDescriptor": ["page_id", "generation", "store_id", "dtype", "layout", "format_version", "state", "valid_tokens", "ref_count", "pin_count", "owner_hint", "last_access_epoch", "index_metadata_handle", "transfer_event"],
+    "LogicalBlockTable": ["page_size", "max_length", "handles", "version"],
+    "RequestKVState": ["request_id", "block_table", "sequence_length", "tail_valid_tokens", "version", "parent_request_id", "fork_position", "reuse_namespace", "lifecycle_state", "layer_lengths", "pending_append", "token_block_hashes"],
+    "SlotMapping": ["page_ids", "offsets"],
+    "SelectedPageView": ["flat_page_ids", "block_table_indptr", "logical_block_ids", "page_valid_tokens", "selection_name", "exact", "metadata"],
+    "PagedBatchView": ["request_ids", "query_indptr", "block_table_indptr", "flat_block_table", "flat_logical_block_ids", "flat_page_valid_tokens", "sequence_lengths", "query_lengths", "tail_valid_tokens", "slot_mapping", "query_positions", "page_size", "layer", "version"],
+    "PagedKVAppendInput": ["key", "value", "key_pool_view", "value_pool_view", "slot_mapping", "page_size", "num_kv_heads", "head_dim"],
+    "PagedAttentionInput": ["query", "key_pool_view", "value_pool_view", "batch_view", "page_size", "num_query_heads", "num_kv_heads", "head_dim", "softmax_scale", "causal", "kv_dtype", "output_dtype", "selected_pages", "workspace", "return_logsumexp"],
+    "PagedAttentionOutput": ["output", "logsumexp", "provider_metrics"],
+    "PagedAttentionCapability": ["provider_name", "provider_version", "provider_abi", "architectures", "dtypes", "page_sizes", "head_dims", "supports_mha", "supports_gqa", "supports_mqa", "supports_decode", "supports_prefill", "supports_ragged_batch", "supports_partial_tail", "supports_cuda_graph", "numerical_contract_version", "requires_full_kv_workspace", "requires_full_score_matrix", "qualification_status"]
+  },
+  "provider_methods": {
+    "capability": ["self"],
+    "estimate_workspace": ["self", "request"],
+    "append_kv": ["self", "append_input"],
+    "copy_pages": ["self", "store", "source_page_ids", "target_page_ids", "valid_tokens"],
+    "decode": ["self", "request"],
+    "prefill": ["self", "request"]
+  },
+  "store_methods": {
+    "capability": ["self"],
+    "layer_view": ["self", "layer"],
+    "read_pages": ["self", "layer", "page_ids", "stream"],
+    "write_pages": ["self", "layer", "page_ids", "key", "value", "stream"],
+    "copy_page": ["self", "source_page_id", "target_page_id", "valid_tokens", "stream"],
+    "close": ["self"]
+  },
+  "selection_methods": {
+    "capability": ["self"],
+    "select": ["self", "requests", "layer", "query", "batch_view"]
+  },
+  "reuse_methods": {
+    "capability": ["self"],
+    "fork": ["self", "runtime", "state", "request_id", "max_length"],
+    "register_prefix": ["self", "runtime", "state", "token_ids"],
+    "lookup_prefix": ["self", "runtime", "token_ids", "max_length", "reuse_namespace", "request_id"]
+  }
+}
