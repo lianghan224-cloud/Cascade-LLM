@@ -9,7 +9,9 @@
 5. 真实模型：checkpoint、逐层结果、logits、Top-k、长 decode 和显存稳定性。
 6. 性能与长期稳定：1000 token、P50/P95/P99、内存和 stream/event 漂移。
 
-完成 Level 5 才能标记 `qualified`；完成 Level 6 并纳入持续回归后才能标记 `production`。
+完成 Numerical Contract L0–L4 可标记 `numerically_qualified`；完成代表性性能
+门禁可标记 `performance_qualified`；完成 L0–L5 并纳入持续回归后才能标记
+`production`。
 
 ## 生成资格工作单
 
@@ -19,7 +21,8 @@
   --output qualification/environment.json
 ```
 
-输出只把 Level 1 标记为 `observed`，总体状态保持 `unqualified`。后续各级必须附带原始 JSON、日志、模型哈希、Provider ABI 和 Numerical Contract key，由维护者审查后更新注册状态。
+输出只完成环境证据，总体状态保持 `declared`。后续各级必须附带原始 JSON、
+日志、模型哈希、Provider ABI 和 Numerical Contract key，由维护者审查后更新状态。
 
 ## Numerical Contract
 

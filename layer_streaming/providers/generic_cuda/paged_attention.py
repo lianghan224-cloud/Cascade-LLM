@@ -170,7 +170,7 @@ class GenericCUDAPagedAttentionBackend(
             supports_ragged_batch=True,
             supports_partial_tail=True,
             supports_cuda_graph=False,
-            numerical_contract_version=1,
+            numerical_contract_version=2,
             requires_full_kv_workspace=False,
             requires_full_score_matrix=False,
             qualification_status=self.qualification_status,
@@ -274,4 +274,3 @@ class GenericCUDAPagedAttentionBackend(
 
 
 # Compatibility alias.  It is attention-only and no longer exposes append/copy.
-GenericCUDAPagedAttentionProvider = GenericCUDAPagedAttentionBackend

@@ -20,7 +20,9 @@ class NumericalContractRegistryHardwareTest(unittest.TestCase):
             scale_dtype="bf16",
             physical_layout="row_major",
         )
-        record = NumericalContractRecord(key, "/contract.json", "qualified")
+        record = NumericalContractRecord(
+            key, "/contract.json", "numerically_qualified"
+        )
         registry.register(record)
         self.assertEqual(registry.resolve(key), record)
         self.assertIsNone(

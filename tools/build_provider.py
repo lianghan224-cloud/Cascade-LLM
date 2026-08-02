@@ -60,7 +60,7 @@ def main():
     if architectures != ("sm86",):
         raise SystemExit(
             "no kernel implementation exists for {}; use --metadata-only to "
-            "prepare an unqualified build declaration".format(",".join(architectures))
+            "prepare a declared build configuration".format(",".join(architectures))
         )
     command = [
         sys.executable,

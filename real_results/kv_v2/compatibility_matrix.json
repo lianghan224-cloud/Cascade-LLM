@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "contract_version": 2,
+  "rows": [
+    {
+      "architecture": "sm80",
+      "physical_hardware": false,
+      "provider_loaded": true,
+      "status": "declared",
+      "numerical": "not_run",
+      "performance": "not_run",
+      "production": "not_passed"
+    },
+    {
+      "architecture": "sm86",
+      "physical_hardware": true,
+      "provider_loaded": true,
+      "status": "performance_qualified",
+      "numerical": "passed",
+      "performance": "passed",
+      "production": "not_passed"
+    },
+    {
+      "architecture": "sm89",
+      "physical_hardware": false,
+      "provider_loaded": true,
+      "status": "declared",
+      "numerical": "not_run",
+      "performance": "not_run",
+      "production": "not_passed"
+    },
+    {
+      "architecture": "sm90",
+      "physical_hardware": false,
+      "provider_loaded": true,
+      "status": "declared",
+      "numerical": "not_run",
+      "performance": "not_run",
+      "production": "not_passed"
+    }
+  ]
+}

@@ -7,7 +7,7 @@ from ..generic_cuda.paged_attention import (
 class SM86PagedAttentionBackend(GenericCUDAPagedAttentionBackend):
     name = "sm86"
     architectures = ("sm86",)
-    qualification_status = "smoke_passed"
+    qualification_status = "performance_qualified"
     supported_head_dims = (128,)
     num_warps = 4
     num_stages = 3
@@ -24,8 +24,5 @@ class SM86PagedAttentionBackend(GenericCUDAPagedAttentionBackend):
 class SM86PagedKVKernelBackend(GenericCUDAPagedKVKernelBackend):
     name = "sm86_kv_kernel"
     architectures = ("sm86",)
-    qualification_status = "smoke_passed"
+    qualification_status = "performance_qualified"
     supported_head_dims = (128,)
-
-
-SM86PagedAttentionProvider = SM86PagedAttentionBackend

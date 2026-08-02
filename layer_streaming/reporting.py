@@ -108,7 +108,7 @@ def hardware_metadata(device=None):
         result["runtime_features"] = runtime.as_dict()
     except BaseException as error:
         # Reporting must not hide a completed inference result. Detection failures
-        # stay explicit and are treated as unqualified by compatibility tooling.
+        # stay explicit and retain their exact compatibility status.
         result["hardware_detection_error"] = "{}: {}".format(
             type(error).__name__, error
         )

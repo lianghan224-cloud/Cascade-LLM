@@ -8,6 +8,7 @@ from typing import Optional, Tuple
 
 from .capability import CompatibilityDecision
 from .profile import HardwareProfile, RuntimeFeatureProfile
+from ..qualification_status import qualification_status
 
 
 COMPATIBILITY_REPORT_SCHEMA_VERSION = 1
@@ -23,6 +24,11 @@ class CompatibilityReport:
     overall_status: str
     schema_version: int = COMPATIBILITY_REPORT_SCHEMA_VERSION
     created_at_unix: float = field(default_factory=time.time)
+
+    def __post_init__(self):
+        object.__setattr__(
+            self, "overall_status", qualification_status(self.overall_status)
+        )
 
     def as_dict(self):
         return {
@@ -91,14 +97,23 @@ def build_compatibility_report(
 ):
     decisions = tuple(decisions)
     if decisions and all(item.supported for item in decisions):
-        if all(item.status in {"qualified", "production"} for item in decisions):
-            overall = "qualified"
-        else:
-            overall = "unqualified"
+        ordered = (
+            "declared",
+            "compiled",
+            "smoke_passed",
+            "numerically_qualified",
+            "performance_qualified",
+            "production",
+        )
+        ranks = {name: index for index, name in enumerate(ordered)}
+        overall = min(
+            (item.status for item in decisions),
+            key=lambda name: ranks.get(name, -1),
+        )
     elif decisions:
         overall = "unsupported"
     else:
-        overall = "unqualified"
+        overall = "declared"
     return CompatibilityReport(
         hardware=hardware,
         runtime=runtime,

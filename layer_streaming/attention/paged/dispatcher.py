@@ -82,11 +82,6 @@ class PagedAttentionDispatcher:
     def kv_kernel_backend(self):
         return self.bundle.kv_kernel_backend
 
-    @property
-    def provider(self):
-        """Compatibility alias for the attention-only backend."""
-        return self.attention_backend
-
     def validate(self, request, phase=None):
         request.validate()
         backend = self.attention_backend

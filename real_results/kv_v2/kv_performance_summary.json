@@ -1,0 +1,19 @@
+{
+  "architecture": "sm86",
+  "evidence": {
+    "input_report_count": 2
+  },
+  "matrix": {
+    "case_count": 48,
+    "checks": {
+      "cases_present": true,
+      "representative_faster_than_reference": true,
+      "sm86_no_generic_regression": true,
+      "workspace_zero": true
+    },
+    "passed": true
+  },
+  "provider": "sm86",
+  "schema_version": 1,
+  "status": "performance_qualified"
+}

@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from ..qualification_status import qualification_status
+
 
 PAGED_KV_KERNEL_ABI_VERSION = 1
 
@@ -19,6 +21,15 @@ class PagedKVKernelCapability:
     supports_copy: bool
     qualification_status: str
 
+    def __post_init__(self):
+        object.__setattr__(
+            self,
+            "qualification_status",
+            qualification_status(self.qualification_status),
+        )
+        if int(self.backend_abi) <= 0:
+            raise ValueError("backend_abi must be positive")
+
     def as_dict(self):
         return {name: getattr(self, name) for name in self.__dataclass_fields__}
 
@@ -27,6 +38,15 @@ class PagedKVKernelBackend:
     """Executes payload writes/copies but never owns PageHandle lifecycle."""
 
     name = "abstract_kv_kernel"
+    schema_version = 1
+
+    @property
+    def provider_abi(self):
+        return int(self.capability().backend_abi)
+
+    @property
+    def qualification_status(self):
+        return self.capability().qualification_status
 
     def capability(self):
         raise NotImplementedError
@@ -54,7 +74,7 @@ class TorchPagedKVKernelBackend(PagedKVKernelBackend):
             head_dims=(),
             supports_append=True,
             supports_copy=True,
-            qualification_status="qualified_reference",
+            qualification_status="numerically_qualified",
         )
 
     def append_kv(self, append_input):

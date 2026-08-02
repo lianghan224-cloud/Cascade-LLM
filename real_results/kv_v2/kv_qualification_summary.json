@@ -1,0 +1,35 @@
+{
+  "architecture": "sm86",
+  "evidence": {
+    "automated_tests_passed": true,
+    "contract_name": "llama31_8b_sm86_bf16_hnd_abi1_v2",
+    "missing_production_levels": [
+      "L4",
+      "L5"
+    ]
+  },
+  "levels": {
+    "L0": {
+      "passed": true
+    },
+    "L1": {
+      "passed": true
+    },
+    "L2": {
+      "passed": true
+    },
+    "L3": {
+      "passed": true
+    },
+    "L4": {
+      "passed": false
+    },
+    "L5": {
+      "passed": false
+    }
+  },
+  "production_passed": false,
+  "provider": "sm86",
+  "schema_version": 1,
+  "status": "performance_qualified"
+}

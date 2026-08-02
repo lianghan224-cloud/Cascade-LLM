@@ -46,10 +46,10 @@ class ReferencePagedExactBackend(PagedAttentionBackend):
             supports_ragged_batch=True,
             supports_partial_tail=True,
             supports_cuda_graph=False,
-            numerical_contract_version=1,
+            numerical_contract_version=2,
             requires_full_kv_workspace=False,
             requires_full_score_matrix=False,
-            qualification_status="qualified_reference",
+            qualification_status="numerically_qualified",
         )
 
     def estimate_workspace(self, request):
@@ -208,7 +208,7 @@ class LegacyGatherSDPAReferenceBackend(PagedAttentionBackend):
             numerical_contract_version=1,
             requires_full_kv_workspace=True,
             requires_full_score_matrix=False,
-            qualification_status="diagnostic_only",
+            qualification_status="experimental",
         )
 
     def estimate_workspace(self, request):
@@ -311,5 +311,3 @@ class LegacyGatherSDPAReferenceBackend(PagedAttentionBackend):
 
 # Compatibility aliases for pre-RC imports.  These aliases expose attention
 # methods only; append/copy moved to PagedKVKernelBackend.
-ReferencePagedExactProvider = ReferencePagedExactBackend
-LegacyGatherSDPAReferenceProvider = LegacyGatherSDPAReferenceBackend

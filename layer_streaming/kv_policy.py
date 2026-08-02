@@ -80,6 +80,9 @@ def normalize_reuse(value):
 
 @dataclass(frozen=True)
 class KVPolicy:
+    schema_version = 1
+    provider_abi = 1
+    qualification_status = "declared"
     accuracy: KVAccuracy = KVAccuracy.EXACT
     storage: KVStoragePolicy = KVStoragePolicy.GPU
     dtype: KVDataType = KVDataType.BF16
@@ -208,6 +211,20 @@ class KVPolicy:
             "nvme_budget_bytes": self.nvme_budget_bytes,
             "page_budget": self.page_budget,
             "recent_window": self.recent_window,
+        }
+
+    def capability(self):
+        """Describe policy schema support without claiming kernel support."""
+
+        return {
+            "schema_version": self.schema_version,
+            "provider_abi": self.provider_abi,
+            "qualification_status": self.qualification_status,
+            "accuracy": tuple(item.value for item in KVAccuracy),
+            "storage": tuple(item.value for item in KVStoragePolicy),
+            "dtype": tuple(item.value for item in KVDataType),
+            "selection": tuple(item.value for item in KVSelectionPolicy),
+            "reuse": tuple(item.value for item in KVReusePolicy),
         }
 
     @property

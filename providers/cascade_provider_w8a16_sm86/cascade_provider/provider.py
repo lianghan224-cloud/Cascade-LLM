@@ -1,4 +1,4 @@
-"""Entry-point wrapper around the qualified, exact SM86 provider binary."""
+"""Entry-point wrapper around the performance-qualified SM86 binary."""
 
 from dataclasses import dataclass
 import json
@@ -38,7 +38,7 @@ class Sm86W8A16Plugin:
         library = ROOT / "lib" / "libcascade_cutlass_sm86.so"
         if not library.is_file():
             raise FileNotFoundError(
-                "qualified SM86 provider binary is missing: {}".format(library)
+                "performance-qualified SM86 binary is missing: {}".format(library)
             )
         return CutlassW8A16Provider(library=library)
 

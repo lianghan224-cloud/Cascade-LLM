@@ -16,7 +16,7 @@ from layer_streaming import (
     PagedKVRuntime,
     PagedKVKernelBackend,
     PagedProviderBundle,
-    ReferencePagedExactProvider,
+    ReferencePagedExactBackend,
     SelectedPageView,
     TorchPagedKVKernelBackend,
     default_paged_registry,
@@ -69,7 +69,7 @@ class KVFrameworkV1CPUTest(unittest.TestCase):
         pool.release(handle)
         self.assertEqual(pool.allocated_pages, 0)
 
-        class InvalidAttention(ReferencePagedExactProvider):
+        class InvalidAttention(ReferencePagedExactBackend):
             def append_kv(self, append_input):
                 del append_input
 
@@ -87,7 +87,7 @@ class KVFrameworkV1CPUTest(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "lifecycle methods"):
             PagedProviderBundle(
                 name="invalid_lifecycle_boundary",
-                attention_backend=ReferencePagedExactProvider(),
+                attention_backend=ReferencePagedExactBackend(),
                 kv_kernel_backend=InvalidKernel(),
             )
 
@@ -124,14 +124,14 @@ class KVFrameworkV1CPUTest(unittest.TestCase):
                     valid_tokens,
                 )
 
-        class AlternateAttentionBackend(ReferencePagedExactProvider):
+        class AlternateAttentionBackend(ReferencePagedExactBackend):
             name = "alternate_reference_attention"
 
         registry = default_paged_registry(load_cuda=False)
         registry.register(
             PagedProviderBundle(
                 name="boundary_test",
-                attention_backend=ReferencePagedExactProvider(),
+                attention_backend=ReferencePagedExactBackend(),
                 kv_kernel_backend=TorchPagedKVKernelBackend(),
             )
         )
@@ -187,7 +187,7 @@ class KVFrameworkV1CPUTest(unittest.TestCase):
         self.assertEqual(runtime.attention_backend.name, "alternate_reference_attention")
         runtime.close()
 
-    def test_architecture_providers_are_independent_and_unqualified(self):
+    def test_architecture_providers_are_independent_and_declared(self):
         registry = default_paged_registry()
         capabilities = registry.capabilities()
         self.assertEqual(capabilities["sm80"]["architectures"], ("sm80",))
@@ -195,11 +195,12 @@ class KVFrameworkV1CPUTest(unittest.TestCase):
         self.assertEqual(capabilities["sm89"]["architectures"], ("sm89",))
         self.assertEqual(capabilities["sm90"]["architectures"], ("sm90",))
         self.assertEqual(
-            capabilities["sm86"]["qualification_status"], "smoke_passed"
+            capabilities["sm86"]["qualification_status"],
+            "performance_qualified",
         )
         for name in ("sm80", "sm89", "sm90"):
             self.assertEqual(
-                capabilities[name]["qualification_status"], "unqualified"
+                capabilities[name]["qualification_status"], "declared"
             )
 
     def make_runtime(

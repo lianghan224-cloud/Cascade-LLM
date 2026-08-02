@@ -169,7 +169,7 @@ def default_provider_registry():
             requires_preprocessed_layout=False,
             physical_layout_names=("row_major",),
             workspace_policy="none",
-            qualification_status="qualified",
+            qualification_status="performance_qualified",
             backend_name="fused_w8a16",
             requires_extension=True,
         ),

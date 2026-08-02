@@ -9,6 +9,15 @@ from ...kv.errors import KVUnsupportedError
 class PagedAttentionBackend:
     name = "abstract"
     is_reference = False
+    schema_version = 1
+
+    @property
+    def provider_abi(self):
+        return int(self.capability().provider_abi)
+
+    @property
+    def qualification_status(self):
+        return self.capability().qualification_status
 
     def capability(self):
         raise NotImplementedError
@@ -21,8 +30,3 @@ class PagedAttentionBackend:
 
     def prefill(self, request):
         raise KVUnsupportedError("{} does not implement prefill".format(self.name))
-
-
-# Import compatibility only.  The frozen V1 contract names the interface
-# PagedAttentionBackend and contains no append/copy/lifecycle methods.
-PagedAttentionProvider = PagedAttentionBackend

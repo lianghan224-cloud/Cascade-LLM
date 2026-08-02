@@ -1,6 +1,7 @@
 """Cascade-LLM KV Framework V1 public surface."""
 
 from .block_table import LogicalBlockTable
+from .api import RequestKVCacheV1
 from .batch_state import PAGED_BATCH_ABI_VERSION, PagedBatchView, build_paged_batch_view
 from .cow import PageCOWOperation
 from .errors import (
@@ -29,7 +30,15 @@ from .policy import (
     KVStoragePolicy,
 )
 from .request_state import PendingAppend, RequestKVState
-from .runtime import PagedKVRuntime, RequestKVCacheV1
+from .runtime import PagedKVRuntime
+from .reports import (
+    KV_REPORT_SCHEMA_VERSION,
+    KVCompatibilityReport,
+    KVNumericalReport,
+    KVOwnershipReport,
+    KVPerformanceReport,
+    KVQualificationReport,
+)
 from .slot_mapping import SlotMapping
 from .types import (
     KV_FRAMEWORK_ABI_VERSION,
@@ -69,6 +78,12 @@ __all__ = [
     "PagedKVKernelBackend",
     "PagedKVKernelCapability",
     "PagedKVRuntime",
+    "KV_REPORT_SCHEMA_VERSION",
+    "KVCompatibilityReport",
+    "KVNumericalReport",
+    "KVOwnershipReport",
+    "KVPerformanceReport",
+    "KVQualificationReport",
     "RequestKVCacheV1",
     "RequestKVState",
     "RequestLifecycleState",

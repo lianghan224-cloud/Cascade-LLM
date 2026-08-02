@@ -1,0 +1,85 @@
+{
+  "architecture": "sm86",
+  "capability": {
+    "architectures": [
+      "sm86"
+    ],
+    "attention_backend": "sm86",
+    "bundle_name": "sm86",
+    "dtypes": [
+      "bf16",
+      "fp16"
+    ],
+    "head_dims": [
+      128
+    ],
+    "kv_kernel_backend": "sm86_kv_kernel",
+    "kv_kernel_capability": {
+      "architectures": [
+        "sm86"
+      ],
+      "backend_abi": 1,
+      "backend_name": "sm86_kv_kernel",
+      "backend_version": "1",
+      "dtypes": [
+        "bf16",
+        "fp16"
+      ],
+      "head_dims": [
+        128
+      ],
+      "page_sizes": [
+        16,
+        32
+      ],
+      "qualification_status": "performance_qualified",
+      "supports_append": true,
+      "supports_copy": true
+    },
+    "numerical_contract_version": 2,
+    "page_sizes": [
+      16,
+      32
+    ],
+    "provider_abi": 1,
+    "provider_name": "sm86",
+    "provider_version": "1",
+    "qualification_status": "performance_qualified",
+    "requires_full_kv_workspace": false,
+    "requires_full_score_matrix": false,
+    "supports_cuda_graph": false,
+    "supports_decode": true,
+    "supports_gqa": true,
+    "supports_mha": true,
+    "supports_mqa": true,
+    "supports_partial_tail": true,
+    "supports_prefill": true,
+    "supports_ragged_batch": true
+  },
+  "evidence": {
+    "automated_tests": {
+      "duration_seconds": 23.26021993206814,
+      "errors": 0,
+      "expected_failures": 0,
+      "failures": 0,
+      "passed": true,
+      "pattern": "test_*.py",
+      "schema_version": 1,
+      "skipped": 0,
+      "start_dir": "tests",
+      "tests_run": 146,
+      "unexpected_successes": 0
+    },
+    "bundle_load_path_present": true,
+    "physical_hardware": {
+      "architecture": "sm86",
+      "cuda": "12.1",
+      "device": "NVIDIA GeForce RTX 3080 Ti",
+      "torch": "2.4.1+cu121",
+      "total_memory_bytes": 12528123904
+    }
+  },
+  "provider": "sm86",
+  "schema_version": 1,
+  "status": "performance_qualified"
+}

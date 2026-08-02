@@ -3,17 +3,11 @@
 from dataclasses import asdict, dataclass
 from typing import Optional, Tuple
 
-
-QUALIFICATION_STATUSES = (
-    "unknown",
-    "declared",
-    "compiled",
-    "smoke_passed",
-    "qualified",
-    "production",
-    "unsupported",
-    "disabled",
+from ..qualification_status import (
+    QUALIFICATION_STATUSES,
+    qualification_status,
 )
+
 
 
 @dataclass(frozen=True)
@@ -43,12 +37,11 @@ class ProviderCapability:
     def __post_init__(self):
         if not self.provider_name or not self.backend_name:
             raise ValueError("provider_name and backend_name must be non-empty")
-        if self.qualification_status not in QUALIFICATION_STATUSES:
-            raise ValueError(
-                "invalid qualification status {}".format(
-                    self.qualification_status
-                )
-            )
+        object.__setattr__(
+            self,
+            "qualification_status",
+            qualification_status(self.qualification_status),
+        )
         if self.provider_abi < 0:
             raise ValueError("provider_abi must be non-negative")
         if self.min_m < 1 or any(
@@ -100,6 +93,9 @@ class CompatibilityDecision:
     reasons: Tuple[str, ...]
     warnings: Tuple[str, ...]
     explicit_fallback_available: bool
+
+    def __post_init__(self):
+        object.__setattr__(self, "status", qualification_status(self.status))
 
     def as_dict(self):
         value = asdict(self)

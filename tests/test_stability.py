@@ -4,13 +4,13 @@ import unittest
 import torch
 
 from layer_streaming import (
-    KVCacheManager,
     ResourceSnapshot,
     StabilityReport,
     StabilityThresholds,
     analyze_stability,
     capture_resource_snapshot,
 )
+from layer_streaming.experimental import KVCacheManager
 
 
 def snapshot(index, latency, *, allocated=100, reserved=200, pinned=300):

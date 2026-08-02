@@ -24,7 +24,7 @@ def main():
         "schema_version": 1,
         "hardware": hardware.as_dict(),
         "runtime": runtime.as_dict(),
-        "qualification_status": "unqualified",
+        "qualification_status": "declared",
         "automatic_promotion": False,
         "levels": {
             "level_1_environment": "observed",

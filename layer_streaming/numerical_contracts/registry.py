@@ -4,6 +4,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Optional
 
+from ..qualification_status import qualification_status
+
 
 @dataclass(frozen=True)
 class NumericalContractKey:
@@ -25,6 +27,13 @@ class NumericalContractRecord:
     key: NumericalContractKey
     contract_path: str
     qualification_status: str
+
+    def __post_init__(self):
+        object.__setattr__(
+            self,
+            "qualification_status",
+            qualification_status(self.qualification_status),
+        )
 
 
 class NumericalContractRegistry:
@@ -81,7 +90,7 @@ def default_numerical_contract_registry(root=None):
                     physical_layout="row_major",
                 ),
                 contract_path=str(contract),
-                qualification_status="qualified",
+                qualification_status="numerically_qualified",
             )
         )
     return registry

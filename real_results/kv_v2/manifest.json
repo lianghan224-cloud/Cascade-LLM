@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "qualification_status": "performance_qualified",
+  "production_passed": false,
+  "inputs": [
+    {
+      "path": "tests/fixtures/kv_numerical_sm86_bf16_abi1_v2.json",
+      "sha256": "0bebf95a22c985ec94797ff84b421c6053f77b21bc817b1ebceea807e38f575b"
+    },
+    {
+      "path": "real_results/kv_v2/artifacts/hardware_provider_v2_sm86.json",
+      "sha256": "ab22133a8a4e54f7a3041aa9aa66cc429223037a3f826e8969b0694e1a6b01c6"
+    },
+    {
+      "path": "real_results/kv_v1/real8b_sm86_multipage.json",
+      "sha256": "1c971a3b49382dd71dcc660395e3bd429899cc15d81454c44b9a6618da003937"
+    },
+    {
+      "path": "real_results/kv_v1/real8b_numerical_attribution.json",
+      "sha256": "15025fe94c6dccea85fde04362a4dcdc2ca320bfb2434bb9954c493ef5aa6281"
+    },
+    {
+      "path": "real_results/kv_v1/real8b_sm86_1000_token_hf_replay.json",
+      "sha256": "227834e52ba93831a9edac4af3e2a043d4c18849013d8cbc70af38ec1ce8fc3f"
+    },
+    {
+      "path": "real_results/kv_v1/real8b_sm86_1000_token_soak.json",
+      "sha256": "442776ffb931372c7d123c21a608f2438ba60768c7b96d19aee429fc7ef226a3"
+    },
+    {
+      "path": "real_results/kv_v1/lifecycle_fork_cow_prefix_1000.json",
+      "sha256": "1fe2b4311cb803b9e32745720e154d2b2854981cc6e1c24345cf1993cb887cf8"
+    },
+    {
+      "path": "real_results/kv_v2/test_summary.json",
+      "sha256": "b323da19535b25018593e7d043890e2ecc0bf8edcca3c60b0b3a814c470eb38e"
+    },
+    {
+      "path": "real_results/kv_v1/production_matrix_short_medium.json",
+      "sha256": "f5c69e1cfb30696f8b1e6b19816ab0494521748e2882703802e2f6d64ab84510"
+    },
+    {
+      "path": "real_results/kv_v1/production_matrix_long.json",
+      "sha256": "f6a7cba39b5625cc38750a9480f9551165e5d0cb0de9ec95ce802a18e254e812"
+    }
+  ],
+  "summaries": {
+    "compatibility": "kv_compatibility_summary.json",
+    "numerical": "kv_numerical_summary.json",
+    "performance": "kv_performance_summary.json",
+    "ownership": "kv_ownership_summary.json",
+    "qualification": "kv_qualification_summary.json"
+  },
+  "compatibility_matrix": "compatibility_matrix.json"
+}

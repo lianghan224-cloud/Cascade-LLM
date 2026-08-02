@@ -4,11 +4,11 @@
 
 | 架构 | 基础 Torch 路径 | CUTLASS W8A16 | 当前结论 |
 | --- | --- | --- | --- |
-| SM75 | compiled，未完成本项目硬件资格验证；BF16 不可用 | unsupported | unqualified |
-| SM80 | compiled，未完成 A100 真实资格验证 | declared，未编译 | unqualified |
-| SM86 | compiled；RTX 3080 Ti 已完成现有回归 | qualified，ABI 2，RTX 3080 Ti | qualified（仅已测组合） |
-| SM89 | compiled，未完成真实资格验证 | declared，未编译 | unqualified |
-| SM90 | compiled，未完成真实资格验证 | declared，未编译 | unqualified |
+| SM75 | compiled，未完成本项目硬件资格验证；BF16 不可用 | unsupported | unsupported |
+| SM80 | compiled，未完成 A100 真实资格验证 | declared，未编译 | declared |
+| SM86 | compiled；RTX 3080 Ti 已完成现有回归 | performance_qualified，ABI 2 | performance_qualified（非 production） |
+| SM89 | compiled，未完成真实资格验证 | declared，未编译 | declared |
+| SM90 | compiled，未完成真实资格验证 | declared，未编译 | declared |
 | unknown | 不选择 | 不选择 | unsupported |
 
 `compiled` 的 Torch 路径表示代码随当前 PyTorch 构建存在，不代表所有列出的 GPU 已完成 Cascade-LLM 资格验证。

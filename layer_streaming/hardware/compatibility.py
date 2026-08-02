@@ -3,7 +3,11 @@
 from .capability import CompatibilityDecision
 
 
-_QUALIFIED = {"qualified", "production"}
+_QUALIFIED = {
+    "numerically_qualified",
+    "performance_qualified",
+    "production",
+}
 
 
 class CompatibilityResolver:
@@ -47,7 +51,7 @@ class CompatibilityResolver:
         capability = matching_arch[0]
         reasons = []
         warnings = []
-        if capability.qualification_status in {"unsupported", "disabled"}:
+        if capability.qualification_status == "unsupported":
             reasons.append(
                 "provider status is {}".format(capability.qualification_status)
             )
@@ -136,16 +140,12 @@ class CompatibilityResolver:
                 )
         if capability.qualification_status not in _QUALIFIED:
             warnings.append(
-                "provider qualification status is {}; result is unqualified".format(
+                "provider status is {}; production qualification has not passed".format(
                     capability.qualification_status
                 )
             )
         supported = not reasons
-        status = (
-            capability.qualification_status
-            if supported and capability.qualification_status in _QUALIFIED
-            else ("unqualified" if supported else "unsupported")
-        )
+        status = capability.qualification_status if supported else "unsupported"
         return CompatibilityDecision(
             supported=supported,
             provider_name=capability.provider_name,

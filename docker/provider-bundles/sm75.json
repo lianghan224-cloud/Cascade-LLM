@@ -6,7 +6,7 @@
     {
       "provider": "fp16/fallback only",
       "architecture": "sm75",
-      "qualification": "unqualified"
+      "qualification": "unsupported"
     }
   ]
 }

@@ -19,7 +19,7 @@
   "requires_preprocessed_layout": false,
   "physical_layout_names": ["row_major"],
   "workspace_policy": "none",
-  "qualification_status": "qualified",
+  "qualification_status": "performance_qualified",
   "backend_name": "fused_w8a16",
   "explicit_fallback": false,
   "requires_extension": true

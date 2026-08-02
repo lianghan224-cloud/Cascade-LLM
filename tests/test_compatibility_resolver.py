@@ -44,14 +44,14 @@ class CompatibilityResolverTest(unittest.TestCase):
         self.registry = default_provider_registry()
         self.resolver = CompatibilityResolver(self.registry)
 
-    def test_only_qualified_loaded_sm86_fused_is_supported(self):
+    def test_only_performance_qualified_loaded_sm86_fused_is_supported(self):
         decision = self.resolver.resolve(
             fake_hardware_profile("sm86"),
             runtime("sm86", loaded=True, abi=(2,)),
             request(),
         )
         self.assertTrue(decision.supported)
-        self.assertEqual(decision.status, "qualified")
+        self.assertEqual(decision.status, "performance_qualified")
         self.assertEqual(decision.provider_name, "cutlass_w8a16_sm86_abi2")
 
     def test_future_architectures_are_declared_but_unavailable(self):
@@ -99,7 +99,7 @@ class CompatibilityResolverTest(unittest.TestCase):
         self.assertIn("K=4097", rendered)
         self.assertIn("physical layout", rendered)
 
-    def test_fallback_must_be_requested_and_is_unqualified(self):
+    def test_fallback_must_be_requested_and_is_compiled(self):
         fallback = request(
             backend="int8_dequant_bf16_fallback",
             n=4097,
@@ -109,7 +109,7 @@ class CompatibilityResolverTest(unittest.TestCase):
             fake_hardware_profile("sm89"), runtime("sm89"), fallback
         )
         self.assertTrue(decision.supported)
-        self.assertEqual(decision.status, "unqualified")
+        self.assertEqual(decision.status, "compiled")
         fused = self.resolver.resolve(
             fake_hardware_profile("sm89"), runtime("sm89"), request()
         )

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export declared/compiled/qualified status without claiming compatibility."""
+"""Export unified provider status without claiming untested compatibility."""
 
 import argparse
 import json
@@ -22,7 +22,7 @@ def main():
     architectures = ("sm75", "sm80", "sm86", "sm89", "sm90")
     payload = {
         "schema_version": 1,
-        "warning": "declared or compiled does not mean qualified compatibility",
+        "warning": "declared or compiled is not numerical/performance qualification",
         "architectures": {
             architecture: [
                 {

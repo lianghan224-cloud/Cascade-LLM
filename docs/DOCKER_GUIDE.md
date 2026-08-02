@@ -47,7 +47,7 @@ docker compose --env-file docker/versions.env run --rm cascade doctor
 ## 镜像类型
 
 - `generic`：BF16/FP16 和显式 INT8/INT4 fallback，不安装 fused Provider。
-- `qualified`：只安装 `qualified/production` Bundle 项；当前只有 SM86 W8A16 ABI 2。
+- `qualified`：Bundle 名称保持兼容，只安装 `performance_qualified/production` 项；当前只有 SM86 W8A16 ABI 2。
 - `sm86`：当前与 qualified Provider 集合相同，但标签明确架构。
 - `devel`：包含 nvcc、编译器、测试和 Provider 开发环境。
 

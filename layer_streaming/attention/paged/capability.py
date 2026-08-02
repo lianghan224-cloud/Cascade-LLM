@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from ...qualification_status import qualification_status
+
 
 @dataclass(frozen=True)
 class PagedAttentionCapability:
@@ -24,6 +26,17 @@ class PagedAttentionCapability:
     requires_full_kv_workspace: bool
     requires_full_score_matrix: bool
     qualification_status: str
+
+    def __post_init__(self):
+        object.__setattr__(
+            self,
+            "qualification_status",
+            qualification_status(self.qualification_status),
+        )
+        if int(self.provider_abi) <= 0:
+            raise ValueError("provider_abi must be positive")
+        if int(self.numerical_contract_version) <= 0:
+            raise ValueError("numerical_contract_version must be positive")
 
     def unsupported_reason(self, request, architecture=None, phase=None):
         if architecture is not None and architecture not in self.architectures:

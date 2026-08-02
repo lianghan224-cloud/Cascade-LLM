@@ -365,7 +365,7 @@ class MixedDtypeRuntime:
         }
 
     def configure_backend_phase_plan(self, phase_plan):
-        """Install an already-qualified prefill/decode dispatch sidecar.
+        """Install an explicitly validated prefill/decode dispatch sidecar.
 
         This additive method deliberately leaves the frozen constructor and
         ExecutionPlan schema unchanged.

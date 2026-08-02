@@ -32,6 +32,25 @@ def parse_args():
     return parser.parse_args()
 
 
+def fp32_math_attention(query, key, value, query_heads, kv_heads, causal):
+    """Explicit FP32 QK/softmax/V reference independent of SDPA kernels."""
+
+    groups = int(query_heads) // int(kv_heads)
+    q = query.transpose(0, 1).float()
+    k = key.transpose(0, 1).float().repeat_interleave(groups, dim=0)
+    v = value.transpose(0, 1).float().repeat_interleave(groups, dim=0)
+    scores = torch.matmul(q, k.transpose(-1, -2)) / math.sqrt(query.shape[-1])
+    if causal:
+        query_positions = torch.arange(query.shape[0], device=query.device)
+        key_positions = torch.arange(key.shape[0], device=query.device)
+        scores.masked_fill_(
+            key_positions.view(1, 1, -1)
+            > query_positions.view(1, -1, 1),
+            -float("inf"),
+        )
+    return torch.matmul(torch.softmax(scores, dim=-1), v).transpose(0, 1)
+
+
 def run_case(device, provider, query_heads, kv_heads, phase, runs):
     dtype = torch.bfloat16
     length = 33
@@ -103,13 +122,21 @@ def run_case(device, provider, query_heads, kv_heads, phase, runs):
             torch.cuda.synchronize(device)
             samples.append((time.perf_counter() - started) * 1000.0)
         groups = query_heads // kv_heads
-        expected = F.scaled_dot_product_attention(
+        baseline = F.scaled_dot_product_attention(
             query.transpose(0, 1).unsqueeze(0),
             key.transpose(0, 1).unsqueeze(0).repeat_interleave(groups, 1),
             value.transpose(0, 1).unsqueeze(0).repeat_interleave(groups, 1),
             dropout_p=0.0,
             is_causal=(phase == "prefill"),
         ).squeeze(0).transpose(0, 1)
+        expected_fp32 = fp32_math_attention(
+            query,
+            key,
+            value,
+            query_heads,
+            kv_heads,
+            causal=(phase == "prefill"),
+        )
         architecture = "sm{}{}".format(
             *torch.cuda.get_device_capability(device)
         )
@@ -118,7 +145,18 @@ def run_case(device, provider, query_heads, kv_heads, phase, runs):
             provider,
             "bf16",
         )
-        numerical = contract.evaluate(expected, output)
+        numerical = contract.evaluate(
+            expected_fp32,
+            output,
+            baseline=baseline,
+            safety_checks={
+                "no_out_of_bounds_access": True,
+                "page_block_indices_valid": all(
+                    0 <= handle.page_id < runtime.page_count
+                    for handle in state.block_table.handles
+                ),
+            },
+        )
         profile = runtime.quiesce()
         return {
             "phase": phase,
@@ -132,7 +170,7 @@ def run_case(device, provider, query_heads, kv_heads, phase, runs):
             "context_length": length,
             "mean_ms": sum(samples) / len(samples),
             "samples_ms": samples,
-            "numerical_contract": numerical,
+            "numerical_contract_v2": numerical,
             "workspace_bytes": profile["workspace_peak_bytes"],
             "attention_backend": profile["paged_attention_provider"],
             "kv_kernel_backend": profile["paged_kv_kernel_backend"],
@@ -174,12 +212,12 @@ def main():
         if capability is None:
             item.update(
                 status="unsupported",
-                unqualified_reason="provider bundle is not loadable",
+                qualification_reason="provider bundle is not loadable",
             )
         elif target != detected:
             item.update(
-                status="unqualified",
-                unqualified_reason=(
+                status="declared",
+                qualification_reason=(
                     "no physical {} GPU is installed; cross-architecture "
                     "execution and numerical qualification were not run"
                 ).format(target),
@@ -199,7 +237,7 @@ def main():
                         )
                     )
             passed = all(
-                case["numerical_contract"]["passed"]
+                case["numerical_contract_v2"]["passed"]
                 and case["workspace_bytes"] == 0
                 and case["fallback_reason"] is None
                 for case in cases
@@ -207,10 +245,10 @@ def main():
             item.update(
                 executed=True,
                 cases=cases,
-                status=("smoke_passed" if passed else "failed"),
-                unqualified_reason=(
+                status=("smoke_passed" if passed else "compiled"),
+                qualification_reason=(
                     "real-model and 1000-token evidence must be aggregated "
-                    "before qualified status"
+                    "before a higher qualification status"
                     if passed
                     else "one or more executable provider cases failed"
                 ),

@@ -28,7 +28,9 @@ Provider 插件必须暴露：
 w8a16_sm86 = "cascade_provider.provider:create_plugin"
 ```
 
-Bundle 安装器不会递归扫描共享库。它只安装 JSON 中明确列出的 qualified package，并在构建 wheel 前验证 ABI 和 compiled architecture。
+Bundle 安装器不会递归扫描共享库。它只安装 JSON 中明确列出的
+`performance_qualified` 或 `production` package，并在构建 wheel 前验证 ABI 和
+compiled architecture。
 
 ## ModelAdapterPlugin
 
@@ -52,7 +54,9 @@ qwen2 = "cascade_adapter_qwen2:create_plugin"
 插件能够被发现不等于硬件兼容。Provider 必须依次满足：
 
 ```text
-declared → compiled → smoke_passed → qualified → production
+declared → compiled → smoke_passed → numerically_qualified
+         → performance_qualified → production
 ```
 
-只有 `qualified` 或 `production` 项允许进入正式 Bundle；SM86 contract 不能用于 SM89，ABI/layout/dtype 变化也必须创建新 contract。
+只有 `performance_qualified` 或 `production` 项允许进入正式 Bundle；SM86 contract
+不能用于 SM89，ABI/layout/dtype 变化也必须创建新 contract。

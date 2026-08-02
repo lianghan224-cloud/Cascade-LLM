@@ -34,6 +34,7 @@ version = {attr = "layer_streaming.version.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["layer_streaming*", "tools*"]
+exclude = ["layer_streaming.experimental*"]
 
 [tool.setuptools.package-data]
 layer_streaming = ["py.typed"]

@@ -48,3 +48,11 @@ real_results/8b_w8a16/golden_v1/english_france.json
 # Locally compiled optional CUDA providers. Keep validated metadata reviewable.
 layer_streaming/providers/*/_build/*
 !layer_streaming/providers/*/_build/*.metadata.json
+# Qualification payloads are CI/release artifacts. Keep only summaries and
+# content manifests in Git.
+real_results/**/*.json
+real_results/**/artifacts/
+!real_results/manifest.json
+!real_results/**/manifest.json
+!real_results/**/*summary.json
+!real_results/**/compatibility_matrix.json

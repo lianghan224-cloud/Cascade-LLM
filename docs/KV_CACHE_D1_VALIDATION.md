@@ -29,7 +29,7 @@ real_results/kv_d1/real8b_golden_multipage_online_failure.json
 复现命令：
 
 ```bash
-.venv/bin/python tools/ablate_kv_cache.py \
+.venv/bin/python benchmarks/ablate_legacy_kv_cache.py \
   --device cuda:0 \
   --contexts 16,32,128,512 \
   --page-sizes 16,32 \
@@ -221,4 +221,5 @@ Prefix 命中粒度和后续 Quest 索引开销。
 
 在 P0 的 fused dense backend、online 数值合同和真实 8B LM Head Golden 关闭前，
 不应把 D1 标记为
-`qualified`，也不应提前将 sparse 或 NVMe 路径设为默认。
+`numerically_qualified`，也不应提前将 sparse 或 NVMe 路径设为默认。该历史
+D1 结论已由 KV Numerical Contract V2 和 KV Framework V1 RC 资格报告取代。

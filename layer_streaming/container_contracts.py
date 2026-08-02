@@ -48,9 +48,9 @@ class BundleProvider:
     def __post_init__(self):
         if not self.package:
             raise ValueError("provider package must be non-empty")
-        if self.qualification not in {"qualified", "production"}:
+        if self.qualification not in {"performance_qualified", "production"}:
             raise ValueError(
-                "installable providers must be qualified or production"
+                "installable providers must be performance_qualified or production"
             )
         if self.architecture not in {"sm75", "sm80", "sm86", "sm89", "sm90"}:
             raise ValueError("unsupported provider architecture")

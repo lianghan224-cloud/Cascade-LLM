@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "passed": true,
+  "tests_run": 146,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "expected_failures": 0,
+  "unexpected_successes": 0,
+  "duration_seconds": 23.26021993206814,
+  "start_dir": "tests",
+  "pattern": "test_*.py"
+}

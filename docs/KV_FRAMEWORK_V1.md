@@ -1,8 +1,8 @@
 # Cascade-LLM KV Framework V1
 
 KV Framework V1 将页面、请求、Batch、Store、Selection、Reuse、Paged
-Attention Backend、Paged KV Kernel Backend 和 Provider Bundle 的边界冻结为版本化合同。它取代 D0/D1 中以
-`layer_streaming/kv_cache.py` 为主的旧 reference 架构；旧模块只保留兼容和消融。
+Attention Backend、Paged KV Kernel Backend 和 Provider Bundle 的边界冻结为版本化合同。它取代 D0/D1 中的旧 reference 架构；旧模块只在
+`layer_streaming/experimental/` 中供显式消融，默认 runtime 不导入。
 
 ## 1. 当前可执行范围
 
@@ -128,10 +128,10 @@ Quest 将来可以返回非连续历史页而不修改 Batch/Backend ABI。当�
 
 | Provider | 真实硬件状态 | 实现 |
 |---|---|---|
-| `sm80` | `unqualified` | 独立 capability/加载路径，复用 Generic kernel |
-| `sm86` | `smoke_passed` | head_dim 128 专用 128-thread reduction |
-| `sm89` | `unqualified` | 独立 capability/加载路径，复用 Generic kernel |
-| `sm90` | `unqualified` | 独立 capability/加载路径，复用 Generic kernel |
+| `sm80` | `declared` | 独立 capability/加载路径，复用 Generic kernel；无真机证据 |
+| `sm86` | `performance_qualified` | head_dim 128 专用 128-thread reduction；非 production |
+| `sm89` | `declared` | 独立 capability/加载路径，复用 Generic kernel；无真机证据 |
+| `sm90` | `declared` | 独立 capability/加载路径，复用 Generic kernel；无真机证据 |
 
 `sm80/sm89/sm90` 不能描述为已兼容；它们必须在对应真实硬件上完成模型、长稳和性能
 资格验证后才能提升状态。
@@ -202,8 +202,9 @@ Split Attention → Attention Backend
 4. Prefix Index 尚无容量上限、LRU、tenant API 和 partial-block reuse。
 5. CUDA Graph 未实现；Batch metadata 当前会在 host 构造并有少量同步点。
 6. SM86 已完成 RTX 3080 Ti kernel smoke、性能矩阵和真实 8B 1000-token 长稳，但严格
-   HF-SDPA 阶段 Golden 仍失败，因此状态仍不是 `qualified`。
-7. SM80/SM89/SM90 没有真实硬件结果，必须保持 `unqualified`。
+   Numerical Contract V2 的 L0–L3 与性能通过，但 L4 未运行、L5 ownership
+   reserved drift 非零，因此状态为 `performance_qualified` 而非 `production`。
+7. SM80/SM89/SM90 没有真实硬件结果，必须保持 `declared`。
 8. Quantized KV、CPU/NVMe Store 和 sparse selection 都是明确的 unsupported 接口。
 
 验证数据和未通过项见 `docs/KV_FRAMEWORK_V1_VALIDATION.md`。

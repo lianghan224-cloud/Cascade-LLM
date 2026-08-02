@@ -6,9 +6,13 @@ Cascade-LLM 根据 Compute Capability、运行时环境、Provider 能力和数�
 
 ## 状态语义
 
-Provider 使用 `unknown`、`declared`、`compiled`、`smoke_passed`、`qualified`、`production`、`unsupported`、`disabled`。其中只有 `qualified` 和 `production` 表示通过真实模型资格验证。
+Provider 和报告统一使用 `declared`、`compiled`、`smoke_passed`、
+`numerically_qualified`、`performance_qualified`、`production`、
+`experimental`、`unsupported`。旧的 `unknown/unqualified/qualified/disabled`
+不再是合法状态。
 
-报告级 `unqualified` 不是 Provider 生命周期状态，而表示“请求可能可以执行，但没有达到 qualified”。例如 PyTorch fallback 已存在于当前构建中，但在一块新 GPU 上仍需完成硬件资格验证。
+只有 `production` 表示 L0–L5 与长期性能门禁全部通过；
+`numerically_qualified` 和 `performance_qualified` 必须按其字面范围解释。
 
 ## 启动检查
 

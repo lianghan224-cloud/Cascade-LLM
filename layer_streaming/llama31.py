@@ -6,8 +6,8 @@ import math
 import torch
 import torch.nn.functional as F
 
-from .kv_cache import SimpleKVCache
-from .kv.runtime import PagedKVRuntime, RequestKVCacheV1
+from .kv.api import RequestKVCacheV1
+from .kv.runtime import PagedKVRuntime
 from .providers.generic_cuda import deterministic_lm_head
 
 

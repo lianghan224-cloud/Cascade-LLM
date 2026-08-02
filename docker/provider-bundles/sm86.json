@@ -12,7 +12,7 @@
       "contract_target": "numerical_contracts/sm86_w8a16_abi2.json",
       "provider_abi": 2,
       "architecture": "sm86",
-      "qualification": "qualified"
+      "qualification": "performance_qualified"
     }
   ],
   "declarations": []

@@ -4,7 +4,7 @@ from unittest import mock
 import torch
 import torch.nn.functional as F
 
-from layer_streaming import (
+from layer_streaming.experimental import (
     DensePagedOnlineAttention,
     KVCacheCapacityError,
     KVCacheError,

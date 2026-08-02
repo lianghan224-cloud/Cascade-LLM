@@ -1,0 +1,17 @@
+{
+  "architecture": "sm86",
+  "checks": {
+    "all_pages_released_after_close": true,
+    "cuda_allocated_returned": true,
+    "cuda_reserved_bounded": true,
+    "ownership_graph_exact_every_sample": true,
+    "quiescent_pin_count_zero": true,
+    "thread_count_stable": true
+  },
+  "evidence": {
+    "cycles": 1000
+  },
+  "provider": "sm86",
+  "schema_version": 1,
+  "status": "performance_qualified"
+}

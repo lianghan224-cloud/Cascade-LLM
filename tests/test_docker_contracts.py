@@ -61,7 +61,7 @@ class DockerContractsTest(unittest.TestCase):
         provider = bundles["sm86"].providers[0]
         self.assertEqual(provider.architecture, "sm86")
         self.assertEqual(provider.provider_abi, 2)
-        self.assertEqual(provider.qualification, "qualified")
+        self.assertEqual(provider.qualification, "performance_qualified")
         for architecture in ("sm75", "sm80", "sm89", "sm90"):
             self.assertFalse(bundles[architecture].providers)
 

@@ -126,8 +126,8 @@ def run_case(args, provider, context_length, page_size, phase, tensors):
             "workspace_peak_bytes": profile["workspace_peak_bytes"],
             "kv_pool_bytes": profile["store_bytes"],
             "gpu_peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
-            "requires_full_kv_workspace": runtime.provider.capability().requires_full_kv_workspace,
-            "qualification_status": runtime.provider.capability().qualification_status,
+            "requires_full_kv_workspace": runtime.attention_backend.capability().requires_full_kv_workspace,
+            "qualification_status": runtime.attention_backend.capability().qualification_status,
             "attention_backend": runtime.attention_backend.name,
             "kv_kernel_backend": runtime.kv_kernel_backend.name,
             "provider_bundle": runtime.provider_bundle.name,
@@ -223,10 +223,12 @@ def main():
                         contract = default_paged_numerical_contract(
                             architecture, item["provider"], args.dtype
                         )
-                        item["numerical_contract"] = contract.evaluate(
-                            reference_output, output
+                        item["pairwise_numerical_diagnostic"] = (
+                            contract.diagnose_pairwise(reference_output, output)
                         )
-                        item["numerical_contract"]["contract"] = contract.as_dict()
+                        item["pairwise_numerical_diagnostic"]["contract"] = (
+                            contract.as_dict()
+                        )
                     if reference_p50 is not None and item["supported"]:
                         item["speedup_vs_reference"] = (
                             reference_p50 / item["p50_ms"]
@@ -257,10 +259,11 @@ def main():
         },
         "results": results,
         "acceptance": {
-            "production_numerics_pass": (None if not has_reference else bool(production) and all(
-                item.get("numerical_contract", {}).get("passed", False)
-                for item in production
-            )),
+            "production_numerics_pass": None,
+            "production_numerics_reason": (
+                "Numerical Contract V2 requires FP32 math and native-precision "
+                "baselines; benchmark pairwise metrics are diagnostic only"
+            ),
             "production_has_zero_full_kv_workspace": bool(production) and all(
                 item["workspace_peak_bytes"] == 0
                 and not item["requires_full_kv_workspace"]

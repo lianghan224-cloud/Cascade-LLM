@@ -96,6 +96,12 @@ def snapshot(index, token, latency, kv_runtime, state):
     }
 
 
+def percentile(values, fraction):
+    ordered = sorted(float(item) for item in values)
+    index = min(len(ordered) - 1, int(round((len(ordered) - 1) * fraction)))
+    return ordered[index]
+
+
 def main():
     args = parse_args()
     for name in ("decode_tokens", "load_cycles", "allocation_cycles", "sample_every"):
@@ -297,6 +303,8 @@ def main():
         "latency_ms": {
             "mean": statistics.mean(all_latencies),
             "p50": statistics.median(all_latencies),
+            "p95": percentile(all_latencies, 0.95),
+            "p99": percentile(all_latencies, 0.99),
             "max": max(all_latencies),
             "first": all_latencies[0],
             "last": all_latencies[-1],

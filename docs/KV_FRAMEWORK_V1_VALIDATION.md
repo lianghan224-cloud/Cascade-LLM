@@ -237,7 +237,7 @@ real_results/kv_v1/lifecycle_fork_cow_prefix_1000.json
 | LM Head legacy-HF 严格门禁 | 通过 | streamed/resident 均 297/297 |
 | Production Paged 严格 HF 门禁 | **未通过** | 不放宽门限；kernel contract 另行通过 |
 | 真实 8B 1000-token 稳定性 | 通过 | 0 resource drift，HF sampled Top-1 101/101 |
-| SM80/SM89/SM90 真实资格 | **未完成** | `unqualified` |
+| SM80/SM89/SM90 真实资格 | **未完成** | `declared` |
 | INT8/FP8/INT4 KV、Offload、Quest | **未实现** | ABI only |
 | Continuous batching scheduler | **未实现** | Runtime ABI 已支持 Batch |
 

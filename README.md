@@ -23,7 +23,7 @@ KV Cache V2 已完成 D0 与 D1 reference：正交 KV 策略、HND 非连续页�
 - `layer_streaming/weight_store.py`：full-pinned 与 pinned-staging 权重存储。
 - `layer_streaming/runtime.py`：H2D Copy Stream、Compute Stream、Event 和缓冲区生命周期。
 - `layer_streaming/pipeline.py`：常驻 SourceProducer/H2DScheduler、ComputeConsumer 和三条有界队列。
-- `layer_streaming/kv_cache.py`：固定块预分配 KV arena、请求 handle、回收和越界检查。
+- `layer_streaming/kv/`：Paged KV Runtime、请求表、页面所有权与 Prefix Cache；旧消融位于 `layer_streaming/experimental/`。
 - `layer_streaming/memory.py`：RAM、memlock、GPU slots、KV、词表及 logits 的启动预检。
 - `layer_streaming/reporting.py`：稳定的 `run_report.json` schema 和跨 token profile 聚合。
 - `layer_streaming/stability.py`：长时间运行资源快照、趋势阈值和 stability report。

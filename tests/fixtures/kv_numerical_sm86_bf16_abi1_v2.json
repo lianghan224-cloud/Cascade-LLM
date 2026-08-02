@@ -1,0 +1,36 @@
+{
+  "name": "llama31_8b_sm86_bf16_hnd_abi1_v2",
+  "architecture": "sm86",
+  "provider_name": "sm86",
+  "provider_abi": 1,
+  "model_id": "llama31_8b",
+  "kv_dtype": "bf16",
+  "layout": "hnd",
+  "stage_envelopes": {
+    "attention": {"max_abs_error": 0.16, "mean_abs_error_max": 0.005},
+    "residual": {"max_abs_error": 0.60, "mean_abs_error_max": 0.030},
+    "mlp": {"max_abs_error": 0.50, "mean_abs_error_max": 0.025},
+    "final_norm": {"max_abs_error": 1.00, "mean_abs_error_max": 0.060},
+    "logits": {"max_abs_error": 0.70, "mean_abs_error_max": 0.080}
+  },
+  "logits_generation": {
+    "fixed_prompt_top1_required": 1.0,
+    "fixed_prompt_top10_min": 0.90,
+    "teacher_forced_top1_min": 0.999,
+    "teacher_forced_min_positions": 100
+  },
+  "quality": {
+    "perplexity_relative_degradation_max": 0.001,
+    "short_accuracy_drop_pp_max": 0.2,
+    "long_hit_rate_drop_pp_max": 0.2,
+    "dialogue_accuracy_drop_pp_max": 0.2
+  },
+  "stability": {
+    "minimum_generated_tokens": 1000,
+    "last_first_quartile_ratio_max": 1.05,
+    "require_zero_allocator_drift": true,
+    "require_zero_reference_drift": true,
+    "require_zero_workspace_growth": true
+  },
+  "schema_version": 2
+}

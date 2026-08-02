@@ -15,7 +15,7 @@ class HardwareProviderRegistryTest(unittest.TestCase):
         }
         self.assertEqual(
             providers["cutlass_w8a16_sm86_abi2"].qualification_status,
-            "qualified",
+            "performance_qualified",
         )
         for architecture in ("sm80", "sm89", "sm90"):
             self.assertEqual(
