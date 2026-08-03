@@ -4,7 +4,18 @@ Cascade-LLM 是面向单机单卡、单请求优先的 CPU 常驻权重流式推
 
 当前重点是可验证的推理内核，不是通用推理服务器。统一执行计划由任意兼容 Llama `config.json` 和 checkpoint metadata 构建，支持 BF16、FP16、INT8 per-channel/per-group 与 packed INT4 per-group。INT8/INT4 fallback 始终显式命名；此外已提供可选的 SM86 CUTLASS W8A16 provider：per-channel 支持 prefill/decode，per-group 当前仅支持 M=1 decode，其他 fused 格式仍不会被静默模拟。
 
-KV Cache V2 已完成 D0 与 D1 reference：正交 KV 策略、HND 非连续页池、请求页表、Fork/COW/引用计数以及 exact MHA/GQA attention 已接入。默认多页路径会显式整理当前层连续 K/V 后调用 SDPA，以保持正确性基线；另有不生成完整 K/V 临时区的 online reference，但尚未关闭真实 8B 误差传播和性能门槛。Prefix、CPU/NVMe Tier、INT8 KV 和 Quest 均会明确拒绝而不会静默模拟。详见 `docs/KV_CACHE_ARCHITECTURE_V2.md` 和 `docs/KV_CACHE_D1_VALIDATION.md`。
+当前 KV 里程碑为 **KV Stack Beta**：generation-safe PagePool/Ownership、Fork/COW/Prefix/Beam/Speculative/rollback、Quest-flat CPU summary index、Mock GPU/CPU/SSD tiering、prefetch/coordinator 和显式 workload routing 已完成。SM86 CUDA 当前服务 Decode/Short Suffix；Full/Chunked Prefill 会记录原因并进入 `reference_paged_exact` correctness fallback。真实 CPU/NVMe/GDS 活动 KV、Quest 数据集质量和专用高吞吐 Prefill Kernel 尚未完成。权威状态见 `docs/KV_ARCHITECTURE_CONTRACT.md` 与 `docs/KV_REMEDIATION_IMPLEMENTATION_REPORT.md`。
+
+## 迁移与 Codex 交接
+
+迁移到新服务器时不要复制 `.venv`、模型进入 Git 或沿用旧 GPU 编译产物。使用以下入口：
+
+- [`AGENTS.md`](AGENTS.md)：Codex 每次进入仓库自动读取的开发约定；
+- [`docs/CODEX_HANDOFF.md`](docs/CODEX_HANDOFF.md)：项目目标、当前状态、暂停边界和大权重实验路线；
+- [`docs/SERVER_MIGRATION.md`](docs/SERVER_MIGRATION.md)：Git/模型/依赖/Codex 的完整迁移步骤；
+- `scripts/bootstrap_server.sh`：按锁文件创建 Python 3.10 环境；
+- `scripts/verify_server.sh`：目标机 GPU、依赖和测试验收；
+- `tools/capture_environment.py`：生成不包含凭据的机器环境回执。
 
 ## 核心代码
 

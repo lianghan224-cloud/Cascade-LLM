@@ -4,6 +4,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.codex-log/
 build/
 dist/
 *.egg-info/
@@ -56,3 +57,8 @@ real_results/**/artifacts/
 !real_results/**/manifest.json
 !real_results/**/*summary.json
 !real_results/**/compatibility_matrix.json
+
+# Machine-specific migration receipts are generated after cloning. They may
+# contain host paths and GPU UUIDs, so keep them local unless explicitly
+# redacted and promoted into a reviewed summary.
+reports/migration/

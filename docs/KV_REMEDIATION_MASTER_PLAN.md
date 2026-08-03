@@ -1,6 +1,6 @@
 # Cascade-LLM KV 子系统一次性整改总计划
 
-> 本文件是本轮 KV 整改的**唯一总规范和唯一任务入口**。  
+> 本文件是本轮 KV 整改的**唯一总规范和唯一任务入口**。
 > 其他配套文件只是本文件的执行摘录，不增加任何隐藏要求。若内容冲突，以本文件为准。
 
 ## 0. 本轮执行结论
@@ -915,7 +915,7 @@ reports/kv_validation.json
 
 ### Logic Gate
 
-`--profile logic` 至少必须覆盖 V02～V59 中所有不要求 CUDA 的项目，并全部 PASS。  
+`--profile logic` 至少必须覆盖 V02～V59 中所有不要求 CUDA 的项目，并全部 PASS。
 任何功能未实现都必须 FAIL，不能 SKIP。
 
 ### Production Gate
