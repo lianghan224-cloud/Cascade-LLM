@@ -87,6 +87,17 @@ class KVExecutionCoordinator:
             for state, transaction in zip(requests, pending):
                 transaction.completed_layers.add(layer)
                 state.layer_lengths[layer] = transaction.end
+                if hasattr(runtime.selection, "build_request_layer"):
+                    runtime.selection.build_request_layer(
+                        runtime,
+                        state,
+                        layer,
+                        version=state.version + 1,
+                        changed_blocks=range(
+                            transaction.start // runtime.page_size,
+                            (transaction.end - 1) // runtime.page_size + 1,
+                        ),
+                    )
             runtime._metrics.append_calls += 1
             runtime._metrics.append_tokens += total_tokens
         except BaseException:

@@ -1,0 +1,3003 @@
+{
+  "cases": [
+    {
+      "artifacts": [
+        "reports/kv_remediation/preflight_git_status.txt",
+        "reports/kv_remediation/preflight_worktree.patch",
+        "reports/kv_remediation/preflight_index.patch",
+        "reports/kv_remediation/preflight_untracked_files.txt",
+        "reports/kv_remediation/preflight_head.txt"
+      ],
+      "case_id": "V00",
+      "duration": 0.0,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "missing": [],
+        "snapshots": [
+          "preflight_git_status.txt",
+          "preflight_worktree.patch",
+          "preflight_index.patch",
+          "preflight_untracked_files.txt",
+          "preflight_head.txt"
+        ]
+      },
+      "name": "pre-modification snapshot",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [
+        "reports/kv_remediation/baseline_pytest.txt",
+        "reports/kv_remediation/baseline_unittest.txt",
+        "reports/kv_remediation/baseline.md",
+        "reports/kv_remediation/baseline.json"
+      ],
+      "case_id": "V01",
+      "duration": 0.0,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "present": [
+          "baseline_pytest.txt",
+          "baseline_unittest.txt",
+          "baseline.md",
+          "baseline.json"
+        ]
+      },
+      "name": "existing weight-free baseline",
+      "profile": "full",
+      "reason": "baseline records include pre-existing failures; V01 requires recording, not a clean baseline",
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V02",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "allocate/release closure",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V03",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "non-negative ref_count",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V04",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "non-negative pin_count",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V05",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "double release/unpin rejection",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V06",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "generation and ABA rejection",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V07",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "bounded quiescence",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V08",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "request cancellation cleanup",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V09",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "simulated OOM recovery",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V10",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "simulated kernel failure recovery",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V11",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "IO submit failure rollback",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V12",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "IO completion failure rollback",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V13",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "concurrent allocate/fork/free",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V14",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "100k randomized lifecycle operations",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V15",
+      "duration": 0.022293823438563516,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "concurrent_cycles": 2000,
+        "free_pages": 8,
+        "minimized_repro": [
+          "unpin"
+        ],
+        "random_operations": 100002,
+        "seed": 20260803
+      },
+      "name": "minimal reproduction reduction",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V16",
+      "duration": 0.0029190669090233064,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cow_isolated": true,
+        "partial_commit_length": 23,
+        "prefix_evicted_pages": 2,
+        "rollback_length": 3,
+        "seed": 20260803
+      },
+      "name": "Fork sharing",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V17",
+      "duration": 0.0029190669090233064,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cow_isolated": true,
+        "partial_commit_length": 23,
+        "prefix_evicted_pages": 2,
+        "rollback_length": 3,
+        "seed": 20260803
+      },
+      "name": "COW isolation",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V18",
+      "duration": 0.0029190669090233064,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cow_isolated": true,
+        "partial_commit_length": 23,
+        "prefix_evicted_pages": 2,
+        "rollback_length": 3,
+        "seed": 20260803
+      },
+      "name": "Prefix ownership",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V19",
+      "duration": 0.0029190669090233064,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cow_isolated": true,
+        "partial_commit_length": 23,
+        "prefix_evicted_pages": 2,
+        "rollback_length": 3,
+        "seed": 20260803
+      },
+      "name": "Prefix eviction with active owner",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V20",
+      "duration": 0.0029190669090233064,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cow_isolated": true,
+        "partial_commit_length": 23,
+        "prefix_evicted_pages": 2,
+        "rollback_length": 3,
+        "seed": 20260803
+      },
+      "name": "Beam fork",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V21",
+      "duration": 0.0029190669090233064,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cow_isolated": true,
+        "partial_commit_length": 23,
+        "prefix_evicted_pages": 2,
+        "rollback_length": 3,
+        "seed": 20260803
+      },
+      "name": "Beam branch exit",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V22",
+      "duration": 0.0029190669090233064,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cow_isolated": true,
+        "partial_commit_length": 23,
+        "prefix_evicted_pages": 2,
+        "rollback_length": 3,
+        "seed": 20260803
+      },
+      "name": "Speculative commit",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V23",
+      "duration": 0.0029190669090233064,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cow_isolated": true,
+        "partial_commit_length": 23,
+        "prefix_evicted_pages": 2,
+        "rollback_length": 3,
+        "seed": 20260803
+      },
+      "name": "Speculative partial commit",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V24",
+      "duration": 0.0029190669090233064,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cow_isolated": true,
+        "partial_commit_length": 23,
+        "prefix_evicted_pages": 2,
+        "rollback_length": 3,
+        "seed": 20260803
+      },
+      "name": "Speculative rollback",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V25",
+      "duration": 0.0029190669090233064,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cow_isolated": true,
+        "partial_commit_length": 23,
+        "prefix_evicted_pages": 2,
+        "rollback_length": 3,
+        "seed": 20260803
+      },
+      "name": "cross-page rollback",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V26",
+      "duration": 0.0029190669090233064,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cow_isolated": true,
+        "partial_commit_length": 23,
+        "prefix_evicted_pages": 2,
+        "rollback_length": 3,
+        "seed": 20260803
+      },
+      "name": "in-page append/rollback",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V27",
+      "duration": 6.49083328122894e-05,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "candidate_count": 5,
+        "max_score_error": 0.25,
+        "recall": 1.0,
+        "selected_count": 2,
+        "serialized_bytes": 395
+      },
+      "name": "Quest index build",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V28",
+      "duration": 6.49083328122894e-05,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "candidate_count": 5,
+        "max_score_error": 0.25,
+        "recall": 1.0,
+        "selected_count": 2,
+        "serialized_bytes": 395
+      },
+      "name": "Quest full selection",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V29",
+      "duration": 6.49083328122894e-05,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "candidate_count": 5,
+        "max_score_error": 0.25,
+        "recall": 1.0,
+        "selected_count": 2,
+        "serialized_bytes": 395
+      },
+      "name": "Quest full reference equivalence",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V30",
+      "duration": 6.49083328122894e-05,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "candidate_count": 5,
+        "max_score_error": 0.25,
+        "recall": 1.0,
+        "selected_count": 2,
+        "serialized_bytes": 395
+      },
+      "name": "Quest budget/top-k",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V31",
+      "duration": 6.49083328122894e-05,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "candidate_count": 5,
+        "max_score_error": 0.25,
+        "recall": 1.0,
+        "selected_count": 2,
+        "serialized_bytes": 395
+      },
+      "name": "Quest sparse statistics",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V32",
+      "duration": 6.49083328122894e-05,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "candidate_count": 5,
+        "max_score_error": 0.25,
+        "recall": 1.0,
+        "selected_count": 2,
+        "serialized_bytes": 395
+      },
+      "name": "Quest append update",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V33",
+      "duration": 6.49083328122894e-05,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "candidate_count": 5,
+        "max_score_error": 0.25,
+        "recall": 1.0,
+        "selected_count": 2,
+        "serialized_bytes": 395
+      },
+      "name": "Quest Fork record sharing",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V34",
+      "duration": 6.49083328122894e-05,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "candidate_count": 5,
+        "max_score_error": 0.25,
+        "recall": 1.0,
+        "selected_count": 2,
+        "serialized_bytes": 395
+      },
+      "name": "Quest COW record isolation",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V35",
+      "duration": 6.49083328122894e-05,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "candidate_count": 5,
+        "max_score_error": 0.25,
+        "recall": 1.0,
+        "selected_count": 2,
+        "serialized_bytes": 395
+      },
+      "name": "Quest rollback",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V36",
+      "duration": 6.49083328122894e-05,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "candidate_count": 5,
+        "max_score_error": 0.25,
+        "recall": 1.0,
+        "selected_count": 2,
+        "serialized_bytes": 395
+      },
+      "name": "Quest stale-version rejection",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V37",
+      "duration": 6.49083328122894e-05,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "candidate_count": 5,
+        "max_score_error": 0.25,
+        "recall": 1.0,
+        "selected_count": 2,
+        "serialized_bytes": 395
+      },
+      "name": "Quest serialization round trip",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V38",
+      "duration": 6.49083328122894e-05,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "candidate_count": 5,
+        "max_score_error": 0.25,
+        "recall": 1.0,
+        "selected_count": 2,
+        "serialized_bytes": 395
+      },
+      "name": "Quest boundary cases",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V39",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "logical block to location mapping",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V40",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "Mock GPU to CPU migration",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V41",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "Mock CPU to SSD migration",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V42",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "Mock SSD/CPU/GPU round trip",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V43",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "unique authoritative copy",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V44",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "read during migration",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V45",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "migration failure rollback",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V46",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "pinned eviction exclusion",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V47",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "prefetch deduplication",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V48",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "prefetch cancellation cleanup",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V49",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "tier capacity handling",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V50",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "reload after eviction",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V51",
+      "duration": 0.034245039228923045,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "authoritative_unique": true,
+        "cancellations": 1,
+        "deduplicated": 1,
+        "failures": 2,
+        "migrations": 7,
+        "roundtrip_bytes": 128
+      },
+      "name": "atomic metadata commit",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V52",
+      "duration": 0.0638880577753298,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cancelled": 1,
+        "compute_failures": 1,
+        "requests": 7,
+        "served": 7,
+        "wait_ms": 303.0077829025686
+      },
+      "name": "selection/prefetch/view end-to-end",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V53",
+      "duration": 0.0638880577753298,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cancelled": 1,
+        "compute_failures": 1,
+        "requests": 7,
+        "served": 7,
+        "wait_ms": 303.0077829025686
+      },
+      "name": "compute pin lifecycle",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V54",
+      "duration": 0.0638880577753298,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cancelled": 1,
+        "compute_failures": 1,
+        "requests": 7,
+        "served": 7,
+        "wait_ms": 303.0077829025686
+      },
+      "name": "multi-request prefetch fairness",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V55",
+      "duration": 0.0638880577753298,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "cancelled": 1,
+        "compute_failures": 1,
+        "requests": 7,
+        "served": 7,
+        "wait_ms": 303.0077829025686
+      },
+      "name": "cancellation propagation",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V56",
+      "duration": 0.004235560016240925,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "architecture": "cpu",
+        "attention_backend": "reference_paged_exact",
+        "fallback_reason": "decode_suffix_reference has no full_prefill kernel; using correctness prefill fallback",
+        "is_reference": true,
+        "kv_kernel_backend": "torch_paged_kv",
+        "requested": "decode_suffix_reference",
+        "selected": "reference_paged_exact",
+        "supported": true,
+        "unsupported_reason": null,
+        "workload": "full_prefill"
+      },
+      "name": "Full Prefill routing",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V57",
+      "duration": 0.004235560016240925,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "architecture": "cpu",
+        "attention_backend": "decode_suffix_reference",
+        "fallback_reason": null,
+        "is_reference": true,
+        "kv_kernel_backend": "torch_paged_kv",
+        "requested": "decode_suffix_reference",
+        "selected": "decode_suffix_reference",
+        "supported": true,
+        "unsupported_reason": null,
+        "workload": "decode"
+      },
+      "name": "Decode routing",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V58",
+      "duration": 0.004235560016240925,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "architecture": "cpu",
+        "attention_backend": "reference_paged_exact",
+        "fallback_reason": "decode_suffix_reference has no chunked_prefill kernel; using correctness prefill fallback",
+        "is_reference": true,
+        "kv_kernel_backend": "torch_paged_kv",
+        "requested": "decode_suffix_reference",
+        "selected": "reference_paged_exact",
+        "supported": true,
+        "unsupported_reason": null,
+        "workload": "chunked_prefill"
+      },
+      "name": "Chunked Prefill routing",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V59",
+      "duration": 0.004235560016240925,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "chunked_fallback": "decode_suffix_reference has no chunked_prefill kernel; using correctness prefill fallback",
+        "full_fallback": "decode_suffix_reference has no full_prefill kernel; using correctness prefill fallback",
+        "short_suffix_selected": "decode_suffix_reference"
+      },
+      "name": "correct fallback without dedicated kernel",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V60",
+      "duration": 0.07000311714364216,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "architecture": "sm86",
+        "device": "NVIDIA GeForce RTX 3080 Ti",
+        "latency_ms": 17.25373207591474,
+        "max_abs_error": 0.0026137828826904297,
+        "provider": "sm86",
+        "seed": 20260803
+      },
+      "name": "synthetic Decode numerics",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V61",
+      "duration": 0.07000311714364216,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "architecture": "sm86",
+        "decision": {
+          "architecture": "sm86",
+          "attention_backend": "reference_paged_exact",
+          "fallback_reason": "sm86 has no full_prefill kernel; using correctness prefill fallback",
+          "is_reference": true,
+          "kv_kernel_backend": "sm86_kv_kernel",
+          "requested": "sm86",
+          "selected": "reference_paged_exact",
+          "supported": true,
+          "unsupported_reason": null,
+          "workload": "full_prefill"
+        },
+        "device": "NVIDIA GeForce RTX 3080 Ti",
+        "max_abs_error": 0.007788419723510742,
+        "provider": "sm86",
+        "seed": 20260803
+      },
+      "name": "synthetic Full Prefill numerics",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V62",
+      "duration": 0.07000311714364216,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "architecture": "sm86",
+        "device": "NVIDIA GeForce RTX 3080 Ti",
+        "max_abs_error": 0.003809213638305664,
+        "provider": "sm86",
+        "seed": 20260803
+      },
+      "name": "synthetic Chunked Prefill numerics",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V63",
+      "duration": 0.07000311714364216,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "architecture": "sm86",
+        "device": "NVIDIA GeForce RTX 3080 Ti",
+        "provider": "sm86",
+        "repetitions": 8,
+        "seed": 20260803,
+        "streams": 2
+      },
+      "name": "multi-stream race",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V64",
+      "duration": 0.07000311714364216,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "allocated_drift_bytes": 0,
+        "architecture": "sm86",
+        "device": "NVIDIA GeForce RTX 3080 Ti",
+        "iterations": 50,
+        "provider": "sm86",
+        "seed": 20260803
+      },
+      "name": "CUDA allocated-memory drift",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V65",
+      "duration": 0.07000311714364216,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "architecture": "sm86",
+        "device": "NVIDIA GeForce RTX 3080 Ti",
+        "iterations": 50,
+        "provider": "sm86",
+        "reserved_drift_bytes": 0,
+        "seed": 20260803
+      },
+      "name": "CUDA reserved-memory drift",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V66",
+      "duration": 0.07000311714364216,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "architecture": "sm86",
+        "device": "NVIDIA GeForce RTX 3080 Ti",
+        "final_pin_count": 0,
+        "provider": "sm86",
+        "recovered": true,
+        "seed": 20260803
+      },
+      "name": "CUDA kernel failure recovery",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V67",
+      "duration": 0.07000311714364216,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "architecture": "sm86",
+        "attention_calls": 63,
+        "decode_latency_ms": 17.25373207591474,
+        "device": "NVIDIA GeForce RTX 3080 Ti",
+        "drift_loop_ms": 21.617386024445295,
+        "provider": "sm86",
+        "seed": 20260803
+      },
+      "name": "current-hardware performance baseline",
+      "profile": "full",
+      "reason": null,
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V68",
+      "duration": 0.0,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {},
+      "name": "real-model logits/Top-1",
+      "profile": "full",
+      "reason": "CASCADE_KV_MODEL_PATH is not configured with real model weights",
+      "seed": 20260803,
+      "status": "SKIPPED_WITH_REASON"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V69",
+      "duration": 0.0,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {},
+      "name": "real 8B long generation",
+      "profile": "full",
+      "reason": "CASCADE_KV_MODEL_PATH is not configured with real model weights",
+      "seed": 20260803,
+      "status": "SKIPPED_WITH_REASON"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V70",
+      "duration": 0.0,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {},
+      "name": "real long-context Prefill",
+      "profile": "full",
+      "reason": "CASCADE_KV_MODEL_PATH is not configured with real model weights",
+      "seed": 20260803,
+      "status": "SKIPPED_WITH_REASON"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V71",
+      "duration": 0.0,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {},
+      "name": "real Quest accuracy",
+      "profile": "full",
+      "reason": "CASCADE_KV_DATASET_PATH is not configured with an accuracy dataset",
+      "seed": 20260803,
+      "status": "SKIPPED_WITH_REASON"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V72",
+      "duration": 0.0,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {},
+      "name": "real NVMe throughput/latency",
+      "profile": "full",
+      "reason": "CASCADE_KV_NVME_PATH is not configured for dedicated NVMe/GDS validation",
+      "seed": 20260803,
+      "status": "SKIPPED_WITH_REASON"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V73",
+      "duration": 0.0,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {},
+      "name": "real IO/compute overlap",
+      "profile": "full",
+      "reason": "CASCADE_KV_NVME_PATH is not configured for dedicated NVMe/GDS validation",
+      "seed": 20260803,
+      "status": "SKIPPED_WITH_REASON"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V74",
+      "duration": 0.0,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {
+        "capability": [
+          8,
+          6
+        ],
+        "synthetic_only": true
+      },
+      "name": "SM86 specialized path validation",
+      "profile": "full",
+      "reason": "SM86 synthetic specialized path and current-hardware baseline passed; this is not a production performance claim",
+      "seed": 20260803,
+      "status": "PASS"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V75",
+      "duration": 0.0,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {},
+      "name": "other-architecture tuning",
+      "profile": "full",
+      "reason": "only SM86 devices are present; other architecture-specific tuning requires its target GPU",
+      "seed": 20260803,
+      "status": "SKIPPED_WITH_REASON"
+    },
+    {
+      "artifacts": [],
+      "case_id": "V76",
+      "duration": 0.0,
+      "environment": {
+        "cuda_available": true,
+        "cuda_device_count": 2,
+        "cuda_devices": [
+          {
+            "capability": "sm86",
+            "index": 0,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          },
+          {
+            "capability": "sm86",
+            "index": 1,
+            "name": "NVIDIA GeForce RTX 3080 Ti",
+            "total_memory": 12528123904
+          }
+        ],
+        "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+        "python": "3.8.10",
+        "torch": "2.4.1+cu121"
+      },
+      "metrics": {},
+      "name": "large dynamic batch",
+      "profile": "full",
+      "reason": "real weights and CASCADE_KV_SERVING_COMMAND are not configured",
+      "seed": 20260803,
+      "status": "SKIPPED_WITH_REASON"
+    }
+  ],
+  "duration": 1.7615958189126104,
+  "environment": {
+    "cuda_available": true,
+    "cuda_device_count": 2,
+    "cuda_devices": [
+      {
+        "capability": "sm86",
+        "index": 0,
+        "name": "NVIDIA GeForce RTX 3080 Ti",
+        "total_memory": 12528123904
+      },
+      {
+        "capability": "sm86",
+        "index": 1,
+        "name": "NVIDIA GeForce RTX 3080 Ti",
+        "total_memory": 12528123904
+      }
+    ],
+    "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.29",
+    "python": "3.8.10",
+    "torch": "2.4.1+cu121"
+  },
+  "generated_at": "2026-08-03T09:27:06.682097+00:00",
+  "profile": "full",
+  "schema_version": 1,
+  "seed": 20260803,
+  "status": "PASS",
+  "summary": {
+    "BLOCKED": 0,
+    "FAIL": 0,
+    "PASS": 69,
+    "SKIPPED_WITH_REASON": 8
+  }
+}

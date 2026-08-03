@@ -1,0 +1,21 @@
+{
+  "captured_at": "2026-08-03",
+  "commands": [
+    {
+      "command": ".venv/bin/python -m unittest -v tests.test_kv_cache tests.test_kv_framework_v1 tests.contract.test_kv_framework_contract tests.test_fused_provider_dispatch",
+      "passed": 30,
+      "errors": 1,
+      "exit_code": 1,
+      "artifact": "reports/kv_remediation/baseline_unittest.txt",
+      "reason": "test_fused_provider_dispatch imports test_tiny_model_e2e as a top-level module under this invocation"
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q ...",
+      "passed": 0,
+      "errors": 1,
+      "exit_code": 1,
+      "artifact": "reports/kv_remediation/baseline_pytest.txt",
+      "reason": "pytest is not installed in .venv"
+    }
+  ]
+}

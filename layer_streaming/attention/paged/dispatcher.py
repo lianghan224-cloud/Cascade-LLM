@@ -11,6 +11,7 @@ from .reference import (
     LegacyGatherSDPAReferenceBackend,
     ReferencePagedExactBackend,
 )
+from .routing import PagedWorkload, classify_paged_workload
 
 
 class PagedAttentionRegistry:
@@ -107,6 +108,9 @@ class PagedAttentionDispatcher:
             "fallback_reason": None,
             "unsupported_reason": reason,
             "is_reference": bool(backend.is_reference),
+            "workload": (
+                phase.value if isinstance(phase, PagedWorkload) else phase
+            ),
         }
         if reason is not None:
             raise KVProviderError(
@@ -117,15 +121,50 @@ class PagedAttentionDispatcher:
         return backend
 
     def execute(self, request, phase=None):
-        phase = phase or (
-            "decode" if request.batch_view.max_query_length == 1 else "prefill"
+        workload = classify_paged_workload(request, phase=phase)
+        provider = self.attention_backend
+        supported_workloads = tuple(
+            getattr(provider, "workload_kinds", ())
         )
-        provider = self.validate(request, phase=phase)
-        return (
-            provider.decode(request)
-            if phase == "decode"
-            else provider.prefill(request)
-        )
+        if workload.value not in supported_workloads:
+            fallback_bundle = self.registry.get("reference_paged_exact")
+            fallback = fallback_bundle.attention_backend
+            request.validate()
+            architecture = detected_architecture(request.query.device)
+            reason = fallback.capability().unsupported_reason(
+                request,
+                architecture=architecture,
+                phase=workload.capability_phase,
+            )
+            if reason is not None:
+                raise KVProviderError(
+                    "correctness fallback {} rejected {}: {}".format(
+                        fallback.name, workload.value, reason
+                    )
+                )
+            self.last_decision = {
+                "requested": self.provider_name,
+                "selected": fallback_bundle.name,
+                "attention_backend": fallback.name,
+                "kv_kernel_backend": self.kv_kernel_backend.name,
+                "architecture": architecture,
+                "supported": True,
+                "fallback_reason": (
+                    "{} has no {} kernel; using correctness prefill fallback".format(
+                        provider.name, workload.value
+                    )
+                ),
+                "unsupported_reason": None,
+                "is_reference": True,
+                "workload": workload.value,
+            }
+            provider = fallback
+        else:
+            provider = self.validate(
+                request, phase=workload.capability_phase
+            )
+            self.last_decision["workload"] = workload.value
+        return getattr(provider, workload.backend_method)(request)
 
 
 def default_paged_registry(load_cuda=True):

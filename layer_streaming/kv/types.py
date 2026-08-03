@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
 
+from .errors import KVLifecycleError
+
 
 KV_FRAMEWORK_ABI_VERSION = 1
 KV_PAGE_FORMAT_VERSION = 1
@@ -46,6 +48,19 @@ class PageDescriptor:
     index_metadata_handle: object = field(default=None, repr=False)
     transfer_event: object = field(default=None, repr=False)
 
+    def __post_init__(self):
+        # These V2 lifecycle attributes intentionally remain outside the
+        # frozen V1 dataclass field list.  That keeps the published V1 ABI
+        # stable while giving the runtime one canonical place for version and
+        # in-flight accounting.
+        self.data_version = 0
+        self.index_version = 0
+        self.inflight_compute = 0
+        self.inflight_io = 0
+        self.dirty = False
+        self.error = None
+        self.logical_mappings = set()
+
     def as_dict(self):
         return {
             "page_id": int(self.page_id),
@@ -60,6 +75,13 @@ class PageDescriptor:
             "pin_count": int(self.pin_count),
             "owner_hint": self.owner_hint,
             "last_access_epoch": int(self.last_access_epoch),
+            "data_version": int(self.data_version),
+            "index_version": int(self.index_version),
+            "inflight_compute": int(self.inflight_compute),
+            "inflight_io": int(self.inflight_io),
+            "dirty": bool(self.dirty),
+            "error": self.error,
+            "logical_mapping_count": len(self.logical_mappings),
             "has_index_metadata": self.index_metadata_handle is not None,
             "has_transfer_event": self.transfer_event is not None,
         }
@@ -87,6 +109,14 @@ class PageHandle:
 
     @property
     def state(self):
+        if self._descriptor.generation != self.generation:
+            raise KVLifecycleError(
+                "stale PageHandle state access: page={} handle_generation={} current_generation={}".format(
+                    self.page_id,
+                    self.generation,
+                    self._descriptor.generation,
+                )
+            )
         return self._descriptor.state
 
     def identity(self):

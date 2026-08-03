@@ -51,6 +51,9 @@ class LogicalBlockTable:
     def physical_page_ids(self, required_store="gpu"):
         result = []
         for handle in self.handles:
+            # Accessing state performs the handle-local generation check before
+            # a raw physical ID is compacted for a provider.
+            handle.state
             if required_store is not None and handle.store_id != required_store:
                 raise KVLifecycleError(
                     "page {} is in store {}, expected {}".format(

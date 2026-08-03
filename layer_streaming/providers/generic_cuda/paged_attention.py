@@ -152,6 +152,10 @@ class GenericCUDAPagedAttentionBackend(
 
     name = "generic_cuda"
     is_reference = False
+    # The current CUDA mapping is a decode/short-suffix kernel. Full and
+    # chunked prefill route to the correctness fallback until a dedicated
+    # prefill kernel advertises those capabilities.
+    workload_kinds = ("decode", "short_suffix")
 
     def capability(self):
         return PagedAttentionCapability(

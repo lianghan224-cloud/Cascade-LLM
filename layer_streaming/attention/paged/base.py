@@ -10,6 +10,12 @@ class PagedAttentionBackend:
     name = "abstract"
     is_reference = False
     schema_version = 1
+    workload_kinds = (
+        "full_prefill",
+        "chunked_prefill",
+        "decode",
+        "short_suffix",
+    )
 
     @property
     def provider_abi(self):

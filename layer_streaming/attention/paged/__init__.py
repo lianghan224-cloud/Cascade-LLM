@@ -22,6 +22,7 @@ from .reference import (
     ReferencePagedExactBackend,
 )
 from .workspace import PagedWorkspaceEstimate
+from .routing import PagedWorkload, classify_paged_workload
 
 __all__ = [
     "LegacyGatherSDPAReferenceBackend",
@@ -37,6 +38,8 @@ __all__ = [
     "PagedNumericalContract",
     "default_paged_numerical_contract",
     "PagedWorkspaceEstimate",
+    "PagedWorkload",
+    "classify_paged_workload",
     "ReferencePagedExactBackend",
     "default_paged_registry",
     "detected_architecture",

@@ -1,0 +1,100 @@
+{
+  "audience": "technical",
+  "delivery_mode": "html",
+  "required_structure_mapping": {
+    "technical_summary": "技术结论",
+    "key_findings": [
+      "分页与事务生命周期",
+      "零完整-KV workspace",
+      "完整 Prompt Prefill",
+      "suffix/Decode",
+      "真实 8B"
+    ],
+    "scope_and_definitions": "范围、指标与容量定义",
+    "methodology": "方法与验证评级",
+    "limitations_and_robustness": "限制、失败模式与状态漂移",
+    "recommended_next_steps": "建议的下一步",
+    "further_questions": "仍需回答的问题"
+  },
+  "chart_map": [
+    {
+      "section": "Memory benefit",
+      "question": "How much full-KV workspace is avoided?",
+      "family": "comparison",
+      "type": "bar",
+      "fields": [
+        "context_label",
+        "legacy_workspace_mib",
+        "production_workspace_mib"
+      ],
+      "takeaway": "Production direct paging holds full-KV workspace at zero",
+      "palette": "hard two-root cap"
+    },
+    {
+      "section": "Full Prefill cost",
+      "question": "What latency is paid for zero workspace?",
+      "family": "comparison",
+      "type": "bar",
+      "fields": [
+        "context_label",
+        "legacy_baseline",
+        "generic_slowdown",
+        "sm86_slowdown"
+      ],
+      "takeaway": "SM86 slowdown grows to 27.1x at 2048 tokens",
+      "palette": "relaxed multi-category"
+    },
+    {
+      "section": "Suffix kernel benefit",
+      "question": "Does SM86 improve direct paging at long context?",
+      "family": "comparison",
+      "type": "bar",
+      "fields": [
+        "context_label",
+        "median_speedup"
+      ],
+      "takeaway": "SM86 retains a stable local gain",
+      "palette": "single-root preferred"
+    },
+    {
+      "section": "Lifecycle stability",
+      "question": "Does CUDA memory creep across ownership churn?",
+      "family": "trend",
+      "type": "line",
+      "fields": [
+        "cycle",
+        "allocated_mib",
+        "reserved_mib"
+      ],
+      "takeaway": "Memory remains flat across eleven checkpoints",
+      "palette": "hard two-root cap"
+    }
+  ],
+  "omitted_visuals": [
+    {
+      "segment": "Fresh real-8B mode comparison",
+      "reason": "Only two contexts and mode differences below 0.5%; an exact table is more honest than a nearly flat chart."
+    },
+    {
+      "segment": "KV capacity projection",
+      "reason": "Five discrete planning points require exact lookup and caveats; table preferred."
+    }
+  ],
+  "validation": {
+    "overall_assessment": "Share with caveats",
+    "calculation_spot_checks": [
+      "Recomputed all SM86/Generic ratios from raw p50 values.",
+      "Recomputed full-Prefill slowdown and workspace MiB from raw bytes.",
+      "Recomputed real-8B mode spread per context and phase.",
+      "Recomputed BF16 KV bytes/token from model config and policy formula.",
+      "Reconciled lifecycle allocation_count and release_count at 2001 each."
+    ],
+    "required_caveats": [
+      "Fresh performance evidence is from one RTX 3080 Ti (SM86).",
+      "Fresh real-8B mode results have two measured runs after one warmup and support only noise-level comparisons.",
+      "The 1000-token real-model soak and quality suite are checked-in evidence from the same current commit, not rerun on 2026-08-03.",
+      "The full-Prefill benchmark is a one-layer synthetic kernel test; the 8B end-to-end result includes streamed weights.",
+      "Legacy gather+SDPA is an experimental comparison path, not a production serving baseline."
+    ]
+  }
+}

@@ -68,11 +68,18 @@ class PrefixCache:
         return state, match
 
     def close(self):
+        self.evict_all()
+
+    def evict_all(self):
+        """Drop cache ownership without disturbing active request owners."""
+
         handles = tuple(self.owned_handles.values())
         self.page_pool.assert_releasable(handles, "close prefix cache")
+        self.index.remove_handles(handles)
         for handle in reversed(handles):
             self.page_pool.release(handle)
         self.owned_handles.clear()
+        return len(handles)
 
     def __len__(self):
         return len(self.index)

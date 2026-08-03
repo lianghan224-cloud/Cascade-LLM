@@ -1,0 +1,927 @@
+{
+  "schema_version": 1,
+  "hardware": {
+    "device": "NVIDIA GeForce RTX 3080 Ti",
+    "architecture": "sm86",
+    "torch": "2.4.1+cu121",
+    "cuda": "12.1"
+  },
+  "configuration": {
+    "device": "cuda:0",
+    "providers": [
+      "legacy_gather_sdpa_reference",
+      "reference_paged_exact",
+      "sm86"
+    ],
+    "lengths": [
+      512,
+      2048,
+      4096
+    ],
+    "page_sizes": [
+      16,
+      32
+    ],
+    "phases": [
+      "decode"
+    ],
+    "batch_size": 2,
+    "prefill_query_length": 8,
+    "query_heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "dtype": "bf16",
+    "warmup": 1,
+    "runs": 3
+  },
+  "results": [
+    {
+      "supported": true,
+      "provider": "legacy_gather_sdpa_reference",
+      "context_length": 512,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 4.125479686384399,
+      "p50_ms": 4.060511011630297,
+      "p95_ms": 4.268652992323041,
+      "samples_ms": [
+        4.268652992323041,
+        4.060511011630297,
+        4.0472750551998615
+      ],
+      "workspace_peak_bytes": 8388608,
+      "kv_pool_bytes": 3932160,
+      "gpu_peak_allocated_bytes": 19982336,
+      "requires_full_kv_workspace": true,
+      "qualification_status": "experimental",
+      "attention_backend": "legacy_gather_sdpa_reference",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "legacy_gather_sdpa_reference",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.0009765625,
+          "mean_abs_error": 8.202433673432097e-05,
+          "p99_abs_error": 0.00048828125,
+          "max_relative_error": 47.44444274902344,
+          "cosine_similarity": 0.999997615814209
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "legacy_gather_sdpa_reference",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 114.7046090135863
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 512,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 465.6764450094973,
+      "p50_ms": 465.759327984415,
+      "p95_ms": 465.8109979936853,
+      "samples_ms": [
+        465.759327984415,
+        465.8109979936853,
+        465.4590090503916
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 3932160,
+      "gpu_peak_allocated_bytes": 16220672,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "numerically_qualified",
+      "attention_backend": "reference_paged_exact",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "reference_paged_exact",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.0,
+          "mean_abs_error": 0.0,
+          "p99_abs_error": 0.0,
+          "max_relative_error": 0.0,
+          "cosine_similarity": 1.0
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 512,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 1.453326006109516,
+      "p50_ms": 1.441120053641498,
+      "p95_ms": 1.4782400103285909,
+      "samples_ms": [
+        1.4782400103285909,
+        1.4406179543584585,
+        1.441120053641498
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 3932160,
+      "gpu_peak_allocated_bytes": 16210432,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "production",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.00048828125,
+          "mean_abs_error": 7.078415364958346e-08,
+          "p99_abs_error": 0.0,
+          "max_relative_error": 0.006849315017461777,
+          "cosine_similarity": 1.0
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 323.19259371036424
+    },
+    {
+      "supported": true,
+      "provider": "legacy_gather_sdpa_reference",
+      "context_length": 512,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 2.4788916343823075,
+      "p50_ms": 2.470287960022688,
+      "p95_ms": 2.5181389646604657,
+      "samples_ms": [
+        2.470287960022688,
+        2.448247978463769,
+        2.5181389646604657
+      ],
+      "workspace_peak_bytes": 8388608,
+      "kv_pool_bytes": 4194304,
+      "gpu_peak_allocated_bytes": 29052928,
+      "requires_full_kv_workspace": true,
+      "qualification_status": "experimental",
+      "attention_backend": "legacy_gather_sdpa_reference",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "legacy_gather_sdpa_reference",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.0009765625,
+          "mean_abs_error": 8.81913656485267e-05,
+          "p99_abs_error": 0.0009765625,
+          "max_relative_error": 11.70351791381836,
+          "cosine_similarity": 0.9999974370002747
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "legacy_gather_sdpa_reference",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 96.54307590544069
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 512,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 238.48002698893347,
+      "p50_ms": 238.48919803276658,
+      "p95_ms": 238.52061689831316,
+      "samples_ms": [
+        238.52061689831316,
+        238.4302660357207,
+        238.48919803276658
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 4194304,
+      "gpu_peak_allocated_bytes": 16802304,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "numerically_qualified",
+      "attention_backend": "reference_paged_exact",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "reference_paged_exact",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.0,
+          "mean_abs_error": 0.0,
+          "p99_abs_error": 0.0,
+          "max_relative_error": 0.0,
+          "cosine_similarity": 1.0
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 512,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 1.3699076371267438,
+      "p50_ms": 1.369733945466578,
+      "p95_ms": 1.3738919515162706,
+      "samples_ms": [
+        1.3738919515162706,
+        1.369733945466578,
+        1.3660970143973827
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 4194304,
+      "gpu_peak_allocated_bytes": 16767488,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "production",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 3.0517578125e-05,
+          "mean_abs_error": 3.841705620288849e-09,
+          "p99_abs_error": 0.0,
+          "max_relative_error": 0.006896551698446274,
+          "cosine_similarity": 1.0
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 174.11351950654114
+    },
+    {
+      "supported": true,
+      "provider": "legacy_gather_sdpa_reference",
+      "context_length": 2048,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 13.773739027480284,
+      "p50_ms": 13.778554974123836,
+      "p95_ms": 13.801819062791765,
+      "samples_ms": [
+        13.778554974123836,
+        13.801819062791765,
+        13.740843045525253
+      ],
+      "workspace_peak_bytes": 33554432,
+      "kv_pool_bytes": 14942208,
+      "gpu_peak_allocated_bytes": 88605696,
+      "requires_full_kv_workspace": true,
+      "qualification_status": "experimental",
+      "attention_backend": "legacy_gather_sdpa_reference",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "legacy_gather_sdpa_reference",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.0009765625,
+          "mean_abs_error": 4.5113483793102205e-05,
+          "p99_abs_error": 0.000244140625,
+          "max_relative_error": 20.92258071899414,
+          "cosine_similarity": 0.9999973773956299
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "legacy_gather_sdpa_reference",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 133.46183328953077
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 2048,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 1839.9213399582852,
+      "p50_ms": 1838.9112069271505,
+      "p95_ms": 1842.0904179802164,
+      "samples_ms": [
+        1838.762394967489,
+        1842.0904179802164,
+        1838.9112069271505
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 14942208,
+      "gpu_peak_allocated_bytes": 38406144,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "numerically_qualified",
+      "attention_backend": "reference_paged_exact",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "reference_paged_exact",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.0,
+          "mean_abs_error": 0.0,
+          "p99_abs_error": 0.0,
+          "max_relative_error": 0.0,
+          "cosine_similarity": 1.0
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 2048,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 5.195753299631178,
+      "p50_ms": 5.195628968067467,
+      "p95_ms": 5.199436913244426,
+      "samples_ms": [
+        5.199436913244426,
+        5.195628968067467,
+        5.192194017581642
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 14942208,
+      "gpu_peak_allocated_bytes": 38413312,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "production",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 1.9073486328125e-06,
+          "mean_abs_error": 2.673914423212409e-10,
+          "p99_abs_error": 0.0,
+          "max_relative_error": 0.006451612804085016,
+          "cosine_similarity": 1.0
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 353.9342817258831
+    },
+    {
+      "supported": true,
+      "provider": "legacy_gather_sdpa_reference",
+      "context_length": 2048,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 7.352445002955695,
+      "p50_ms": 7.352333981543779,
+      "p95_ms": 7.353257038630545,
+      "samples_ms": [
+        7.353257038630545,
+        7.352333981543779,
+        7.3517439886927605
+      ],
+      "workspace_peak_bytes": 33554432,
+      "kv_pool_bytes": 15204352,
+      "gpu_peak_allocated_bytes": 89103872,
+      "requires_full_kv_workspace": true,
+      "qualification_status": "experimental",
+      "attention_backend": "legacy_gather_sdpa_reference",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "legacy_gather_sdpa_reference",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.00048828125,
+          "mean_abs_error": 4.454833469935693e-05,
+          "p99_abs_error": 0.00048828125,
+          "max_relative_error": 8.621301651000977,
+          "cosine_similarity": 0.9999973773956299
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "legacy_gather_sdpa_reference",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 125.27167785366245
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 2048,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 921.7345740180463,
+      "p50_ms": 921.0392140084878,
+      "p95_ms": 923.1267370050773,
+      "samples_ms": [
+        923.1267370050773,
+        921.0377710405737,
+        921.0392140084878
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 15204352,
+      "gpu_peak_allocated_bytes": 38822400,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "numerically_qualified",
+      "attention_backend": "reference_paged_exact",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "reference_paged_exact",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.0,
+          "mean_abs_error": 0.0,
+          "p99_abs_error": 0.0,
+          "max_relative_error": 0.0,
+          "cosine_similarity": 1.0000001192092896
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 2048,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 4.922278652278085,
+      "p50_ms": 4.921750980429351,
+      "p95_ms": 4.932182026095688,
+      "samples_ms": [
+        4.932182026095688,
+        4.921750980429351,
+        4.912902950309217
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 15204352,
+      "gpu_peak_allocated_bytes": 38806528,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "production",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.00048828125,
+          "mean_abs_error": 6.441405275836587e-08,
+          "p99_abs_error": 0.0,
+          "max_relative_error": 0.007633587811142206,
+          "cosine_similarity": 1.0
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 187.13649220996152
+    },
+    {
+      "supported": true,
+      "provider": "legacy_gather_sdpa_reference",
+      "context_length": 4096,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 26.722756020414334,
+      "p50_ms": 26.722218957729638,
+      "p95_ms": 26.735924067907035,
+      "samples_ms": [
+        26.722218957729638,
+        26.735924067907035,
+        26.710125035606325
+      ],
+      "workspace_peak_bytes": 67108864,
+      "kv_pool_bytes": 29622272,
+      "gpu_peak_allocated_bytes": 166254592,
+      "requires_full_kv_workspace": true,
+      "qualification_status": "experimental",
+      "attention_backend": "legacy_gather_sdpa_reference",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "legacy_gather_sdpa_reference",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.00048828125,
+          "mean_abs_error": 3.203473534085788e-05,
+          "p99_abs_error": 0.000244140625,
+          "max_relative_error": 8.892473220825195,
+          "cosine_similarity": 0.9999972581863403
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "legacy_gather_sdpa_reference",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 137.0300905350645
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 4096,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 3663.7987196833515,
+      "p50_ms": 3661.7480830755085,
+      "p95_ms": 3668.0230300407857,
+      "samples_ms": [
+        3661.7480830755085,
+        3668.0230300407857,
+        3661.6250459337607
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 29622272,
+      "gpu_peak_allocated_bytes": 67683328,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "numerically_qualified",
+      "attention_backend": "reference_paged_exact",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "reference_paged_exact",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.0,
+          "mean_abs_error": 0.0,
+          "p99_abs_error": 0.0,
+          "max_relative_error": 0.0,
+          "cosine_similarity": 1.0
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 4096,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 9.955083718523383,
+      "p50_ms": 9.929265012033284,
+      "p95_ms": 10.013775085099041,
+      "samples_ms": [
+        9.922211058437824,
+        9.929265012033284,
+        10.013775085099041
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 29622272,
+      "gpu_peak_allocated_bytes": 67699712,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "production",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 6.103515625e-05,
+          "mean_abs_error": 2.62953108176589e-08,
+          "p99_abs_error": 0.0,
+          "max_relative_error": 0.00699300691485405,
+          "cosine_similarity": 1.0
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 368.78339722404763
+    },
+    {
+      "supported": true,
+      "provider": "legacy_gather_sdpa_reference",
+      "context_length": 4096,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 13.820724717030922,
+      "p50_ms": 13.831124058924615,
+      "p95_ms": 13.835262041538954,
+      "samples_ms": [
+        13.795788050629199,
+        13.831124058924615,
+        13.835262041538954
+      ],
+      "workspace_peak_bytes": 67108864,
+      "kv_pool_bytes": 29884416,
+      "gpu_peak_allocated_bytes": 166464512,
+      "requires_full_kv_workspace": true,
+      "qualification_status": "experimental",
+      "attention_backend": "legacy_gather_sdpa_reference",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "legacy_gather_sdpa_reference",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.00048828125,
+          "mean_abs_error": 3.3562188036739826e-05,
+          "p99_abs_error": 0.000244140625,
+          "max_relative_error": 9.370369911193848,
+          "cosine_similarity": 0.9999971389770508
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "legacy_gather_sdpa_reference",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 132.61920037994602
+    },
+    {
+      "supported": true,
+      "provider": "reference_paged_exact",
+      "context_length": 4096,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 1834.3556247030695,
+      "p50_ms": 1834.272613050416,
+      "p95_ms": 1836.853894055821,
+      "samples_ms": [
+        1834.272613050416,
+        1831.9403670029715,
+        1836.853894055821
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 29884416,
+      "gpu_peak_allocated_bytes": 67945472,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "numerically_qualified",
+      "attention_backend": "reference_paged_exact",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "reference_paged_exact",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 0.0,
+          "mean_abs_error": 0.0,
+          "p99_abs_error": 0.0,
+          "max_relative_error": 0.0,
+          "cosine_similarity": 1.0000001192092896
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "reference_paged_exact",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 1.0
+    },
+    {
+      "supported": true,
+      "provider": "sm86",
+      "context_length": 4096,
+      "page_size": 32,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 9.376277642635008,
+      "p50_ms": 9.377529029734433,
+      "p95_ms": 9.381006937474012,
+      "samples_ms": [
+        9.370296960696578,
+        9.377529029734433,
+        9.381006937474012
+      ],
+      "workspace_peak_bytes": 0,
+      "kv_pool_bytes": 29884416,
+      "gpu_peak_allocated_bytes": 67961856,
+      "requires_full_kv_workspace": false,
+      "qualification_status": "production",
+      "attention_backend": "sm86",
+      "kv_kernel_backend": "sm86_kv_kernel",
+      "provider_bundle": "sm86",
+      "pairwise_numerical_diagnostic": {
+        "diagnostic_only": true,
+        "shape_match": true,
+        "metrics": {
+          "max_abs_error": 7.62939453125e-06,
+          "mean_abs_error": 2.013621269725263e-09,
+          "p99_abs_error": 0.0,
+          "max_relative_error": 0.006802720949053764,
+          "cosine_similarity": 1.0000001192092896
+        },
+        "contract": {
+          "architecture": "sm86",
+          "provider_name": "sm86",
+          "provider_abi": 1,
+          "kv_dtype": "bf16",
+          "output_dtype": "bf16",
+          "baseline_error_multiplier": 2.0,
+          "version": 2
+        }
+      },
+      "speedup_vs_reference": 195.6029789120644
+    }
+  ],
+  "acceptance": {
+    "production_numerics_pass": null,
+    "production_numerics_reason": "Numerical Contract V2 requires FP32 math and native-precision baselines; benchmark pairwise metrics are diagnostic only",
+    "production_has_zero_full_kv_workspace": true,
+    "production_faster_than_reference": true
+  }
+}

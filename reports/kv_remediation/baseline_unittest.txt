@@ -1,0 +1,50 @@
+test_append_uses_stable_preallocated_page_arena (tests.test_kv_cache.KVCacheTest) ... ok
+test_attention_inputs_fail_before_materialization (tests.test_kv_cache.KVCacheTest) ... ok
+test_capacity_and_order_errors_are_controlled (tests.test_kv_cache.KVCacheTest) ... ok
+test_dense_paged_attention_matches_sdpa_for_gqa_prefill_and_decode (tests.test_kv_cache.KVCacheTest) ... ok
+test_fork_shares_sealed_pages_and_copies_mutable_tail (tests.test_kv_cache.KVCacheTest) ... ok
+test_noncontiguous_physical_pages_follow_request_table (tests.test_kv_cache.KVCacheTest) ... ok
+test_one_hundred_allocate_release_cycles_restore_all_pages (tests.test_kv_cache.KVCacheTest) ... ok
+test_online_paged_attention_avoids_full_kv_materialization (tests.test_kv_cache.KVCacheTest) ... ok
+test_reset_is_atomic_when_a_page_is_pinned (tests.test_kv_cache.KVCacheTest) ... ok
+test_reset_release_and_page_reuse (tests.test_kv_cache.KVCacheTest) ... ok
+test_single_page_decode_does_not_pass_an_all_true_mask_to_sdpa (tests.test_kv_cache.KVCacheTest) ... ok
+test_admission_and_release_are_predictable (tests.test_kv_framework_v1.KVFrameworkV1CPUTest) ... ok
+test_architecture_providers_are_independent_and_declared (tests.test_kv_framework_v1.KVFrameworkV1CPUTest) ... ok
+test_backend_replacement_preserves_block_table_and_cow_semantics (tests.test_kv_framework_v1.KVFrameworkV1CPUTest) ... ok
+test_chunked_prefill_reads_random_noncontiguous_pages (tests.test_kv_framework_v1.KVFrameworkV1CPUTest) ... ok
+test_fork_tail_cow_beam_and_speculative_commit (tests.test_kv_framework_v1.KVFrameworkV1CPUTest) ... ok
+test_page_generation_rejects_stale_handle (tests.test_kv_framework_v1.KVFrameworkV1CPUTest) ... ok
+test_production_attention_has_no_hidden_gather_or_sdpa (tests.test_kv_framework_v1.KVFrameworkV1CPUTest) ... ok
+test_provider_bundle_has_no_lifecycle_ownership (tests.test_kv_framework_v1.KVFrameworkV1CPUTest) ... ok
+test_ragged_batch_prefill_mha_gqa_and_mqa (tests.test_kv_framework_v1.KVFrameworkV1CPUTest) ... ok
+test_reuse_policy_does_not_silently_expand (tests.test_kv_framework_v1.KVFrameworkV1CPUTest) ... ok
+test_session_and_in_memory_prefix_survive_origin_release (tests.test_kv_framework_v1.KVFrameworkV1CPUTest) ... ok
+test_deterministic_lm_head_is_chunk_independent (tests.test_kv_framework_v1.KVFrameworkV1CUDATest) ... ok
+test_generic_cuda_consumes_sparse_ready_page_metadata (tests.test_kv_framework_v1.KVFrameworkV1CUDATest) ... ok
+test_generic_cuda_prefill_decode_mha_gqa_mqa (tests.test_kv_framework_v1.KVFrameworkV1CUDATest) ... ok
+test_sm86_provider_is_real_and_workspace_free (tests.test_kv_framework_v1.KVFrameworkV1CUDATest) ... ok
+test_frozen_interfaces_expose_versioned_metadata (tests.contract.test_kv_framework_contract.KVFrameworkContractTest) ... ok
+test_production_import_graph_excludes_legacy_and_aliases (tests.contract.test_kv_framework_contract.KVFrameworkContractTest) ... ok
+test_runtime_remains_a_thin_coordinator (tests.contract.test_kv_framework_contract.KVFrameworkContractTest) ... ok
+test_v1_contract_is_frozen (tests.contract.test_kv_framework_contract.KVFrameworkContractTest) ... ok
+test_fused_provider_dispatch (unittest.loader._FailedTest) ... ERROR
+
+======================================================================
+ERROR: test_fused_provider_dispatch (unittest.loader._FailedTest)
+----------------------------------------------------------------------
+ImportError: Failed to import test module: test_fused_provider_dispatch
+Traceback (most recent call last):
+  File "/usr/lib/python3.8/unittest/loader.py", line 154, in loadTestsFromName
+    module = __import__(module_name)
+  File "/disk2/home/guest/lianghan/repos/Cascade-LLM/tests/test_fused_provider_dispatch.py", line 22, in <module>
+    from test_tiny_model_e2e import generate_checkpoint
+ModuleNotFoundError: No module named 'test_tiny_model_e2e'
+
+
+----------------------------------------------------------------------
+Ran 31 tests in 2.229s
+
+FAILED (errors=1)
+
+BASELINE_EXIT_CODE=1

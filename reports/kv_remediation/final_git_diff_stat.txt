@@ -1,0 +1,30 @@
+ layer_streaming/attention/paged/__init__.py        |   3 +
+ layer_streaming/attention/paged/base.py            |   6 +
+ layer_streaming/attention/paged/dispatcher.py      |  55 ++++-
+ layer_streaming/kv/block_table.py                  |   3 +
+ layer_streaming/kv/execution.py                    |  11 +
+ layer_streaming/kv/ownership.py                    | 115 +++++++++-
+ layer_streaming/kv/page_pool.py                    | 187 ++++++++++++++++-
+ layer_streaming/kv/prefix_cache.py                 |   7 +
+ layer_streaming/kv/runtime.py                      | 110 +++++-----
+ layer_streaming/kv/selection/__init__.py           |  12 ++
+ layer_streaming/kv/selection/quest_flat.py         | 233 ++++++++++++++++++++-
+ layer_streaming/kv/stores/__init__.py              |  16 ++
+ layer_streaming/kv/types.py                        |  30 +++
+ .../providers/generic_cuda/paged_attention.py      |   4 +
+ 14 files changed, 710 insertions(+), 82 deletions(-)
+
+Remediation-added untracked files:
+docs/KV_CURRENT_STATE_AUDIT.md
+docs/KV_ARCHITECTURE_CONTRACT.md
+docs/KV_REMEDIATION_IMPLEMENTATION_REPORT.md
+layer_streaming/attention/paged/routing.py
+layer_streaming/kv/runtime_validation.py
+layer_streaming/kv/scheduler.py
+layer_streaming/kv/selection/quest_cpu.py
+layer_streaming/kv/stores/tiered.py
+tests/test_kv_remediation.py
+tools/kv_validation_cases.py
+tools/validate_kv_stack.py
+reports/kv_validation.md
+reports/kv_validation.json

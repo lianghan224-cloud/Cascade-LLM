@@ -1,6 +1,7 @@
 """Exclusive owner of page references, pins, Fork and Copy-on-Write."""
 
 import math
+import time
 
 import torch
 
@@ -39,26 +40,46 @@ class OwnershipManager:
     def event_count(self):
         return len(self.attention_events) + len(self.append_events)
 
-    def drain_layer_attention(self, layer):
+    @staticmethod
+    def _wait_event(event, timeout_seconds, label):
+        deadline = time.monotonic() + float(timeout_seconds)
+        while not event.query():
+            if time.monotonic() >= deadline:
+                raise KVLifecycleError(
+                    "KV quiesce timed out waiting for {} after {:.3f}s".format(
+                        label, float(timeout_seconds)
+                    )
+                )
+            time.sleep(0.001)
+
+    def drain_layer_attention(self, layer, timeout_seconds=5.0):
         if self.device.type != "cuda":
             return
         layer = int(layer)
         handles = self.attention_pins[layer]
         if not handles:
             return
-        self.attention_events[layer].synchronize()
+        self._wait_event(
+            self.attention_events[layer],
+            timeout_seconds,
+            "attention layer {}".format(layer),
+        )
         for handle in reversed(handles):
             self.page_pool.unpin(handle)
         self.attention_pins[layer] = []
 
-    def drain_layer_append(self, layer):
+    def drain_layer_append(self, layer, timeout_seconds=5.0):
         if self.device.type != "cuda":
             return
         layer = int(layer)
         handles = self.append_pins[layer]
         if not handles:
             return
-        self.append_events[layer].synchronize()
+        self._wait_event(
+            self.append_events[layer],
+            timeout_seconds,
+            "append layer {}".format(layer),
+        )
         for handle in reversed(handles):
             self.page_pool.unpin(handle)
         self.append_pins[layer] = []
@@ -280,8 +301,13 @@ class OwnershipManager:
             )
             if valid:
                 self.page_pool.seal(handle, valid)
+        first_changed = pending.start // self.page_size
+        last_changed = (pending.end - 1) // self.page_size
+        next_version = state.version + 1
+        for handle in state.block_table.handles[first_changed : last_changed + 1]:
+            self.page_pool.mark_data_updated(handle, version=next_version)
         state.pending_append = None
-        state.version += 1
+        state.version = next_version
         return state
 
     def fork(self, state, request_id=None, max_length=None, branch=True):
@@ -317,6 +343,8 @@ class OwnershipManager:
             child.parent_request_id = state.request_id
             child.fork_position = state.sequence_length
             child.version = state.version
+            if hasattr(self.runtime.selection, "fork_request"):
+                self.runtime.selection.fork_request(state, child)
             self.runtime._metrics.fork_count += 1
             return child
         except BaseException:
@@ -340,6 +368,8 @@ class OwnershipManager:
         parent.tail_valid_tokens = branch.tail_valid_tokens
         parent.layer_lengths[:] = list(branch.layer_lengths)
         parent.version += 1
+        if hasattr(self.runtime.selection, "commit_branch"):
+            self.runtime.selection.commit_branch(parent, branch)
         branch.block_table.handles[:] = []
         branch.lifecycle_state = RequestLifecycleState.RELEASED
         self.runtime.request_table.pop(branch.request_id, None)
@@ -361,6 +391,72 @@ class OwnershipManager:
         state.tail_valid_tokens = 0
         state.layer_lengths[:] = [0] * self.layer_count
         state.version += 1
+        if hasattr(self.runtime.selection, "release_request"):
+            self.runtime.selection.release_request(state)
+
+    def rollback(self, state, target_length, target_version=None):
+        """Rollback a committed/speculative suffix, including page boundaries."""
+
+        state.ensure_active()
+        target_length = int(target_length)
+        if target_length < 0 or target_length > state.sequence_length:
+            raise ValueError("rollback target is outside the committed sequence")
+        if state.pending_append is not None:
+            self.abort_append(state)
+        next_version = (
+            state.version + 1 if target_version is None else int(target_version)
+        )
+        if next_version <= state.version:
+            raise ValueError("rollback target_version must advance monotonically")
+        self.drain_handles(state.block_table.handles)
+        required = int(math.ceil(target_length / float(self.page_size)))
+        removed = tuple(state.block_table.handles[required:])
+        self.page_pool.assert_releasable(removed, "rollback suffix")
+        changed_block = None
+        if required and target_length % self.page_size:
+            changed_block = required - 1
+            source = state.block_table.handles[changed_block]
+            descriptor = self.page_pool.descriptor(source)
+            if descriptor.ref_count > 1:
+                target = self.page_pool.allocate(owner_hint=state.request_id)
+                valid = target_length % self.page_size
+                self.page_pool.begin_copy(source, target)
+                try:
+                    self.runtime.kv_kernel_backend.copy_pages(
+                        self.runtime.store,
+                        (source.page_id,),
+                        (target.page_id,),
+                        (valid,),
+                    )
+                except BaseException:
+                    self.page_pool.end_copy(source, target, valid)
+                    self.page_pool.release(target)
+                    raise
+                self.page_pool.end_copy(source, target, valid)
+                state.block_table.replace(changed_block, target)
+                self.page_pool.release(source)
+        state.block_table.truncate(required)
+        for handle in reversed(removed):
+            self.page_pool.release(handle)
+        state.sequence_length = target_length
+        state.tail_valid_tokens = (
+            target_length % self.page_size or (self.page_size if target_length else 0)
+        )
+        state.layer_lengths[:] = [target_length] * self.layer_count
+        if required:
+            tail = state.block_table.handles[-1]
+            descriptor = self.page_pool.descriptor(tail)
+            if descriptor.ref_count == 1:
+                self.page_pool.seal(tail, state.tail_valid_tokens)
+            if changed_block is not None:
+                self.page_pool.mark_data_updated(tail, version=next_version)
+        state.version = next_version
+        if hasattr(self.runtime.selection, "rollback_request"):
+            self.runtime.selection.rollback_request(
+                self.runtime, state, changed_block=changed_block
+            )
+        self.page_pool.validate_invariants()
+        return state
 
     def release(self, state):
         if state.lifecycle_state == RequestLifecycleState.RELEASED:
@@ -379,12 +475,15 @@ class OwnershipManager:
         state.block_table.handles[:] = []
         state.lifecycle_state = RequestLifecycleState.RELEASED
         self.runtime.request_table.pop(state.request_id, None)
+        if hasattr(self.runtime.selection, "release_request"):
+            self.runtime.selection.release_request(state)
         self.runtime._metrics.release_count += 1
 
-    def quiesce(self):
+    def quiesce(self, timeout_seconds=5.0):
         for layer in range(self.layer_count):
-            self.drain_layer_append(layer)
-            self.drain_layer_attention(layer)
+            self.drain_layer_append(layer, timeout_seconds=timeout_seconds)
+            self.drain_layer_attention(layer, timeout_seconds=timeout_seconds)
+        self.page_pool.validate_invariants()
 
     def close(self):
         self.quiesce()

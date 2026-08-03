@@ -3,6 +3,7 @@
 from contextlib import contextmanager
 import heapq
 import threading
+import time
 
 from .errors import KVCapacityError, KVLifecycleError
 from .types import PageDescriptor, PageHandle, PageState
@@ -103,6 +104,13 @@ class KVPagePoolV1:
             descriptor.owner_hint = owner_hint
             descriptor.index_metadata_handle = None
             descriptor.transfer_event = None
+            descriptor.data_version = 0
+            descriptor.index_version = 0
+            descriptor.inflight_compute = 0
+            descriptor.inflight_io = 0
+            descriptor.dirty = False
+            descriptor.error = None
+            descriptor.logical_mappings.clear()
             self._touch(descriptor)
             self._peak_allocated = max(self._peak_allocated, self.allocated_pages)
             self._allocation_count += 1
@@ -170,6 +178,7 @@ class KVPagePoolV1:
             if target_descriptor.state != PageState.ALLOCATED:
                 raise KVLifecycleError("copy target must be allocated")
             source_descriptor.pin_count += 1
+            source_descriptor.inflight_io += 1
             target_descriptor.state = PageState.COPYING
             self._touch(source_descriptor)
             self._touch(target_descriptor)
@@ -182,39 +191,120 @@ class KVPagePoolV1:
                 raise KVLifecycleError("copy target is not in COPYING state")
             if source_descriptor.pin_count <= 0:
                 raise KVLifecycleError("copy source pin underflow")
+            if source_descriptor.inflight_io <= 0:
+                raise KVLifecycleError("copy source IO accounting underflow")
             source_descriptor.pin_count -= 1
+            source_descriptor.inflight_io -= 1
             target_descriptor.valid_tokens = int(valid_tokens)
             target_descriptor.state = PageState.ACTIVE
             self._touch(source_descriptor)
             self._touch(target_descriptor)
 
-    def pin(self, handle):
+    def pin(self, handle, kind="compute"):
         with self._lock:
             descriptor = self.descriptor(handle)
             if descriptor.state == PageState.FREE:
                 raise KVLifecycleError("cannot pin a free page")
+            if kind not in {"compute", "io"}:
+                raise ValueError("pin kind must be compute or io")
             descriptor.pin_count += 1
+            if kind == "compute":
+                descriptor.inflight_compute += 1
+            else:
+                descriptor.inflight_io += 1
             self._touch(descriptor)
 
-    def unpin(self, handle):
+    def unpin(self, handle, kind="compute"):
         with self._lock:
             descriptor = self.descriptor(handle)
             if descriptor.pin_count <= 0:
                 raise KVLifecycleError("page pin underflow")
+            if kind not in {"compute", "io"}:
+                raise ValueError("pin kind must be compute or io")
+            counter = (
+                descriptor.inflight_compute
+                if kind == "compute"
+                else descriptor.inflight_io
+            )
+            if counter <= 0:
+                raise KVLifecycleError(
+                    "page {} pin kind {} underflow".format(
+                        descriptor.page_id, kind
+                    )
+                )
             descriptor.pin_count -= 1
+            if kind == "compute":
+                descriptor.inflight_compute -= 1
+            else:
+                descriptor.inflight_io -= 1
             self._touch(descriptor)
 
     @contextmanager
-    def pinned(self, handles):
+    def pinned(self, handles, kind="compute"):
         pinned = []
         try:
             for handle in handles:
-                self.pin(handle)
+                self.pin(handle, kind=kind)
                 pinned.append(handle)
             yield
         finally:
             for handle in reversed(pinned):
-                self.unpin(handle)
+                self.unpin(handle, kind=kind)
+
+    def mark_data_updated(self, handle, version=None):
+        """Commit a page data version and invalidate any older index."""
+
+        with self._lock:
+            descriptor = self.descriptor(handle)
+            if descriptor.state == PageState.FREE:
+                raise KVLifecycleError("cannot version a free page")
+            next_version = (
+                descriptor.data_version + 1
+                if version is None
+                else int(version)
+            )
+            if next_version < descriptor.data_version:
+                raise KVLifecycleError("data version cannot move backwards")
+            descriptor.data_version = next_version
+            descriptor.dirty = descriptor.index_version != next_version
+            self._touch(descriptor)
+            return next_version
+
+    def mark_index_built(self, handle, version):
+        with self._lock:
+            descriptor = self.descriptor(handle)
+            version = int(version)
+            if version != descriptor.data_version:
+                raise KVLifecycleError(
+                    "index version {} does not match page {} data version {}".format(
+                        version,
+                        descriptor.page_id,
+                        descriptor.data_version,
+                    )
+                )
+            descriptor.index_version = version
+            descriptor.dirty = False
+            self._touch(descriptor)
+
+    def attach_index(self, handle, index_metadata_handle, version):
+        """Atomically publish a queryable index record for a page version."""
+
+        with self._lock:
+            descriptor = self.descriptor(handle)
+            self.mark_index_built(handle, version)
+            descriptor.index_metadata_handle = index_metadata_handle
+            descriptor.error = None
+            self._touch(descriptor)
+
+    def add_logical_mapping(self, handle, mapping):
+        with self._lock:
+            descriptor = self.descriptor(handle)
+            descriptor.logical_mappings.add(tuple(mapping))
+
+    def remove_logical_mapping(self, handle, mapping):
+        with self._lock:
+            descriptor = self.descriptor(handle)
+            descriptor.logical_mappings.discard(tuple(mapping))
 
     def assert_releasable(self, handles, operation="release"):
         blocked = []
@@ -223,6 +313,8 @@ class KVPagePoolV1:
             reason = None
             if descriptor.pin_count:
                 reason = "pinned"
+            elif descriptor.inflight_compute or descriptor.inflight_io:
+                reason = "inflight"
             elif descriptor.state in _BUSY_STATES:
                 reason = descriptor.state.value
             elif descriptor.ref_count <= 0:
@@ -253,10 +345,90 @@ class KVPagePoolV1:
             descriptor.owner_hint = None
             descriptor.index_metadata_handle = None
             descriptor.transfer_event = None
+            descriptor.data_version = 0
+            descriptor.index_version = 0
+            descriptor.inflight_compute = 0
+            descriptor.inflight_io = 0
+            descriptor.dirty = False
+            descriptor.error = None
+            descriptor.logical_mappings.clear()
             descriptor.state = PageState.FREE
             heapq.heappush(self._free, descriptor.page_id)
             self._release_count += 1
             return True
+
+    def validate_invariants(self):
+        """Raise with page-local diagnostics if ownership state is corrupt."""
+
+        with self._lock:
+            free_ids = set(self._free)
+            if len(free_ids) != len(self._free):
+                raise KVLifecycleError("free-list contains duplicate page IDs")
+            for descriptor in self.descriptors:
+                context = "page={} generation={}".format(
+                    descriptor.page_id, descriptor.generation
+                )
+                if descriptor.ref_count < 0 or descriptor.pin_count < 0:
+                    raise KVLifecycleError(context + " has a negative count")
+                if (
+                    descriptor.inflight_compute < 0
+                    or descriptor.inflight_io < 0
+                ):
+                    raise KVLifecycleError(context + " has negative inflight work")
+                if descriptor.pin_count != (
+                    descriptor.inflight_compute + descriptor.inflight_io
+                ):
+                    raise KVLifecycleError(context + " pin/inflight counts diverged")
+                is_free = descriptor.state == PageState.FREE
+                if is_free != (descriptor.page_id in free_ids):
+                    raise KVLifecycleError(context + " free-list state diverged")
+                if is_free and any(
+                    (
+                        descriptor.ref_count,
+                        descriptor.pin_count,
+                        descriptor.inflight_compute,
+                        descriptor.inflight_io,
+                        len(descriptor.logical_mappings),
+                    )
+                ):
+                    raise KVLifecycleError(context + " FREE invariant failed")
+                if not is_free and descriptor.ref_count <= 0:
+                    raise KVLifecycleError(context + " allocated page has no owner")
+                if (
+                    descriptor.index_version > descriptor.data_version
+                    and descriptor.index_metadata_handle is not None
+                ):
+                    raise KVLifecycleError(context + " index is newer than data")
+            return True
+
+    def wait_quiescent(self, timeout_seconds=5.0):
+        deadline = time.monotonic() + float(timeout_seconds)
+        while True:
+            with self._lock:
+                busy = [
+                    (
+                        item.page_id,
+                        item.generation,
+                        item.pin_count,
+                        item.inflight_compute,
+                        item.inflight_io,
+                        item.state.value,
+                    )
+                    for item in self.descriptors
+                    if item.pin_count
+                    or item.inflight_compute
+                    or item.inflight_io
+                    or item.state in _BUSY_STATES
+                ]
+            if not busy:
+                return True
+            if time.monotonic() >= deadline:
+                raise KVLifecycleError(
+                    "KV quiesce timed out after {:.3f}s; busy={}".format(
+                        float(timeout_seconds), busy
+                    )
+                )
+            time.sleep(0.001)
 
     def state_counts(self):
         result = {state.value: 0 for state in PageState}
@@ -288,5 +460,10 @@ class KVPagePoolV1:
             "max_pin_count": max(
                 (item.pin_count for item in allocated), default=0
             ),
+            "inflight_compute": sum(
+                item.inflight_compute for item in allocated
+            ),
+            "inflight_io": sum(item.inflight_io for item in allocated),
+            "dirty_pages": sum(item.dirty for item in allocated),
             "state_counts": self.state_counts(),
         }

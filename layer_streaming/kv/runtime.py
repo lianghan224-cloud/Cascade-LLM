@@ -8,7 +8,6 @@ import torch
 from ..attention.paged import (
     PagedAttentionDispatcher,
     default_paged_registry,
-    detected_architecture,
 )
 from ..kv_policy import (
     KVAccuracy,
@@ -26,12 +25,13 @@ from .ownership import OwnershipManager
 from .page_pool import KVPagePoolV1
 from .prefix_cache import PrefixCache
 from .request_table import RequestTable
+from .runtime_validation import validate_runtime_provider
 from .reuse import (
     PrefixMemoryReuse,
     RequestOnlyReuse,
     SessionReuse,
 )
-from .selection import DenseSelection
+from .selection import DenseSelection, QuestFlatSelection
 from .stores import GPUKVStore
 from .types import RequestLifecycleState
 
@@ -126,55 +126,7 @@ class PagedKVRuntime:
             self.policy.attention_backend,
             allow_reference=allow_reference,
         )
-        # Resolve static capability before allocating the GPU page arena.
-        attention_backend = self.dispatcher.attention_backend
-        kv_kernel_backend = self.dispatcher.kv_kernel_backend
-        if attention_backend.is_reference and not allow_reference:
-            raise ValueError("reference provider requires allow_reference=True")
-        capability = attention_backend.capability()
-        kernel_capability = kv_kernel_backend.capability()
-        architecture = detected_architecture(self.device)
-        static_errors = []
-        if architecture not in capability.architectures:
-            static_errors.append("architecture {}".format(architecture))
-        if self.policy.dtype.value not in capability.dtypes:
-            static_errors.append("dtype {}".format(self.policy.dtype.value))
-        if self.page_size not in capability.page_sizes:
-            static_errors.append("page size {}".format(self.page_size))
-        if capability.head_dims and self.head_dim not in capability.head_dims:
-            static_errors.append("head dim {}".format(self.head_dim))
-        if self.num_kv_heads == 1 and self.num_query_heads > 1:
-            if not capability.supports_mqa:
-                static_errors.append("MQA")
-        elif self.num_query_heads == self.num_kv_heads:
-            if not capability.supports_mha:
-                static_errors.append("MHA")
-        elif not capability.supports_gqa:
-            static_errors.append("GQA")
-        if architecture not in kernel_capability.architectures:
-            static_errors.append("KV kernel architecture {}".format(architecture))
-        if self.policy.dtype.value not in kernel_capability.dtypes:
-            static_errors.append(
-                "KV kernel dtype {}".format(self.policy.dtype.value)
-            )
-        if self.page_size not in kernel_capability.page_sizes:
-            static_errors.append("KV kernel page size {}".format(self.page_size))
-        if (
-            kernel_capability.head_dims
-            and self.head_dim not in kernel_capability.head_dims
-        ):
-            static_errors.append("KV kernel head dim {}".format(self.head_dim))
-        if not kernel_capability.supports_append:
-            static_errors.append("KV append")
-        if not kernel_capability.supports_copy:
-            static_errors.append("KV page copy")
-        if static_errors:
-            raise KVUnsupportedError(
-                "provider {} rejected runtime before allocation: {}".format(
-                    self.dispatcher.bundle.name,
-                    ", ".join(static_errors),
-                )
-            )
+        validate_runtime_provider(self, allow_reference=allow_reference)
         self.store = store or GPUKVStore(
             layer_count=self.layer_count,
             page_count=self.page_count,
@@ -192,7 +144,15 @@ class PagedKVRuntime:
             format_version=1,
             reserved_free_pages=reserved_free_pages,
         )
-        self.selection = DenseSelection()
+        self.selection = (
+            QuestFlatSelection(
+                budget=self.policy.page_budget,
+                recent_window=self.policy.recent_window,
+                mode=("full" if self.policy.page_budget == 0 else "budget"),
+            )
+            if self.policy.selection == KVSelectionPolicy.QUEST_FLAT
+            else DenseSelection()
+        )
         self.reuse = {
             KVReusePolicy.REQUEST_ONLY: RequestOnlyReuse,
             KVReusePolicy.SESSION: SessionReuse,
@@ -222,16 +182,23 @@ class PagedKVRuntime:
     def _validate_policy(self, inferred_dtype):
         if self.policy.page_size != self.page_size:
             raise ValueError("KV policy page size does not match runtime")
-        if self.policy.accuracy != KVAccuracy.EXACT:
-            raise KVUnsupportedError("V1 executable path currently supports exact KV only")
+        if self.policy.accuracy not in {KVAccuracy.EXACT, KVAccuracy.SPARSE}:
+            raise KVUnsupportedError(
+                "executable KV supports exact or Quest sparse accuracy"
+            )
         if self.policy.storage != KVStoragePolicy.GPU:
             raise KVUnsupportedError("active CPU/NVMe KV stores are not implemented")
         if self.policy.dtype not in {KVDataType.BF16, KVDataType.FP16}:
             raise KVUnsupportedError("quantized KV formats are not implemented")
         if inferred_dtype != self.policy.dtype and self.dtype != torch.float32:
             raise ValueError("runtime tensor dtype does not match KV policy")
-        if self.policy.selection != KVSelectionPolicy.DENSE:
-            raise KVUnsupportedError("sparse page selection is not implemented")
+        if self.policy.selection not in {
+            KVSelectionPolicy.DENSE,
+            KVSelectionPolicy.QUEST_FLAT,
+        }:
+            raise KVUnsupportedError(
+                "only dense and Quest-flat page selection are implemented"
+            )
         if self.policy.reuse == KVReusePolicy.PREFIX_PERSISTENT:
             raise KVUnsupportedError("persistent prefix reuse is not implemented")
 
@@ -310,6 +277,24 @@ class PagedKVRuntime:
 
     def commit(self, state):
         return self.ownership.commit(state)
+
+    def rollback(self, state, target_length, target_version=None):
+        with self._lock:
+            return self.ownership.rollback(
+                state,
+                target_length=target_length,
+                target_version=target_version,
+            )
+
+    def commit_speculative(self, state, draft_start, accepted_tokens):
+        draft_start = int(draft_start)
+        accepted_tokens = int(accepted_tokens)
+        if accepted_tokens < 0:
+            raise ValueError("accepted speculative tokens must not be negative")
+        target = draft_start + accepted_tokens
+        if target > state.sequence_length:
+            raise ValueError("speculative commit exceeds the appended draft")
+        return self.rollback(state, target)
 
     def prepare_batch(
         self,
@@ -412,13 +397,18 @@ class PagedKVRuntime:
         request_id=None,
     ):
         with self._lock:
-            return self.prefix_cache.reuse(
+            result = self.prefix_cache.reuse(
                 self,
                 token_ids,
                 max_length,
                 reuse_namespace=reuse_namespace,
                 request_id=request_id,
             )
+            state, _ = result
+            if hasattr(self.selection, "build_request_layer"):
+                for layer in range(self.layer_count):
+                    self.selection.build_request_layer(self, state, layer)
+            return result
 
     def reset(self, state):
         with self._lock:
@@ -471,11 +461,13 @@ class PagedKVRuntime:
         )
         return result
 
-    def quiesce(self):
+    def quiesce(self, timeout_seconds=5.0):
         """Wait for bounded page kernels and release all transient page pins."""
         with self._lock:
             self._check_open()
-            self.ownership.quiesce()
+            self.ownership.quiesce(timeout_seconds=timeout_seconds)
+            self.page_pool.wait_quiescent(timeout_seconds=timeout_seconds)
+            self.page_pool.validate_invariants()
             return self.profile_stats()
 
     def close(self):

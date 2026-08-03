@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "hardware": {
+    "device": "NVIDIA GeForce RTX 3080 Ti",
+    "architecture": "sm86",
+    "torch": "2.4.1+cu121",
+    "cuda": "12.1"
+  },
+  "configuration": {
+    "device": "cuda:0",
+    "providers": [
+      "legacy_gather_sdpa_reference"
+    ],
+    "lengths": [
+      4096
+    ],
+    "page_sizes": [
+      16
+    ],
+    "phases": [
+      "decode"
+    ],
+    "batch_size": 2,
+    "prefill_query_length": 8,
+    "query_heads": 32,
+    "kv_heads": 8,
+    "head_dim": 128,
+    "dtype": "bf16",
+    "warmup": 1,
+    "runs": 3
+  },
+  "results": [
+    {
+      "supported": true,
+      "provider": "legacy_gather_sdpa_reference",
+      "context_length": 4096,
+      "page_size": 16,
+      "phase": "decode",
+      "batch_size": 2,
+      "query_lengths": [
+        1,
+        1
+      ],
+      "mean_ms": 26.405512704513967,
+      "p50_ms": 26.311983005143702,
+      "p95_ms": 26.702441042289138,
+      "samples_ms": [
+        26.702441042289138,
+        26.20211406610906,
+        26.311983005143702
+      ],
+      "workspace_peak_bytes": 67108864,
+      "kv_pool_bytes": 29622272,
+      "gpu_peak_allocated_bytes": 157702144,
+      "requires_full_kv_workspace": true,
+      "qualification_status": "experimental",
+      "attention_backend": "legacy_gather_sdpa_reference",
+      "kv_kernel_backend": "torch_paged_kv",
+      "provider_bundle": "legacy_gather_sdpa_reference"
+    }
+  ],
+  "acceptance": {
+    "production_numerics_pass": null,
+    "production_numerics_reason": "Numerical Contract V2 requires FP32 math and native-precision baselines; benchmark pairwise metrics are diagnostic only",
+    "production_has_zero_full_kv_workspace": false,
+    "production_faster_than_reference": null
+  }
+}

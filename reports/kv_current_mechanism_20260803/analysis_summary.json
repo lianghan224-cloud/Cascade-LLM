@@ -1,0 +1,485 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-03T02:01:37.398718+00:00",
+  "as_of_date": "2026-08-03",
+  "git_commit": "a614b485370500ceda84662572e60759835a835d",
+  "hardware": {
+    "vendor": "nvidia",
+    "device_name": "NVIDIA GeForce RTX 3080 Ti",
+    "device_index": 0,
+    "compute_capability_major": 8,
+    "compute_capability_minor": 6,
+    "architecture": "sm86",
+    "total_memory_bytes": 12528123904,
+    "free_memory_bytes": 12228624384,
+    "driver_version": null,
+    "cuda_runtime_version": "12.1",
+    "torch_version": "2.4.1+cu121",
+    "torch_cuda_version": "12.1",
+    "supports_fp16": true,
+    "supports_bf16": true,
+    "supports_int8_tensor_core": true,
+    "supports_int4_tensor_core": true,
+    "unified_addressing": true,
+    "async_copy_supported": true,
+    "schema_version": 1
+  },
+  "headline": {
+    "tests_passed": 148,
+    "test_failures": 0,
+    "lifecycle_cycles": 1000,
+    "resource_drift_bytes": 0,
+    "production_case_count": 64,
+    "production_zero_workspace": true,
+    "short_sm86_median_speedup": 1.0846,
+    "long_sm86_median_speedup": 1.1563,
+    "full_prefill_max_sm86_slowdown": 27.096,
+    "real8b_max_mode_spread_pct": 0.402,
+    "bytes_per_token": 131072,
+    "kib_per_token": 128.0,
+    "theoretical_kv_only_tokens": 95582,
+    "strict_hf_diagnostic_failures": 23,
+    "strict_hf_comparison_count": 297,
+    "quality_max_accuracy_drop_pp": 0.0,
+    "historical_1000_token_p50_ms": 1458.872,
+    "historical_hf_top1_matches": 101,
+    "historical_hf_sampled_positions": 101
+  },
+  "test_summary": {
+    "schema_version": 1,
+    "passed": true,
+    "tests_run": 148,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "expected_failures": 0,
+    "unexpected_successes": 0,
+    "duration_seconds": 23.04073765000794,
+    "start_dir": "tests",
+    "pattern": "test_*.py"
+  },
+  "lifecycle": {
+    "operations": {
+      "beam_forks_and_discards": 1000,
+      "speculative_forks_and_commits": 1000,
+      "session_forks": 142,
+      "prefix_registrations": 62
+    },
+    "acceptance": {
+      "ownership_graph_exact_every_sample": true,
+      "quiescent_pin_count_zero": true,
+      "all_pages_released_after_close": true,
+      "thread_count_stable": true,
+      "cuda_allocated_returned": true,
+      "cuda_reserved_steady_during_cycles": true,
+      "allocator_cache_released_after_trim": true
+    },
+    "resource_drift": {
+      "cuda_allocated_bytes": 0,
+      "cuda_reserved_bytes": 0,
+      "thread_count": 0
+    }
+  },
+  "prefill_rows": [
+    {
+      "context": 128,
+      "context_label": "128",
+      "legacy_ms": 1.072,
+      "generic_ms": 2.742,
+      "sm86_ms": 1.61,
+      "generic_slowdown": 2.558,
+      "sm86_slowdown": 1.502,
+      "legacy_workspace_mib": 2.0,
+      "production_workspace_mib": 0.0,
+      "runs": 5
+    },
+    {
+      "context": 512,
+      "context_label": "512",
+      "legacy_ms": 2.485,
+      "generic_ms": 34.745,
+      "sm86_ms": 14.894,
+      "generic_slowdown": 13.98,
+      "sm86_slowdown": 5.993,
+      "legacy_workspace_mib": 8.0,
+      "production_workspace_mib": 0.0,
+      "runs": 5
+    },
+    {
+      "context": 1024,
+      "context_label": "1024",
+      "legacy_ms": 4.406,
+      "generic_ms": 117.751,
+      "sm86_ms": 57.936,
+      "generic_slowdown": 26.725,
+      "sm86_slowdown": 13.149,
+      "legacy_workspace_mib": 16.0,
+      "production_workspace_mib": 0.0,
+      "runs": 5
+    },
+    {
+      "context": 2048,
+      "context_label": "2048",
+      "legacy_ms": 8.535,
+      "generic_ms": 469.688,
+      "sm86_ms": 231.275,
+      "generic_slowdown": 55.028,
+      "sm86_slowdown": 27.096,
+      "legacy_workspace_mib": 32.0,
+      "production_workspace_mib": 0.0,
+      "runs": 5
+    }
+  ],
+  "workspace_rows": [
+    {
+      "context": 128,
+      "context_label": "128",
+      "legacy_workspace_mib": 2.0,
+      "production_workspace_mib": 0.0
+    },
+    {
+      "context": 512,
+      "context_label": "512",
+      "legacy_workspace_mib": 8.0,
+      "production_workspace_mib": 0.0
+    },
+    {
+      "context": 1024,
+      "context_label": "1024",
+      "legacy_workspace_mib": 16.0,
+      "production_workspace_mib": 0.0
+    },
+    {
+      "context": 2048,
+      "context_label": "2048",
+      "legacy_workspace_mib": 32.0,
+      "production_workspace_mib": 0.0
+    }
+  ],
+  "suffix_speedups": [
+    {
+      "context": 1024,
+      "context_label": "1024",
+      "median_speedup": 1.1871,
+      "min_speedup": 1.1366,
+      "max_speedup": 1.2477,
+      "case_count": 4
+    },
+    {
+      "context": 2048,
+      "context_label": "2048",
+      "median_speedup": 1.1625,
+      "min_speedup": 1.1282,
+      "max_speedup": 1.2024,
+      "case_count": 4
+    },
+    {
+      "context": 4096,
+      "context_label": "4096",
+      "median_speedup": 1.1486,
+      "min_speedup": 1.1206,
+      "max_speedup": 1.1856,
+      "case_count": 4
+    },
+    {
+      "context": 8192,
+      "context_label": "8192",
+      "median_speedup": 1.1569,
+      "min_speedup": 1.1243,
+      "max_speedup": 1.1921,
+      "case_count": 4
+    }
+  ],
+  "lifecycle_rows": [
+    {
+      "cycle": 1,
+      "allocated_mib": 1.266,
+      "reserved_mib": 2.0,
+      "allocated_pages": 1,
+      "sequence_length": 2,
+      "total_ref_count": 1,
+      "total_pin_count": 0
+    },
+    {
+      "cycle": 100,
+      "allocated_mib": 1.266,
+      "reserved_mib": 2.0,
+      "allocated_pages": 7,
+      "sequence_length": 101,
+      "total_ref_count": 13,
+      "total_pin_count": 0
+    },
+    {
+      "cycle": 200,
+      "allocated_mib": 1.266,
+      "reserved_mib": 2.0,
+      "allocated_pages": 13,
+      "sequence_length": 201,
+      "total_ref_count": 25,
+      "total_pin_count": 0
+    },
+    {
+      "cycle": 300,
+      "allocated_mib": 1.266,
+      "reserved_mib": 2.0,
+      "allocated_pages": 19,
+      "sequence_length": 301,
+      "total_ref_count": 37,
+      "total_pin_count": 0
+    },
+    {
+      "cycle": 400,
+      "allocated_mib": 1.266,
+      "reserved_mib": 2.0,
+      "allocated_pages": 26,
+      "sequence_length": 401,
+      "total_ref_count": 51,
+      "total_pin_count": 0
+    },
+    {
+      "cycle": 500,
+      "allocated_mib": 1.266,
+      "reserved_mib": 2.0,
+      "allocated_pages": 32,
+      "sequence_length": 501,
+      "total_ref_count": 63,
+      "total_pin_count": 0
+    },
+    {
+      "cycle": 600,
+      "allocated_mib": 1.266,
+      "reserved_mib": 2.0,
+      "allocated_pages": 38,
+      "sequence_length": 601,
+      "total_ref_count": 75,
+      "total_pin_count": 0
+    },
+    {
+      "cycle": 700,
+      "allocated_mib": 1.266,
+      "reserved_mib": 2.0,
+      "allocated_pages": 44,
+      "sequence_length": 701,
+      "total_ref_count": 87,
+      "total_pin_count": 0
+    },
+    {
+      "cycle": 800,
+      "allocated_mib": 1.266,
+      "reserved_mib": 2.0,
+      "allocated_pages": 51,
+      "sequence_length": 801,
+      "total_ref_count": 101,
+      "total_pin_count": 0
+    },
+    {
+      "cycle": 900,
+      "allocated_mib": 1.266,
+      "reserved_mib": 2.0,
+      "allocated_pages": 57,
+      "sequence_length": 901,
+      "total_ref_count": 113,
+      "total_pin_count": 0
+    },
+    {
+      "cycle": 1000,
+      "allocated_mib": 1.266,
+      "reserved_mib": 2.0,
+      "allocated_pages": 63,
+      "sequence_length": 1001,
+      "total_ref_count": 125,
+      "total_pin_count": 0
+    }
+  ],
+  "real8b_rows": [
+    {
+      "context": 8,
+      "provider": "legacy_gather_sdpa_reference",
+      "ttft_ms": 1357.166,
+      "decode_ms": 1356.586,
+      "decode_tps": 0.7371,
+      "workspace_mib": 0.1406,
+      "top1_matches_legacy": true,
+      "runs": 2
+    },
+    {
+      "context": 8,
+      "provider": "generic_cuda",
+      "ttft_ms": 1359.27,
+      "decode_ms": 1357.521,
+      "decode_tps": 0.7366,
+      "workspace_mib": 0.0,
+      "top1_matches_legacy": true,
+      "runs": 2
+    },
+    {
+      "context": 8,
+      "provider": "sm86",
+      "ttft_ms": 1359.089,
+      "decode_ms": 1356.571,
+      "decode_tps": 0.7372,
+      "workspace_mib": 0.0,
+      "top1_matches_legacy": true,
+      "runs": 2
+    },
+    {
+      "context": 128,
+      "provider": "legacy_gather_sdpa_reference",
+      "ttft_ms": 1355.189,
+      "decode_ms": 1356.278,
+      "decode_tps": 0.7373,
+      "workspace_mib": 2.0156,
+      "top1_matches_legacy": true,
+      "runs": 2
+    },
+    {
+      "context": 128,
+      "provider": "generic_cuda",
+      "ttft_ms": 1357.023,
+      "decode_ms": 1358.43,
+      "decode_tps": 0.7361,
+      "workspace_mib": 0.0,
+      "top1_matches_legacy": true,
+      "runs": 2
+    },
+    {
+      "context": 128,
+      "provider": "sm86",
+      "ttft_ms": 1356.61,
+      "decode_ms": 1352.979,
+      "decode_tps": 0.7391,
+      "workspace_mib": 0.0,
+      "top1_matches_legacy": true,
+      "runs": 2
+    }
+  ],
+  "capacity_rows": [
+    {
+      "context_tokens": 8192,
+      "kv_gib": 1.0,
+      "share_of_physical_vram_pct": 8.6,
+      "interpretation": "fits before other GPU allocations"
+    },
+    {
+      "context_tokens": 32768,
+      "kv_gib": 4.0,
+      "share_of_physical_vram_pct": 34.3,
+      "interpretation": "fits before other GPU allocations"
+    },
+    {
+      "context_tokens": 65536,
+      "kv_gib": 8.0,
+      "share_of_physical_vram_pct": 68.6,
+      "interpretation": "fits before other GPU allocations"
+    },
+    {
+      "context_tokens": 95582,
+      "kv_gib": 11.668,
+      "share_of_physical_vram_pct": 100.0,
+      "interpretation": "theoretical KV-only ceiling"
+    },
+    {
+      "context_tokens": 131072,
+      "kv_gib": 16.0,
+      "share_of_physical_vram_pct": 137.1,
+      "interpretation": "exceeds physical VRAM"
+    }
+  ],
+  "mode_support": [
+    {
+      "capability": "Exact dense GPU KV, BF16/FP16",
+      "status": "implemented",
+      "measured": "yes",
+      "boundary": "Generic CUDA and SM86 direct paging"
+    },
+    {
+      "capability": "Request/session/in-memory sealed-prefix reuse",
+      "status": "implemented",
+      "measured": "lifecycle",
+      "boundary": "No LRU or persistent tier"
+    },
+    {
+      "capability": "Ragged batch metadata and kernels",
+      "status": "implemented ABI",
+      "measured": "microbenchmark",
+      "boundary": "No continuous-batching scheduler"
+    },
+    {
+      "capability": "INT8/FP8/INT4 KV",
+      "status": "unsupported",
+      "measured": "no",
+      "boundary": "Policy/ABI only"
+    },
+    {
+      "capability": "GPU+CPU/NVMe active KV offload",
+      "status": "unsupported",
+      "measured": "no",
+      "boundary": "No transfer/restore path"
+    },
+    {
+      "capability": "Quest/sparse page selection",
+      "status": "unsupported",
+      "measured": "no",
+      "boundary": "Selection interface only"
+    },
+    {
+      "capability": "Persistent prefix cache",
+      "status": "unsupported",
+      "measured": "no",
+      "boundary": "In-memory full sealed blocks only"
+    },
+    {
+      "capability": "CUDA Graph",
+      "status": "unsupported",
+      "measured": "no",
+      "boundary": "Host metadata and synchronization remain"
+    },
+    {
+      "capability": "SM80/SM89/SM90",
+      "status": "declared only",
+      "measured": "no",
+      "boundary": "No physical qualification evidence"
+    }
+  ],
+  "historical_validation": {
+    "qualification_status": "production",
+    "production_passed": true,
+    "strict_hf_diagnostic_failures": 23,
+    "strict_hf_comparison_count": 297,
+    "quality_coverage": {
+      "perplexity_tokens": 64,
+      "short_examples": 8,
+      "long_context_examples": 4,
+      "dialogue_examples": 6
+    },
+    "quality_metrics": {
+      "perplexity_relative_degradation": 0.0,
+      "perplexity_relative_change": -0.0008750005790326698,
+      "short_accuracy_drop_pp": 0.0,
+      "long_hit_rate_drop_pp": 0.0,
+      "dialogue_accuracy_drop_pp": 0.0
+    },
+    "real8b_1000_token_acceptance": {
+      "cuda_allocated_stable": true,
+      "cuda_reserved_stable": true,
+      "thread_count_stable": true,
+      "workspace_zero": true,
+      "all_pages_released": true,
+      "long_request_page_count_exact": true,
+      "long_request_ref_count_exact": true,
+      "quiescent_pin_count_zero": true,
+      "numerical_finite": true,
+      "numerical_bounded": true
+    },
+    "hf_replay_top1_matches": 101,
+    "hf_replay_sampled_positions": 101
+  },
+  "validation_assessment": "Share with caveats",
+  "validation_caveats": [
+    "Fresh performance evidence is from one RTX 3080 Ti (SM86).",
+    "Fresh real-8B mode results have two measured runs after one warmup and support only noise-level comparisons.",
+    "The 1000-token real-model soak and quality suite are checked-in evidence from the same current commit, not rerun on 2026-08-03.",
+    "The full-Prefill benchmark is a one-layer synthetic kernel test; the 8B end-to-end result includes streamed weights.",
+    "Legacy gather+SDPA is an experimental comparison path, not a production serving baseline."
+  ]
+}
