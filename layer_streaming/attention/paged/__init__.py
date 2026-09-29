@@ -1,4 +1,5 @@
 from .abi import (
+    DevicePagedAttentionInput,
     PAGED_ATTENTION_ABI_VERSION,
     PagedAttentionInput,
     PagedAttentionOutput,
@@ -18,14 +19,17 @@ from .numerical_contract import (
     default_paged_numerical_contract,
 )
 from .reference import (
+    GatherSDPAPrefillBackend,
     LegacyGatherSDPAReferenceBackend,
     ReferencePagedExactBackend,
 )
-from .workspace import PagedWorkspaceEstimate
+from .workspace import PagedWorkspaceEstimate, PagedWorkspaceShape
 from .routing import PagedWorkload, classify_paged_workload
 
 __all__ = [
     "LegacyGatherSDPAReferenceBackend",
+    "GatherSDPAPrefillBackend",
+    "DevicePagedAttentionInput",
     "PAGED_ATTENTION_ABI_VERSION",
     "PAGED_NUMERICAL_CONTRACT_VERSION",
     "PagedAttentionCapability",
@@ -38,6 +42,7 @@ __all__ = [
     "PagedNumericalContract",
     "default_paged_numerical_contract",
     "PagedWorkspaceEstimate",
+    "PagedWorkspaceShape",
     "PagedWorkload",
     "classify_paged_workload",
     "ReferencePagedExactBackend",

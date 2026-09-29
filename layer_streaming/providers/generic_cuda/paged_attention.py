@@ -156,6 +156,7 @@ class GenericCUDAPagedAttentionBackend(
     # chunked prefill route to the correctness fallback until a dedicated
     # prefill kernel advertises those capabilities.
     workload_kinds = ("decode", "short_suffix")
+    supports_device_selected_view = True
 
     def capability(self):
         return PagedAttentionCapability(
@@ -190,8 +191,9 @@ class GenericCUDAPagedAttentionBackend(
             False,
         )
 
-    def _execute(self, request, phase):
-        request.validate()
+    def _launch_attention(
+        self, request, phase, *, physical_blocks, max_query_length
+    ):
         if not request.query.is_cuda:
             raise KVProviderError("generic CUDA paged attention requires CUDA tensors")
         if request.query.dtype != request.key_pool_view.dtype:
@@ -225,7 +227,7 @@ class GenericCUDAPagedAttentionBackend(
             kernel_name,
             (
                 batch.batch_size,
-                batch.max_query_length,
+                int(max_query_length),
                 int(request.num_query_heads),
             ),
             (threads, 1, 1),
@@ -234,7 +236,7 @@ class GenericCUDAPagedAttentionBackend(
                 (ctypes.c_void_p, query.data_ptr()),
                 (ctypes.c_void_p, request.key_pool_view.data_ptr()),
                 (ctypes.c_void_p, request.value_pool_view.data_ptr()),
-                (ctypes.c_void_p, request.flat_block_table.data_ptr()),
+                (ctypes.c_void_p, physical_blocks.data_ptr()),
                 (ctypes.c_void_p, request.logical_block_ids.data_ptr()),
                 (ctypes.c_void_p, request.page_valid_tokens.data_ptr()),
                 (ctypes.c_void_p, request.block_table_indptr.data_ptr()),
@@ -265,13 +267,37 @@ class GenericCUDAPagedAttentionBackend(
                 "full_score_matrix": False,
                 "threads": threads,
                 "compiler": "nvrtc",
+                "selected_view": (
+                    "device"
+                    if physical_blocks
+                    is getattr(request.selected_pages, "physical_slot_tensor", None)
+                    else "host_v1"
+                ),
             },
+        )
+
+    def _execute(self, request, phase):
+        request.validate()
+        return self._launch_attention(
+            request,
+            phase,
+            physical_blocks=request.flat_block_table,
+            max_query_length=request.batch_view.max_query_length,
         )
 
     def decode(self, request):
         if request.batch_view.max_query_length != 1:
             raise ValueError("decode requires query length one for every request")
         return self._execute(request, "decode")
+
+    def decode_device(self, request):
+        request.validate_device_decode()
+        return self._launch_attention(
+            request,
+            "decode",
+            physical_blocks=request.selected_pages.physical_slot_tensor,
+            max_query_length=1,
+        )
 
     def prefill(self, request):
         return self._execute(request, "prefill")

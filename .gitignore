@@ -4,7 +4,12 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.coverage
+coverage.xml
+.hypothesis/
 .codex-log/
+.codex/
+.agents/
 build/
 dist/
 *.egg-info/
@@ -23,42 +28,19 @@ models/
 token
 token.txt
 h2d_driver_bench
+*.so
 
-# Real experiment outputs: receipts/summaries are tracked, raw traces are not.
-real_results/raw/
-real_results/airllm/*.log
-real_results/70b_int8/airllm_compression/*.log
-real_results/70b_int8/airllm_compression/*.pid
-real_results/70b_int8/airllm_compression/*.failed
-real_results/70b_int8/airllm_compression/smoke_*.json
-# Local chats can contain private prompts and are runtime state, not receipts.
-real_results/70b_int8/chat_*.jsonl
-real_results/70b_int8/chat_*session*.json
-# Large per-layer numerical traces are local diagnostic intermediates. Keep
-# their compact gate summaries and versioned contracts in the repository.
-real_results/8b_w8a16/fused_decode_diagnostics.json
-real_results/8b_w8a16/fused_decode_diagnostics_fp32_reference.json
-real_results/8b_w8a16/fused_decode_diagnostics_golden_chongqing.json
-real_results/8b_w8a16/fused_decode_diagnostics_golden_france.json
-real_results/8b_w8a16/golden_v1/baseline_special_tokens.json
-real_results/8b_w8a16/golden_v1/chinese_chongqing.json
-real_results/8b_w8a16/golden_v1/english_france.json
+# Runtime outputs are machine-specific and can contain prompts, host details,
+# hardware identifiers, or large traces. Promote only reviewed summaries to
+# documentation.
+reports/
+real_results/
+results/
+*.log
+
 *.nsys-rep
 *.qdrep
 
 # Locally compiled optional CUDA providers. Keep validated metadata reviewable.
 layer_streaming/providers/*/_build/*
 !layer_streaming/providers/*/_build/*.metadata.json
-# Qualification payloads are CI/release artifacts. Keep only summaries and
-# content manifests in Git.
-real_results/**/*.json
-real_results/**/artifacts/
-!real_results/manifest.json
-!real_results/**/manifest.json
-!real_results/**/*summary.json
-!real_results/**/compatibility_matrix.json
-
-# Machine-specific migration receipts are generated after cloning. They may
-# contain host paths and GPU UUIDs, so keep them local unless explicitly
-# redacted and promoted into a reviewed summary.
-reports/migration/

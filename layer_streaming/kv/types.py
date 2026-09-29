@@ -60,6 +60,9 @@ class PageDescriptor:
         self.dirty = False
         self.error = None
         self.logical_mappings = set()
+        # Additive V2 identity metadata.  It intentionally stays outside the
+        # frozen V1 dataclass fields published by kv_framework_contract().
+        self.pool_uuid = None
 
     def as_dict(self):
         return {
@@ -82,6 +85,7 @@ class PageDescriptor:
             "dirty": bool(self.dirty),
             "error": self.error,
             "logical_mapping_count": len(self.logical_mappings),
+            "pool_uuid": self.pool_uuid,
             "has_index_metadata": self.index_metadata_handle is not None,
             "has_transfer_event": self.transfer_event is not None,
         }
@@ -94,7 +98,14 @@ class PageHandle:
     observes the same lifecycle transition without rewriting its block table.
     """
 
-    __slots__ = ("page_id", "generation", "store_id", "format_id", "_descriptor")
+    __slots__ = (
+        "page_id",
+        "generation",
+        "store_id",
+        "format_id",
+        "_pool_uuid",
+        "_descriptor",
+    )
 
     def __init__(self, descriptor):
         self.page_id = int(descriptor.page_id)
@@ -105,7 +116,14 @@ class PageHandle:
             descriptor.layout,
             descriptor.format_version,
         )
+        self._pool_uuid = str(descriptor.pool_uuid)
         self._descriptor = descriptor
+
+    @property
+    def pool_uuid(self):
+        """Runtime-unique pool identity, additive to the frozen V1 ABI."""
+
+        return self._pool_uuid
 
     @property
     def state(self):
@@ -121,6 +139,7 @@ class PageHandle:
 
     def identity(self):
         return (
+            self.pool_uuid,
             self.page_id,
             self.generation,
             self.store_id,
@@ -133,6 +152,7 @@ class PageHandle:
             "generation": self.generation,
             "store_id": self.store_id,
             "format_id": self.format_id,
+            "pool_uuid": self.pool_uuid,
             "state": self.state.value,
         }
 

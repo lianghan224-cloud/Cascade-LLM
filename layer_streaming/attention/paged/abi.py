@@ -6,7 +6,7 @@ import math
 import torch
 
 from ...kv.batch_state import PagedBatchView
-from ...kv.page_view import SelectedPageView
+from ...kv.page_view import DeviceSelectedPageView, SelectedPageView
 from ...kv.slot_mapping import SlotMapping
 
 
@@ -165,6 +165,115 @@ class PagedAttentionInput:
         if not math.isfinite(float(self.softmax_scale)) or float(self.softmax_scale) <= 0:
             raise ValueError("softmax_scale must be finite and positive")
         return self
+
+
+@dataclass(frozen=True)
+class DevicePagedAttentionInput(PagedAttentionInput):
+    """Additive device-selected Decode ABI; V1 Host ABI remains unchanged.
+
+    The validation deliberately uses tensor metadata only.  Device values are
+    checked with asynchronous assertions so this production entry point never
+    extracts a CUDA scalar merely to launch attention.
+    """
+
+    selected_pages: DeviceSelectedPageView
+
+    def validate_device_decode(self):
+        selected = self.selected_pages
+        if not isinstance(selected, DeviceSelectedPageView):
+            raise TypeError("device attention requires DeviceSelectedPageView")
+        if self.query.ndim != 3:
+            raise ValueError("query must be [batch, query_head, head_dim]")
+        if tuple(self.query.shape) != (
+            self.batch_view.batch_size,
+            int(self.num_query_heads),
+            int(self.head_dim),
+        ):
+            raise ValueError("device Decode requires one query token per request")
+        count = int(selected.selection_count)
+        if count <= 0 or count != int(selected.flat_page_ids.numel()):
+            raise ValueError("device selected-page count is invalid")
+        if selected.block_table_indptr.shape != (
+            self.batch_view.batch_size + 1,
+        ):
+            raise ValueError("device selected indptr does not match batch")
+        if selected.physical_slot_tensor.dtype != torch.int32:
+            raise TypeError("device physical slots must use int32")
+        if not selected.physical_slot_tensor.is_contiguous():
+            raise ValueError("device physical slots must be contiguous")
+        for name, tensor in (
+            ("logical IDs", selected.logical_block_ids),
+            ("valid tokens", selected.page_valid_tokens),
+            ("selected indptr", selected.block_table_indptr),
+            ("sequence lengths", self.batch_view.sequence_lengths),
+            ("query indptr", self.batch_view.query_indptr),
+            ("query positions", self.batch_view.query_positions),
+        ):
+            if tensor.dtype != torch.int32:
+                raise TypeError("device {} must use int32".format(name))
+            if not tensor.is_contiguous():
+                raise ValueError("device {} must be contiguous".format(name))
+        if int(self.num_query_heads) % int(self.num_kv_heads):
+            raise ValueError("query heads must be divisible by KV heads")
+        expected_tail = (
+            int(self.num_kv_heads),
+            int(self.page_size),
+            int(self.head_dim),
+        )
+        if (
+            self.key_pool_view.ndim != 4
+            or tuple(self.key_pool_view.shape[1:]) != expected_tail
+        ):
+            raise ValueError("key pool must be HND [slot, head, token, dim]")
+        if self.value_pool_view.shape != self.key_pool_view.shape:
+            raise ValueError("K/V pools must share a shape")
+        tensors = (
+            self.query,
+            self.key_pool_view,
+            self.value_pool_view,
+            selected.physical_slot_tensor,
+            selected.logical_block_ids,
+            selected.page_valid_tokens,
+            selected.block_table_indptr,
+            selected.epoch_tensor,
+            selected.current_epoch_tensor,
+            selected.generation_tensor,
+            selected.location_state_tensor,
+            selected.error_state_tensor,
+            self.batch_view.sequence_lengths,
+            self.batch_view.query_indptr,
+            self.batch_view.query_positions,
+        )
+        if len({tensor.device for tensor in tensors}) != 1:
+            raise ValueError("device attention tensors must share a device")
+        expected_dtype = {
+            "bf16": torch.bfloat16,
+            "fp16": torch.float16,
+        }.get(str(self.kv_dtype))
+        if expected_dtype is None:
+            raise ValueError("unsupported executable KV dtype {}".format(self.kv_dtype))
+        if self.key_pool_view.dtype != expected_dtype:
+            raise ValueError("KV dtype does not match page pool")
+        if self.query.dtype not in {torch.bfloat16, torch.float16, torch.float32}:
+            raise ValueError("unsupported query dtype")
+        if not math.isfinite(float(self.softmax_scale)) or float(self.softmax_scale) <= 0:
+            raise ValueError("softmax_scale must be finite and positive")
+        torch._assert_async(
+            selected.block_table_indptr[-1] == count,
+            "device selected indptr does not cover selected pages",
+        )
+        torch._assert_async(
+            torch.all(selected.error_state_tensor == 0),
+            "device selected-page validation failed",
+        )
+        torch._assert_async(
+            torch.all(selected.physical_slot_tensor >= 0),
+            "device selected page is not GPU resident",
+        )
+        return self
+
+    def validate(self):
+        return self.validate_device_decode()
 
 
 @dataclass(frozen=True)

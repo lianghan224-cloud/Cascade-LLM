@@ -49,13 +49,79 @@ class KVPolicyTest(unittest.TestCase):
     def test_presets_expand_to_full_explicit_policy(self):
         policy = expand_kv_preset("long-context")
         self.assertEqual(policy.accuracy, KVAccuracy.SPARSE)
-        self.assertEqual(policy.selection, KVSelectionPolicy.QUEST_FLAT)
+        self.assertEqual(policy.selection, KVSelectionPolicy.RGKV)
         self.assertEqual(set(policy.as_dict()), {
             "accuracy", "storage", "dtype", "selection", "reuse",
             "attention_backend",
-            "page_size", "cpu_budget_bytes", "nvme_budget_bytes",
-            "page_budget", "recent_window",
+            "page_size", "gpu_hot_budget_bytes", "cpu_budget_bytes",
+            "nvme_budget_bytes", "gpu_migration_slots_bytes",
+            "cpu_migration_slots_bytes", "gpu_high_watermark_bytes",
+            "gpu_low_watermark_bytes", "cpu_high_watermark_bytes",
+            "cpu_low_watermark_bytes",
+            "page_budget", "recent_window", "rgkv_scorer",
         })
+
+    def test_tensorized_rgkv_scorer_is_explicit_and_selection_scoped(self):
+        policy = KVPolicy(
+            accuracy="sparse",
+            selection="rgkv",
+            rgkv_scorer="torch-tensorized",
+        )
+        self.assertEqual(policy.rgkv_scorer, "torch_tensorized")
+        self.assertFalse(policy.executable_support_errors())
+        self.assertEqual(
+            policy.require_executable_supported(), policy
+        )
+        with self.assertRaisesRegex(ValueError, "requires rgkv"):
+            KVPolicy(rgkv_scorer="torch_tensorized")
+        with self.assertRaisesRegex(ValueError, "unknown RGKV scorer"):
+            KVPolicy(
+                accuracy="sparse",
+                selection="rgkv",
+                rgkv_scorer="hidden_fallback",
+            )
+        replaced = expand_kv_preset(
+            "long-context", {"rgkv_scorer": "torch_tensorized"}
+        )
+        self.assertEqual(replaced.rgkv_scorer, "torch_tensorized")
+
+    def test_tier_policy_fields_are_additive_and_gpu_only_stays_strict(self):
+        policy = KVPolicy(
+            storage="gpu_cpu",
+            gpu_hot_budget_bytes=4096,
+            cpu_budget_bytes=8192,
+            gpu_migration_slots_bytes=1024,
+            cpu_migration_slots_bytes=2048,
+            gpu_high_watermark_bytes=4096,
+            gpu_low_watermark_bytes=2048,
+            cpu_high_watermark_bytes=8192,
+            cpu_low_watermark_bytes=4096,
+        )
+        self.assertEqual(policy.as_dict()["gpu_hot_budget_bytes"], 4096)
+        self.assertFalse(policy.executable_support_errors())
+        with self.assertRaisesRegex(ValueError, "GPU-only KV"):
+            KVPolicy(gpu_hot_budget_bytes=4096)
+        with self.assertRaisesRegex(ValueError, "must not be negative"):
+            KVPolicy(storage="gpu_cpu", cpu_migration_slots_bytes=-1)
+
+    def test_active_gpu_cpu_executable_gate_is_narrow_and_explicit(self):
+        supported = KVPolicy(
+            storage="gpu_cpu",
+            gpu_hot_budget_bytes=4096,
+            cpu_budget_bytes=8192,
+        )
+        self.assertEqual(supported.require_executable_supported(), supported)
+        unsupported = KVPolicy(
+            storage="gpu_cpu",
+            accuracy="sparse",
+            selection="quest_flat",
+            gpu_hot_budget_bytes=4096,
+            cpu_budget_bytes=8192,
+        )
+        self.assertEqual(
+            unsupported.require_executable_supported(), unsupported
+        )
+        self.assertEqual(unsupported.selection, KVSelectionPolicy.RGKV)
 
     def test_page_pool_calculator_covers_mha_gqa_and_low_precision(self):
         bf16 = kv_page_pool_bytes(

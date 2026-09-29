@@ -1,8 +1,10 @@
 """Deterministic CPU reference index for Quest-style page selection.
 
-Normal queries use compact per-dimension extrema. Raw rows are retained only
-for transactional append/rollback and debug validation; budget queries never
-rescan the original keys.
+The standalone correctness oracle can retain raw rows.  The runtime adapter
+uses :meth:`build_compact`, which stores only a small ``[min, max, mean]``
+tensor plus token/version metadata.  This keeps the production-facing index
+free of per-token Python tuples while leaving an exact, serializable reference
+path available to validation tools.
 """
 
 from dataclasses import dataclass, replace
@@ -70,8 +72,24 @@ class QuestIndexRecord:
     rows: tuple
     checksum: str
     format_version: int = QUEST_INDEX_FORMAT_VERSION
+    compact_summary: object = None
+
+    @property
+    def valid_tokens(self):
+        return int(self.token_count)
+
+    @property
+    def is_compact(self):
+        return self.compact_summary is not None
+
+    def summary_rows(self):
+        if self.compact_summary is None:
+            return self.minimum, self.maximum, self.mean
+        value = self.compact_summary.detach().float().cpu()
+        return tuple(tuple(float(item) for item in row.tolist()) for row in value)
 
     def as_dict(self, include_rows=True):
+        minimum, maximum, mean = self.summary_rows()
         result = {
             "record_id": self.record_id.value,
             "logical_block_id": self.logical_block_id.key(),
@@ -80,13 +98,14 @@ class QuestIndexRecord:
             "data_version": int(self.data_version),
             "index_version": int(self.index_version),
             "dimensions": int(self.dimensions),
-            "minimum": list(self.minimum),
-            "maximum": list(self.maximum),
-            "mean": list(self.mean),
+            "minimum": list(minimum),
+            "maximum": list(maximum),
+            "mean": list(mean),
             "checksum": self.checksum,
             "format_version": int(self.format_version),
+            "representation": "compact_tensor" if self.is_compact else "rows",
         }
-        if include_rows:
+        if include_rows and self.rows:
             result["rows"] = [list(item) for item in self.rows]
         return result
 
@@ -152,6 +171,44 @@ def _checksum(rows, metadata):
     return hashlib.sha256(payload).hexdigest()
 
 
+def _summary_checksum(summary, token_count, metadata):
+    if hasattr(summary, "detach"):
+        summary = summary.detach().float().cpu().tolist()
+    payload = json.dumps(
+        {
+            "summary": summary,
+            "token_count": int(token_count),
+            "metadata": metadata,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _to_compact_tensor(block_data):
+    """Return CPU FP32 rows without creating per-token Python objects."""
+
+    import torch
+
+    if hasattr(block_data, "detach"):
+        value = block_data.detach().float()
+    else:
+        value = torch.as_tensor(block_data, dtype=torch.float32)
+    if value.ndim == 1:
+        value = value.reshape(1, -1)
+    elif value.ndim > 2:
+        value = value.reshape(-1, value.shape[-1])
+    if value.ndim != 2:
+        raise ValueError("Quest compact input must be rank one or greater")
+    if value.shape[-1] <= 0:
+        raise ValueError("Quest compact input must have a non-empty dimension")
+    value = value.to(device="cpu", dtype=torch.float32).contiguous()
+    if value.numel() and not bool(torch.isfinite(value).all().item()):
+        raise ValueError("Quest compact input must contain finite values")
+    return value
+
+
 class QuestCPUIndex:
     """Version-checked, serializable page-summary index."""
 
@@ -208,8 +265,140 @@ class QuestCPUIndex:
         self._references[record.record_id.value] = 1
         return record
 
+    def build_compact(self, block_data, metadata):
+        """Build a summary-only record suitable for the runtime adapter.
+
+        The input may be a CUDA tensor, but the current reference scorer is a
+        CPU implementation, so the three summary rows are copied once to a
+        contiguous CPU tensor.  No token rows or nested Python tuples survive
+        the call.  A later GPU scorer can consume the same ``[3, D]`` tensor
+        contract without changing record ownership semantics.
+        """
+
+        import torch
+
+        metadata = dict(metadata)
+        logical = metadata.get("logical_block_id")
+        if not isinstance(logical, LogicalKVBlockId):
+            raise TypeError("logical_block_id must be LogicalKVBlockId")
+        data_version = int(metadata["data_version"])
+        token_start = int(metadata.get("token_start", 0))
+        rows = _to_compact_tensor(block_data)
+        token_count = int(rows.shape[0])
+        dimensions = int(rows.shape[1])
+        if token_count:
+            summary = torch.stack(
+                (rows.amin(dim=0), rows.amax(dim=0), rows.mean(dim=0)),
+                dim=0,
+            ).contiguous()
+        else:
+            summary = torch.empty((3, dimensions), dtype=torch.float32)
+        return self._build_compact_record(
+            logical_block_id=logical,
+            token_start=token_start,
+            token_count=token_count,
+            data_version=data_version,
+            summary=summary,
+        )
+
+    def _build_compact_record(
+        self,
+        *,
+        logical_block_id,
+        token_start,
+        token_count,
+        data_version,
+        summary,
+        record_id=None,
+        checksum=None,
+    ):
+        import torch
+
+        summary = torch.as_tensor(summary, dtype=torch.float32, device="cpu")
+        if summary.ndim != 2 or int(summary.shape[0]) != 3:
+            raise ValueError("Quest compact summary must have shape [3, dimensions]")
+        summary = summary.contiguous()
+        metadata = {
+            "logical_block_id": logical_block_id.key(),
+            "token_start": int(token_start),
+            "data_version": int(data_version),
+        }
+        resolved_checksum = checksum or _summary_checksum(
+            summary, token_count, metadata
+        )
+        if record_id is not None and record_id.value in self._records:
+            current = self._records[record_id.value]
+            if current.checksum != resolved_checksum:
+                raise KVLifecycleError("Quest record ID/checksum collision")
+            return current
+        record = QuestIndexRecord(
+            record_id=record_id or IndexRecordId.create(logical_block_id, data_version),
+            logical_block_id=logical_block_id,
+            token_start=int(token_start),
+            token_count=int(token_count),
+            data_version=int(data_version),
+            index_version=int(data_version),
+            dimensions=int(summary.shape[1]),
+            minimum=(),
+            maximum=(),
+            mean=(),
+            rows=(),
+            checksum=resolved_checksum,
+            compact_summary=summary,
+        )
+        self._records[record.record_id.value] = record
+        self._references[record.record_id.value] = 1
+        return record
+
     def update_append(self, index_record, appended_data, new_version):
         self._require_current(index_record)
+        if index_record.is_compact:
+            appended = _to_compact_tensor(appended_data)
+            if int(appended.shape[1]) != index_record.dimensions:
+                raise ValueError(
+                    "appended Quest dimension {} does not match {}".format(
+                        int(appended.shape[1]), index_record.dimensions
+                    )
+                )
+            if not int(appended.shape[0]):
+                summary = index_record.compact_summary.clone()
+                token_count = index_record.token_count
+            else:
+                import torch
+
+                added_count = int(appended.shape[0])
+                added = torch.stack(
+                    (
+                        appended.amin(dim=0),
+                        appended.amax(dim=0),
+                        appended.mean(dim=0),
+                    ),
+                    dim=0,
+                )
+                if not index_record.token_count:
+                    summary = added
+                else:
+                    old = index_record.compact_summary
+                    combined_mean = (
+                        old[2] * float(index_record.token_count)
+                        + added[2] * float(added_count)
+                    ) / float(index_record.token_count + added_count)
+                    summary = torch.stack(
+                        (
+                            torch.minimum(old[0], added[0]),
+                            torch.maximum(old[1], added[1]),
+                            combined_mean,
+                        ),
+                        dim=0,
+                    )
+                token_count = index_record.token_count + added_count
+            return self._build_compact_record(
+                logical_block_id=index_record.logical_block_id,
+                token_start=index_record.token_start,
+                token_count=token_count,
+                data_version=int(new_version),
+                summary=summary,
+            )
         rows = index_record.rows + _to_rows(appended_data)
         return self.build(
             rows,
@@ -222,6 +411,21 @@ class QuestCPUIndex:
 
     @staticmethod
     def _score(query, record):
+        if record.is_compact:
+            import torch
+
+            query_tensor = torch.as_tensor(query, dtype=torch.float32, device="cpu")
+            if query_tensor.numel() != record.dimensions:
+                raise ValueError(
+                    "query dimension {} does not match index dimension {}".format(
+                        query_tensor.numel(), record.dimensions
+                    )
+                )
+            extrema = torch.maximum(
+                query_tensor * record.compact_summary[0],
+                query_tensor * record.compact_summary[1],
+            )
+            return float(extrema.sum().item())
         query = tuple(float(item) for item in query)
         if len(query) != record.dimensions:
             raise ValueError(
@@ -331,8 +535,34 @@ class QuestCPUIndex:
         self._references[key] += 1
         return index_record
 
+    def release_ref(self, index_record):
+        """Release one adapter owner and delete the record at zero refs."""
+
+        self._require_current(index_record)
+        key = index_record.record_id.value
+        references = int(self._references.get(key, 0))
+        if references <= 0:
+            raise KVLifecycleError("Quest index reference underflow")
+        references -= 1
+        if references:
+            self._references[key] = references
+            return False
+        self._references.pop(key, None)
+        self._records.pop(key, None)
+        return True
+
     def cow_clone(self, index_record, logical_block_id=None):
         self._require_current(index_record)
+        if index_record.is_compact:
+            return self._build_compact_record(
+                logical_block_id=(
+                    logical_block_id or index_record.logical_block_id
+                ),
+                token_start=index_record.token_start,
+                token_count=index_record.token_count,
+                data_version=index_record.data_version,
+                summary=index_record.compact_summary.clone(),
+            )
         return self.build(
             index_record.rows,
             {
@@ -347,6 +577,18 @@ class QuestCPUIndex:
         target_token_count = int(target_token_count)
         if target_token_count < 0 or target_token_count > index_record.token_count:
             raise ValueError("invalid Quest rollback token count")
+        if index_record.is_compact:
+            if target_token_count != index_record.token_count:
+                raise KVLifecycleError(
+                    "compact Quest rollback requires rebuilding the affected page"
+                )
+            return self._build_compact_record(
+                logical_block_id=index_record.logical_block_id,
+                token_start=index_record.token_start,
+                token_count=index_record.token_count,
+                data_version=int(target_version),
+                summary=index_record.compact_summary.clone(),
+            )
         return self.build(
             index_record.rows[:target_token_count],
             {
@@ -368,6 +610,34 @@ class QuestCPUIndex:
         value = json.loads(bytes(payload).decode("utf-8"))
         if int(value["format_version"]) != QUEST_INDEX_FORMAT_VERSION:
             raise ValueError("unsupported Quest index format")
+        if value.get("representation") == "compact_tensor":
+            import torch
+
+            summary = torch.tensor(
+                (value["minimum"], value["maximum"], value["mean"]),
+                dtype=torch.float32,
+            )
+            logical = LogicalKVBlockId.from_key(value["logical_block_id"])
+            expected = _summary_checksum(
+                summary,
+                int(value["token_count"]),
+                {
+                    "logical_block_id": logical.key(),
+                    "token_start": int(value["token_start"]),
+                    "data_version": int(value["data_version"]),
+                },
+            )
+            if str(value["checksum"]) != expected:
+                raise ValueError("Quest compact index checksum mismatch")
+            return self._build_compact_record(
+                logical_block_id=logical,
+                token_start=int(value["token_start"]),
+                token_count=int(value["token_count"]),
+                data_version=int(value["data_version"]),
+                summary=summary,
+                record_id=IndexRecordId(str(value["record_id"])),
+                checksum=expected,
+            )
         record = QuestIndexRecord(
             record_id=IndexRecordId(str(value["record_id"])),
             logical_block_id=LogicalKVBlockId.from_key(value["logical_block_id"]),
@@ -422,12 +692,21 @@ class QuestCPUIndex:
         if not isinstance(index_record, QuestIndexRecord):
             raise TypeError("expected QuestIndexRecord")
         current = self._records.get(index_record.record_id.value)
-        if current is not index_record and current != index_record:
+        if current is not index_record:
             raise KVLifecycleError("unknown Quest index record")
 
     def stats(self):
+        compact_records = [
+            item for item in self._records.values() if item.is_compact
+        ]
         return {
             "records": len(self._records),
+            "references": sum(self._references.values()),
+            "compact_records": len(compact_records),
+            "compact_bytes": sum(
+                int(item.compact_summary.numel() * item.compact_summary.element_size())
+                for item in compact_records
+            ),
             "queries": self.query_count,
             "candidates": self.candidate_count,
             "selected": self.selected_count,

@@ -1,0 +1,28 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  unit:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Install CPU test environment
+        shell: bash
+        run: |
+          set -a
+          source docker/versions.env
+          set +a
+          python -m pip install --upgrade "pip==${PIP_VERSION}" "setuptools==${SETUPTOOLS_VERSION}" "wheel==${WHEEL_VERSION}"
+          python -m pip install "torch==${PYTORCH_VERSION}" --index-url https://download.pytorch.org/whl/cpu
+          grep -v '^torch==' requirements.lock > /tmp/cascade-requirements.lock
+          python -m pip install -r /tmp/cascade-requirements.lock
+          python -m pip install --no-deps --no-build-isolation --editable .
+          python -m pip check
+      - name: Run unit tests
+        run: PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_*.py' -q

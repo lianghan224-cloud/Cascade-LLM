@@ -1,0 +1,23 @@
+{
+  "contract_version": 2,
+  "extends_contract_version": 1,
+  "dataclass_fields": {
+    "PagedBatchViewV2": [
+      "request_ids",
+      "query_indptr",
+      "block_table_indptr",
+      "flat_block_table",
+      "flat_logical_block_ids",
+      "flat_page_valid_tokens",
+      "sequence_lengths",
+      "query_lengths",
+      "tail_valid_tokens",
+      "slot_mapping",
+      "query_positions",
+      "page_size",
+      "layer",
+      "version",
+      "flat_page_generations"
+    ]
+  }
+}

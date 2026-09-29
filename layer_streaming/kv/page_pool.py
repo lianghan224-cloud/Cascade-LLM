@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import heapq
 import threading
 import time
+import uuid
 
 from .errors import KVCapacityError, KVLifecycleError
 from .types import PageDescriptor, PageHandle, PageState
@@ -35,6 +36,7 @@ class KVPagePoolV1:
         self.layout = str(layout)
         self.format_version = int(format_version)
         self.reserved_free_pages = int(reserved_free_pages)
+        self.pool_uuid = uuid.uuid4().hex
         if self.page_count <= 0:
             raise ValueError("page_count must be positive")
         if self.reserved_free_pages < 0 or self.reserved_free_pages >= self.page_count:
@@ -50,6 +52,8 @@ class KVPagePoolV1:
             )
             for index in range(self.page_count)
         ]
+        for descriptor in self.descriptors:
+            descriptor.pool_uuid = self.pool_uuid
         self._free = list(range(self.page_count))
         heapq.heapify(self._free)
         self._epoch = 0
@@ -83,7 +87,41 @@ class KVPagePoolV1:
         self._epoch += 1
         descriptor.last_access_epoch = self._epoch
 
-    def allocate(self, owner_hint=None, include_reserve=False):
+    @staticmethod
+    def _mapping(value):
+        return tuple(value)
+
+    def _allocation_mapping(self, descriptor, owner_hint):
+        return (
+            "allocation",
+            self.pool_uuid,
+            int(descriptor.page_id),
+            int(descriptor.generation),
+            owner_hint,
+        )
+
+    @staticmethod
+    def _fallback_release_mapping(descriptor):
+        retained = sorted(
+            (
+                item for item in descriptor.logical_mappings
+                if item and item[0] == "retain"
+            ),
+            key=repr,
+            reverse=True,
+        )
+        if retained:
+            return retained[0]
+        if not descriptor.logical_mappings:
+            raise KVLifecycleError("page reference has no logical owner")
+        return sorted(descriptor.logical_mappings, key=repr)[-1]
+
+    def allocate(
+        self,
+        owner_hint=None,
+        include_reserve=False,
+        logical_mapping=None,
+    ):
         with self._lock:
             if not self.can_allocate(1, include_reserve=include_reserve):
                 raise KVCapacityError(
@@ -111,6 +149,11 @@ class KVPagePoolV1:
             descriptor.dirty = False
             descriptor.error = None
             descriptor.logical_mappings.clear()
+            descriptor.logical_mappings.add(
+                self._allocation_mapping(descriptor, owner_hint)
+                if logical_mapping is None
+                else self._mapping(logical_mapping)
+            )
             self._touch(descriptor)
             self._peak_allocated = max(self._peak_allocated, self.allocated_pages)
             self._allocation_count += 1
@@ -123,7 +166,9 @@ class KVPagePoolV1:
             raise KVLifecycleError("page handle is outside the pool")
         descriptor = self.descriptors[handle.page_id]
         if (
-            descriptor.generation != handle.generation
+            handle.pool_uuid != self.pool_uuid
+            or handle._descriptor is not descriptor
+            or descriptor.generation != handle.generation
             or descriptor.store_id != handle.store_id
             or descriptor.format_version != self.format_version
         ):
@@ -160,11 +205,25 @@ class KVPagePoolV1:
             )
             self._touch(descriptor)
 
-    def retain(self, handle):
+    def retain(self, handle, logical_mapping=None):
         with self._lock:
             descriptor = self.descriptor(handle)
             if descriptor.state not in {PageState.SEALED, PageState.SHARED}:
                 raise KVLifecycleError("only sealed pages can be shared")
+            mapping = (
+                (
+                    "retain",
+                    self.pool_uuid,
+                    int(descriptor.page_id),
+                    int(descriptor.generation),
+                    int(descriptor.ref_count) + 1,
+                )
+                if logical_mapping is None
+                else self._mapping(logical_mapping)
+            )
+            if mapping in descriptor.logical_mappings:
+                raise KVLifecycleError("logical owner already retains page")
+            descriptor.logical_mappings.add(mapping)
             descriptor.ref_count += 1
             descriptor.state = PageState.SHARED
             self._touch(descriptor)
@@ -179,6 +238,8 @@ class KVPagePoolV1:
                 raise KVLifecycleError("copy target must be allocated")
             source_descriptor.pin_count += 1
             source_descriptor.inflight_io += 1
+            target_descriptor.pin_count += 1
+            target_descriptor.inflight_io += 1
             target_descriptor.state = PageState.COPYING
             self._touch(source_descriptor)
             self._touch(target_descriptor)
@@ -193,12 +254,42 @@ class KVPagePoolV1:
                 raise KVLifecycleError("copy source pin underflow")
             if source_descriptor.inflight_io <= 0:
                 raise KVLifecycleError("copy source IO accounting underflow")
+            if target_descriptor.pin_count <= 0:
+                raise KVLifecycleError("copy target pin underflow")
+            if target_descriptor.inflight_io <= 0:
+                raise KVLifecycleError("copy target IO accounting underflow")
             source_descriptor.pin_count -= 1
             source_descriptor.inflight_io -= 1
+            target_descriptor.pin_count -= 1
+            target_descriptor.inflight_io -= 1
             target_descriptor.valid_tokens = int(valid_tokens)
             target_descriptor.state = PageState.ACTIVE
             self._touch(source_descriptor)
             self._touch(target_descriptor)
+
+    def abort_copy(self, source, target, error=None):
+        """Rollback COPY metadata after submitted work has quiesced."""
+
+        with self._lock:
+            source_descriptor = self.descriptor(source)
+            target_descriptor = self.descriptor(target)
+            if target_descriptor.state != PageState.COPYING:
+                raise KVLifecycleError("copy target is not in COPYING state")
+            for descriptor, label in (
+                (source_descriptor, "source"),
+                (target_descriptor, "target"),
+            ):
+                if descriptor.pin_count <= 0 or descriptor.inflight_io <= 0:
+                    raise KVLifecycleError(
+                        "copy {} IO accounting underflow".format(label)
+                    )
+                descriptor.pin_count -= 1
+                descriptor.inflight_io -= 1
+                self._touch(descriptor)
+            target_descriptor.state = PageState.ALLOCATED
+            target_descriptor.error = None if error is None else repr(error)
+            source_descriptor.transfer_event = None
+            target_descriptor.transfer_event = None
 
     def pin(self, handle, kind="compute"):
         with self._lock:
@@ -263,8 +354,8 @@ class KVPagePoolV1:
                 if version is None
                 else int(version)
             )
-            if next_version < descriptor.data_version:
-                raise KVLifecycleError("data version cannot move backwards")
+            if next_version <= descriptor.data_version:
+                raise KVLifecycleError("data version must advance strictly")
             descriptor.data_version = next_version
             descriptor.dirty = descriptor.index_version != next_version
             self._touch(descriptor)
@@ -297,14 +388,27 @@ class KVPagePoolV1:
             self._touch(descriptor)
 
     def add_logical_mapping(self, handle, mapping):
-        with self._lock:
-            descriptor = self.descriptor(handle)
-            descriptor.logical_mappings.add(tuple(mapping))
+        """Add a real logical owner; metadata and ref count stay atomic."""
+
+        return self.retain(handle, logical_mapping=mapping)
 
     def remove_logical_mapping(self, handle, mapping):
+        """Remove a real logical owner; metadata and ref count stay atomic."""
+
+        return self.release(handle, logical_mapping=mapping)
+
+    def replace_logical_mapping(self, handle, old_mapping, new_mapping):
         with self._lock:
             descriptor = self.descriptor(handle)
-            descriptor.logical_mappings.discard(tuple(mapping))
+            old_mapping = self._mapping(old_mapping)
+            new_mapping = self._mapping(new_mapping)
+            if old_mapping not in descriptor.logical_mappings:
+                raise KVLifecycleError("source logical mapping does not exist")
+            if new_mapping in descriptor.logical_mappings:
+                raise KVLifecycleError("target logical mapping already exists")
+            descriptor.logical_mappings.remove(old_mapping)
+            descriptor.logical_mappings.add(new_mapping)
+            self._touch(descriptor)
 
     def assert_releasable(self, handles, operation="release"):
         blocked = []
@@ -326,10 +430,18 @@ class KVPagePoolV1:
                 "cannot {}; busy KV pages: {}".format(operation, blocked)
             )
 
-    def release(self, handle):
+    def release(self, handle, logical_mapping=None):
         with self._lock:
             self.assert_releasable((handle,))
             descriptor = self.descriptor(handle)
+            mapping = (
+                self._fallback_release_mapping(descriptor)
+                if logical_mapping is None
+                else self._mapping(logical_mapping)
+            )
+            if mapping not in descriptor.logical_mappings:
+                raise KVLifecycleError("logical owner does not retain page")
+            descriptor.logical_mappings.remove(mapping)
             descriptor.ref_count -= 1
             if descriptor.ref_count:
                 descriptor.state = (
@@ -394,6 +506,10 @@ class KVPagePoolV1:
                     raise KVLifecycleError(context + " FREE invariant failed")
                 if not is_free and descriptor.ref_count <= 0:
                     raise KVLifecycleError(context + " allocated page has no owner")
+                if descriptor.ref_count != len(descriptor.logical_mappings):
+                    raise KVLifecycleError(
+                        context + " ref/logical-owner counts diverged"
+                    )
                 if (
                     descriptor.index_version > descriptor.data_version
                     and descriptor.index_metadata_handle is not None
@@ -453,6 +569,9 @@ class KVPagePoolV1:
             "allocation_count": self._allocation_count,
             "release_count": self._release_count,
             "total_ref_count": sum(item.ref_count for item in allocated),
+            "logical_owner_count": sum(
+                len(item.logical_mappings) for item in allocated
+            ),
             "max_ref_count": max(
                 (item.ref_count for item in allocated), default=0
             ),

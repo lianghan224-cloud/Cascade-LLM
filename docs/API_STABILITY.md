@@ -37,6 +37,11 @@ fixture: tests/fixtures/kv_framework_v1.json
 sha256: c1b8e8cad65c0d0d1779703e24129a832100efbd5024a6cfad38841f8e30c0ed
 ```
 
+`PagedBatchViewV2` adds generation metadata for device-side validation without
+changing the V1 constructor or fixture. Runtime batch construction emits V2;
+external V1 callers remain supported. The V2 fixture and hash are verified
+separately in `tests/contract/test_kv_framework_contract.py`.
+
 `tests/test_api_contract.py` 同时验证：
 
 - frozen dataclass 字段快照；

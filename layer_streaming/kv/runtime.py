@@ -1,16 +1,12 @@
 """KV Framework V1 transactional paged runtime."""
-
 import math
 import threading
-
 import torch
-
 from ..attention.paged import (
     PagedAttentionDispatcher,
     default_paged_registry,
 )
 from ..kv_policy import (
-    KVAccuracy,
     KVDataType,
     KVPolicy,
     KVReusePolicy,
@@ -18,6 +14,7 @@ from ..kv_policy import (
     KVStoragePolicy,
 )
 from .batch_state import build_paged_batch_view
+from .active_runtime import ActiveTierRuntimeMixin
 from .errors import KVLifecycleError, KVUnsupportedError
 from .execution import KVExecutionCoordinator
 from .metrics import KVMetrics
@@ -25,34 +22,34 @@ from .ownership import OwnershipManager
 from .page_pool import KVPagePoolV1
 from .prefix_cache import PrefixCache
 from .request_table import RequestTable
+from .runtime_profile import build_runtime_profile
 from .runtime_validation import validate_runtime_provider
 from .reuse import (
     PrefixMemoryReuse,
     RequestOnlyReuse,
     SessionReuse,
 )
-from .selection import DenseSelection, QuestFlatSelection
+from .selection import (
+    DenseSelection,
+    RGKVBudget,
+    RGKVSelectionPolicy,
+    rgkv_scorer_provider,
+)
 from .stores import GPUKVStore
 from .types import RequestLifecycleState
-
-class PagedKVRuntime:
+class PagedKVRuntime(ActiveTierRuntimeMixin):
     """Final page/request/batch owner used by model executors.
-
     The logical block table stores generation-checked PageHandle objects. Only
     `prepare_batch` compacts them into GPU physical page IDs for a provider.
     """
-
     abi_version = 1
     schema_version = 1
-
     @property
     def provider_abi(self):
         return self.attention_backend.provider_abi
-
     @property
     def qualification_status(self):
         return self.attention_backend.qualification_status
-
     def capability(self):
         return {
             "schema_version": self.schema_version,
@@ -62,7 +59,6 @@ class PagedKVRuntime:
             "attention": self.attention_backend.capability().as_dict(),
             "page_kernel": self.kv_kernel_backend.capability().as_dict(),
         }
-
     def __init__(
         self,
         layer_count,
@@ -79,6 +75,11 @@ class PagedKVRuntime:
         provider_registry=None,
         allow_reference=False,
         store=None,
+        prefill_backend="reference_paged_exact",
+        max_prefix_pages=None,
+        max_prefix_bytes=None,
+        prefetch_timeout_seconds=10.0,
+        tier_tensor_factory=None,
     ):
         self.layer_count = int(layer_count)
         self.num_query_heads = int(num_query_heads)
@@ -88,6 +89,9 @@ class PagedKVRuntime:
         self.page_size = int(page_size)
         self.device = torch.device(device)
         self.dtype = dtype
+        self.prefetch_timeout_seconds = float(prefetch_timeout_seconds)
+        if self.prefetch_timeout_seconds <= 0:
+            raise ValueError("prefetch_timeout_seconds must be positive")
         if self.layer_count <= 0 or self.page_count <= 0:
             raise ValueError("layer_count and page_count must be positive")
         if self.num_query_heads <= 0 or self.num_kv_heads <= 0:
@@ -125,32 +129,57 @@ class PagedKVRuntime:
             self.registry,
             self.policy.attention_backend,
             allow_reference=allow_reference,
+            prefill_provider_name=prefill_backend,
         )
         validate_runtime_provider(self, allow_reference=allow_reference)
-        self.store = store or GPUKVStore(
-            layer_count=self.layer_count,
-            page_count=self.page_count,
-            num_kv_heads=self.num_kv_heads,
-            page_size=self.page_size,
-            head_dim=self.head_dim,
-            dtype=dtype,
-            device=self.device,
-        )
-        self.page_pool = KVPagePoolV1(
-            page_count=self.page_count,
-            store_id=self.store.store_id,
-            dtype=self.policy.dtype.value,
-            layout="hnd",
-            format_version=1,
-            reserved_free_pages=reserved_free_pages,
-        )
-        self.selection = (
-            QuestFlatSelection(
-                budget=self.policy.page_budget,
-                recent_window=self.policy.recent_window,
-                mode=("full" if self.policy.page_budget == 0 else "budget"),
+        self._initialize_active_tier_state()
+        self._logical_page_bytes = self._kv_logical_page_bytes()
+        if self.policy.storage == KVStoragePolicy.GPU_CPU:
+            if store is not None:
+                raise ValueError(
+                    "GPU_CPU runtime constructs its bounded hot store from policy"
+                )
+            self._initialize_active_tier(
+                reserved_free_pages, tier_tensor_factory
             )
-            if self.policy.selection == KVSelectionPolicy.QUEST_FLAT
+        else:
+            self.store = store or GPUKVStore(
+                layer_count=self.layer_count,
+                page_count=self.page_count,
+                num_kv_heads=self.num_kv_heads,
+                page_size=self.page_size,
+                head_dim=self.head_dim,
+                dtype=dtype,
+                device=self.device,
+            )
+            self.page_pool = KVPagePoolV1(
+                page_count=self.page_count,
+                store_id=self.store.store_id,
+                dtype=self.policy.dtype.value,
+                layout="hnd",
+                format_version=1,
+                reserved_free_pages=reserved_free_pages,
+            )
+        self.selection = (
+            RGKVSelectionPolicy(
+                budget=RGKVBudget(
+                    total_page_budget=(
+                        self.policy.page_budget or self.page_count
+                    ),
+                    recent_pages=min(
+                        self.policy.page_budget or self.page_count,
+                        int(
+                            math.ceil(
+                                self.policy.recent_window
+                                / float(self.page_size)
+                            )
+                        ),
+                    ),
+                ),
+                mode=("full" if self.policy.page_budget == 0 else "budget"),
+                scorer=rgkv_scorer_provider(self.policy.rgkv_scorer),
+            )
+            if self.policy.selection == KVSelectionPolicy.RGKV
             else DenseSelection()
         )
         self.reuse = {
@@ -172,6 +201,9 @@ class PagedKVRuntime:
             self.page_pool,
             self.layer_count,
             self._metrics,
+            max_prefix_pages=max_prefix_pages,
+            max_prefix_bytes=max_prefix_bytes,
+            page_bytes=self._logical_page_bytes,
         )
         # Compatibility inspection aliases; ownership remains in PrefixCache.
         self.prefix_index = self.prefix_cache.index
@@ -179,71 +211,20 @@ class PagedKVRuntime:
         self.ownership = OwnershipManager(self)
         self.execution = KVExecutionCoordinator(self)
 
-    def _validate_policy(self, inferred_dtype):
-        if self.policy.page_size != self.page_size:
-            raise ValueError("KV policy page size does not match runtime")
-        if self.policy.accuracy not in {KVAccuracy.EXACT, KVAccuracy.SPARSE}:
-            raise KVUnsupportedError(
-                "executable KV supports exact or Quest sparse accuracy"
-            )
-        if self.policy.storage != KVStoragePolicy.GPU:
-            raise KVUnsupportedError("active CPU/NVMe KV stores are not implemented")
-        if self.policy.dtype not in {KVDataType.BF16, KVDataType.FP16}:
-            raise KVUnsupportedError("quantized KV formats are not implemented")
-        if inferred_dtype != self.policy.dtype and self.dtype != torch.float32:
-            raise ValueError("runtime tensor dtype does not match KV policy")
-        if self.policy.selection not in {
-            KVSelectionPolicy.DENSE,
-            KVSelectionPolicy.QUEST_FLAT,
-        }:
-            raise KVUnsupportedError(
-                "only dense and Quest-flat page selection are implemented"
-            )
-        if self.policy.reuse == KVReusePolicy.PREFIX_PERSISTENT:
-            raise KVUnsupportedError("persistent prefix reuse is not implemented")
-
     def _check_open(self):
         if self._closed:
             raise KVLifecycleError("KV runtime is closed")
-
     @property
     def provider_bundle(self):
         return self.dispatcher.bundle
-
     @property
     def attention_backend(self):
         return self.dispatcher.attention_backend
-
     @property
     def kv_kernel_backend(self):
         return self.dispatcher.kv_kernel_backend
-
     def capacity(self, max_length=None):
-        requested_pages = (
-            None
-            if max_length is None
-            else int(math.ceil(int(max_length) / float(self.page_size)))
-        )
-        return {
-            "total_pages": self.page_pool.page_count,
-            "free_pages": self.page_pool.free_pages,
-            "reserved_free_pages": self.page_pool.reserved_free_pages,
-            "requested_pages": requested_pages,
-            "admissible": (
-                True
-                if requested_pages is None
-                else self.page_pool.can_allocate(requested_pages)
-            ),
-            "max_new_tokens": max(
-                0,
-                (
-                    self.page_pool.free_pages
-                    - self.page_pool.reserved_free_pages
-                )
-                * self.page_size,
-            ),
-        }
-
+        return self._runtime_capacity(max_length)
     def create_request(
         self,
         max_length,
@@ -253,21 +234,21 @@ class PagedKVRuntime:
     ):
         with self._lock:
             self._check_open()
+            self._active_tier_admit(max_length)
             return self.request_table.create(
                 max_length=max_length,
                 request_id=request_id,
                 reuse_namespace=reuse_namespace,
                 lifecycle_state=lifecycle_state,
             )
-
     def request(self, request_id):
         self._check_open()
         return self.request_table.request(request_id)
-
     def abort_append(self, state):
         with self._lock:
+            if self.active_tier_enabled:
+                self._tier_abort_append(state)
             return self.ownership.abort_append(state)
-
     def append(self, requests, layer, key, value, query_lengths):
         with self._lock:
             self._check_open()
@@ -278,8 +259,21 @@ class PagedKVRuntime:
     def commit(self, state):
         return self.ownership.commit(state)
 
+    def wait_attention_fence(self, fence_or_id, timeout_seconds=5.0):
+        with self._lock:
+            return self.ownership.wait_attention_fence(fence_or_id, timeout_seconds)
+
+    def drain_attention_fence(self, fence_or_id, timeout_seconds=5.0):
+        with self._lock:
+            return self.ownership.drain_attention_fence(fence_or_id, timeout_seconds)
+
     def rollback(self, state, target_length, target_version=None):
         with self._lock:
+            if self.active_tier_enabled:
+                raise KVUnsupportedError(
+                    "Active Tier rollback is not implemented in the minimal "
+                    "request-only runtime"
+                )
             return self.ownership.rollback(
                 state,
                 target_length=target_length,
@@ -345,6 +339,10 @@ class PagedKVRuntime:
 
     def fork(self, state, request_id=None, max_length=None, branch=True):
         with self._lock:
+            if self.active_tier_enabled:
+                raise KVUnsupportedError(
+                    "Active Tier fork/COW is outside request_only support"
+                )
             return self.ownership.fork(
                 state,
                 request_id=request_id,
@@ -353,6 +351,10 @@ class PagedKVRuntime:
             )
 
     def session_fork(self, state, request_id=None, max_length=None):
+        if self.active_tier_enabled:
+            raise KVUnsupportedError(
+                "Active Tier session fork is outside request_only support"
+            )
         return self.reuse.fork(
             self,
             state,
@@ -362,12 +364,20 @@ class PagedKVRuntime:
 
     def commit_branch(self, parent, branch):
         with self._lock:
+            if self.active_tier_enabled:
+                raise KVUnsupportedError(
+                    "Active Tier branch commit is outside request_only support"
+                )
             return self.ownership.commit_branch(parent, branch)
 
     def discard_branch(self, branch):
         self.release(branch)
 
     def register_prefix(self, state, token_ids):
+        if self.active_tier_enabled:
+            raise KVUnsupportedError(
+                "Active Tier prefix reuse is outside request_only support"
+            )
         return self.reuse.register_prefix(self, state, token_ids)
 
     def _register_prefix_impl(self, state, token_ids):
@@ -381,6 +391,10 @@ class PagedKVRuntime:
         reuse_namespace="default",
         request_id=None,
     ):
+        if self.active_tier_enabled:
+            raise KVUnsupportedError(
+                "Active Tier prefix reuse is outside request_only support"
+            )
         return self.reuse.lookup_prefix(
             self,
             token_ids,
@@ -405,67 +419,44 @@ class PagedKVRuntime:
                 request_id=request_id,
             )
             state, _ = result
-            if hasattr(self.selection, "build_request_layer"):
-                for layer in range(self.layer_count):
-                    self.selection.build_request_layer(self, state, layer)
+            try:
+                if hasattr(self.selection, "reuse_request_from_page_metadata"):
+                    self.selection.reuse_request_from_page_metadata(
+                        self, state
+                    )
+                elif hasattr(self.selection, "build_request_layer"):
+                    for layer in range(self.layer_count):
+                        self.selection.build_request_layer(self, state, layer)
+            except BaseException:
+                self.release(state)
+                raise
             return result
-
     def reset(self, state):
         with self._lock:
+            if self.active_tier_enabled:
+                self._tier_unregister_state(state)
             return self.ownership.reset(state)
-
     def release(self, state):
         with self._lock:
+            if self.active_tier_enabled:
+                self._tier_unregister_state(state)
             return self.ownership.release(state)
 
     def profile_stats(self):
-        pool = self.page_pool.profile()
-        self._metrics.pool_peak_pages = pool["peak_allocated_pages"]
-        self._metrics.shared_pages = pool["shared_pages"]
-        result = self._metrics.as_dict()
-        result.update(
-            {
-                "abi_version": self.abi_version,
-                "kv_policy_resolved": self.policy.as_dict(),
-                "attention_backend": self.attention_backend.name,
-                "attention_accuracy": self.policy.accuracy.value,
-                "layout": "hnd",
-                "kv_store": self.store.store_id,
-                "kv_dtype": self.policy.dtype.value,
-                "kv_selection": self.selection.name,
-                "kv_reuse": self.reuse.name,
-                "kv_page_size": self.page_size,
-                "kv_pool_total_pages": self.page_count,
-                "kv_pool_allocated_pages": pool["allocated_pages"],
-                "active_requests": len(self._requests),
-                "prefix_index_entries": len(self.prefix_index),
-                "paged_attention_provider": self.attention_backend.name,
-                "paged_kv_kernel_backend": self.kv_kernel_backend.name,
-                "paged_provider_bundle": self.provider_bundle.name,
-                "provider_fallback_reason": (
-                    None
-                    if self.dispatcher.last_decision is None
-                    else self.dispatcher.last_decision.get("fallback_reason")
-                ),
-                "provider_decision": self.dispatcher.last_decision,
-                "store_bytes": self.store.nbytes,
-                "page_state_counts": pool["state_counts"],
-                "page_allocations": pool["allocation_count"],
-                "page_releases": pool["release_count"],
-                "total_ref_count": pool["total_ref_count"],
-                "max_ref_count": pool["max_ref_count"],
-                "total_pin_count": pool["total_pin_count"],
-                "max_pin_count": pool["max_pin_count"],
-                "cuda_event_count": self.ownership.event_count,
-            }
-        )
-        return result
+        return build_runtime_profile(self)
 
     def quiesce(self, timeout_seconds=5.0):
         """Wait for bounded page kernels and release all transient page pins."""
         with self._lock:
             self._check_open()
             self.ownership.quiesce(timeout_seconds=timeout_seconds)
+            if self.active_tier_enabled:
+                self.active_tier.quiesce(timeout=timeout_seconds)
+                tier_stats = self.active_tier.stats()
+                if tier_stats["pending_tier_operations"]:
+                    raise KVLifecycleError(
+                        "Active Tier still has pending migration/attention work"
+                    )
             self.page_pool.wait_quiescent(timeout_seconds=timeout_seconds)
             self.page_pool.validate_invariants()
             return self.profile_stats()
@@ -478,8 +469,12 @@ class PagedKVRuntime:
             for state in tuple(self._requests.values()):
                 self.release(state)
             self.prefix_cache.close()
+            if self.active_tier_enabled:
+                self.active_tier.close()
             self.ownership.close()
             self.store.close()
+            if self.cpu_store is not None:
+                self.cpu_store.close()
             self._closed = True
 
     def __enter__(self):

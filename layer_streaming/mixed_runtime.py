@@ -6,9 +6,15 @@ import time
 import torch
 
 from .backends import backend_for_weight
-from .pipeline import PipelineRuntimeCore
+from .pipeline import (
+    DeviceLease,
+    PipelineRuntimeCore,
+    PreparedSource,
+    ReadyTransfer,
+)
 from .placement import build_static_transformer_placement
 from .specs import DTYPE_BYTES
+from .timeline import analyze_copy_compute_timeline
 
 
 _TORCH_DTYPES = {
@@ -239,8 +245,10 @@ class MixedDtypeRuntime:
         )
         self.source_timeout_seconds = float(source_timeout_seconds)
         self.profile = bool(profile)
-        if self.slot_count < 1 or self.prefetch_depth < 1:
-            raise ValueError("slot_count and prefetch_depth must be positive")
+        if self.slot_count < 1 or self.prefetch_depth < 0:
+            raise ValueError(
+                "slot_count must be positive and prefetch_depth nonnegative"
+            )
         self.transfer_slots = [
             torch.empty(plan.slot_bytes, dtype=torch.uint8, device=self.device)
             for _ in range(self.slot_count)
@@ -259,7 +267,7 @@ class MixedDtypeRuntime:
         self.free_events = [
             torch.cuda.Event(enable_timing=False) for _ in plan.units
         ]
-        self.start_event = torch.cuda.Event(enable_timing=False)
+        self.start_event = torch.cuda.Event(enable_timing=self.profile)
         self.resident_done_event = (
             torch.cuda.Event(enable_timing=False)
             if self.resident_units
@@ -308,10 +316,11 @@ class MixedDtypeRuntime:
                 }
             }
             self._stage_events = {
-                ("attention", layer_index): (
+                (stage, layer_index): (
                     torch.cuda.Event(enable_timing=True),
                     torch.cuda.Event(enable_timing=True),
                 )
+                for stage in ("attention", "kv_append", "kv_attention", "mlp")
                 for layer_index in range(plan.geometry.num_hidden_layers)
             }
             self._resident_compute_events = {
@@ -332,16 +341,76 @@ class MixedDtypeRuntime:
         self.backend_phase_plan = None
         self._active_phase = None
         self._used_dequant_events = []
+        self._used_linear_event_keys = set()
+        self._used_stage_event_keys = set()
         self.last_profile = None
         self._closed = False
         self.pipeline = PipelineRuntimeCore(
             plan=plan,
             store=store,
             slot_count=self.slot_count,
-            prefetch_depth=self.prefetch_depth,
+            prefetch_depth=max(1, self.prefetch_depth),
             source_timeout_seconds=self.source_timeout_seconds,
             submit_copy=self._submit_copy,
         )
+
+    def _run_without_prefetch(self, compute_unit, state):
+        """Execute source preparation, H2D, and compute strictly in series."""
+
+        source_wait_ms = 0.0
+        last_ready = None
+        last_free = None
+        reuse_counts = [0] * self.slot_count
+        started = time.perf_counter()
+        for index, unit in enumerate(self.streamed_units):
+            if last_free is not None:
+                last_free.synchronize()
+            source_started = time.perf_counter()
+            future = self.store.prepare_unit(
+                unit,
+                0,
+                reuse_event=last_ready,
+            )
+            source = future.result(timeout=self.source_timeout_seconds)
+            source_wait_ms += (
+                time.perf_counter() - source_started
+            ) * 1000.0
+            prepared = PreparedSource(
+                job=None,
+                index=index,
+                unit=unit,
+                source=source,
+                stage_slot_index=0,
+            )
+            last_ready = self._submit_copy(
+                prepared, DeviceLease(0, last_free)
+            )
+            reuse_counts[0] += 1
+            ready = ReadyTransfer(
+                job=None,
+                index=index,
+                unit=unit,
+                device_slot_index=0,
+                ready_event=last_ready,
+            )
+            state, last_free = self._consume(ready, compute_unit, state)
+        if last_free is not None:
+            last_free.synchronize()
+        self.pipeline.last_stats = {
+            "pipeline_host_wall_ms": (
+                time.perf_counter() - started
+            ) * 1000.0,
+            "source_prepare_wait_ms": source_wait_ms,
+            "ready_wait_ms": 0.0,
+            "free_slot_wait_ms": 0.0,
+            "source_queue_max_depth": 0,
+            "ready_queue_max_depth": 0,
+            "source_queue_capacity": 0,
+            "ready_queue_capacity": 0,
+            "transfer_slot_reuse_counts": reuse_counts,
+            "prefetch_disabled": True,
+        }
+        return state, last_free
 
     @property
     def stats(self):
@@ -569,15 +638,20 @@ class MixedDtypeRuntime:
                 pair[0 if phase == "start" else 1].record(
                     self.compute_stream
                 )
+                if phase == "end":
+                    self._used_linear_event_keys.add(name)
 
             compute_unit.set_linear_profiler(record_linear)
         if self.profile and hasattr(compute_unit, "set_stage_profiler"):
             def record_stage(phase, stage, layer_index):
-                pair = self._stage_events.get((stage, layer_index))
+                key = (stage, layer_index)
+                pair = self._stage_events.get(key)
                 if pair is not None:
                     pair[0 if phase == "start" else 1].record(
                         self.compute_stream
                     )
+                    if phase == "end":
+                        self._used_stage_event_keys.add(key)
 
             compute_unit.set_stage_profiler(record_stage)
         self.start_event.record(self.coordinator)
@@ -585,6 +659,8 @@ class MixedDtypeRuntime:
         self.compute_stream.wait_event(self.start_event)
         self.store.reset_profile()
         self._used_dequant_events = []
+        self._used_linear_event_keys = set()
+        self._used_stage_event_keys = set()
         resident_done = None
         try:
             if self.resident_units:
@@ -596,14 +672,19 @@ class MixedDtypeRuntime:
                     resident_done = self.resident_done_event
                     resident_done.record(self.compute_stream)
             if self.streamed_units:
-                state, last_free = self.pipeline.run(
-                    lambda ready, current: self._consume(
-                        ready, compute_unit, current
-                    ),
-                    state,
-                    timeout_seconds=self.source_timeout_seconds,
-                    units=self.streamed_units,
-                )
+                if self.prefetch_depth == 0:
+                    state, last_free = self._run_without_prefetch(
+                        compute_unit, state
+                    )
+                else:
+                    state, last_free = self.pipeline.run(
+                        lambda ready, current: self._consume(
+                            ready, compute_unit, current
+                        ),
+                        state,
+                        timeout_seconds=self.source_timeout_seconds,
+                        units=self.streamed_units,
+                    )
             else:
                 last_free = resident_done
                 self.pipeline.last_stats = {
@@ -615,6 +696,7 @@ class MixedDtypeRuntime:
                     "ready_queue_max_depth": 0,
                     "source_queue_capacity": self.pipeline.source_queue.maxsize,
                     "ready_queue_capacity": self.pipeline.ready_queue.maxsize,
+                    "transfer_slot_reuse_counts": [0] * self.slot_count,
                 }
         finally:
             if self.profile and hasattr(compute_unit, "set_linear_profiler"):
@@ -627,6 +709,22 @@ class MixedDtypeRuntime:
         result = dict(self.pipeline.last_stats)
         result.update(self.store.profile_stats())
         result["wall_ms"] = (time.perf_counter() - started) * 1000.0
+        if result.get("staging_timeline"):
+            result["staging_timeline"] = [
+                dict(
+                    {
+                        key: value
+                        for key, value in item.items()
+                        if key not in {"started_monotonic", "ended_monotonic"}
+                    },
+                    start_ms=(item["started_monotonic"] - started) * 1000.0,
+                    end_ms=(item["ended_monotonic"] - started) * 1000.0,
+                )
+                for item in sorted(
+                    result["staging_timeline"],
+                    key=lambda value: value["started_monotonic"],
+                )
+            ]
         result["h2d_bytes"] = sum(
             unit.transfer_bytes for unit in self.streamed_units
         )
@@ -660,35 +758,117 @@ class MixedDtypeRuntime:
                 else self.backend_phase_plan.selection.decode
             )
         if self.profile:
-            copy_ms = sum(
-                self._timing_events["copy_start"][index].elapsed_time(
+            transfer_timeline = []
+            copy_intervals = []
+            compute_intervals = []
+            assignments = self.pipeline.scheduler.unit_slot_assignments
+            for index, unit in enumerate(self.streamed_units):
+                copy_start = self.start_event.elapsed_time(
+                    self._timing_events["copy_start"][index]
+                )
+                copy_end = self.start_event.elapsed_time(
                     self._timing_events["copy_end"][index]
                 )
-                for index in range(len(self.streamed_units))
-            )
-            compute_ms = sum(
-                self._timing_events["compute_start"][index].elapsed_time(
+                compute_start = self.start_event.elapsed_time(
+                    self._timing_events["compute_start"][index]
+                )
+                compute_end = self.start_event.elapsed_time(
                     self._timing_events["compute_end"][index]
                 )
-                for index in range(len(self.streamed_units))
+                copy_intervals.append((copy_start, copy_end))
+                compute_intervals.append((compute_start, compute_end))
+                transfer_timeline.append(
+                    {
+                        "unit_id": unit.unit_id,
+                        "layer_id": int(unit.layer_id),
+                        "operation": unit.operation,
+                        "h2d_bytes": int(unit.transfer_bytes),
+                        "slot_index": (
+                            0
+                            if self.prefetch_depth == 0
+                            else assignments.get(index)
+                        ),
+                        "copy_start_ms": copy_start,
+                        "copy_end_ms": copy_end,
+                        "copy_duration_ms": copy_end - copy_start,
+                        "compute_start_ms": compute_start,
+                        "compute_end_ms": compute_end,
+                        "compute_duration_ms": compute_end - compute_start,
+                        "ready_to_compute_gap_ms": max(
+                            0.0, compute_start - copy_end
+                        ),
+                    }
+                )
+            resident_compute_timeline = []
+            for unit in self.resident_units:
+                start, end = self._resident_compute_events[unit.unit_id]
+                compute_start = self.start_event.elapsed_time(start)
+                compute_end = self.start_event.elapsed_time(end)
+                compute_intervals.append((compute_start, compute_end))
+                resident_compute_timeline.append(
+                    {
+                        "unit_id": unit.unit_id,
+                        "layer_id": int(unit.layer_id),
+                        "operation": unit.operation,
+                        "compute_start_ms": compute_start,
+                        "compute_end_ms": compute_end,
+                        "compute_duration_ms": compute_end - compute_start,
+                    }
+                )
+            timeline_summary = analyze_copy_compute_timeline(
+                copy_intervals,
+                compute_intervals,
+                result["wall_ms"],
             )
-            compute_ms += sum(
-                start.elapsed_time(end)
-                for start, end in self._resident_compute_events.values()
-            )
+            copy_ms = timeline_summary["copy_busy_ms"]
+            compute_ms = timeline_summary["compute_busy_ms"]
             result["h2d_event_sum_ms"] = copy_ms
             result["compute_event_sum_ms"] = compute_ms
+            result["transfer_timeline"] = transfer_timeline
+            result["resident_compute_timeline"] = resident_compute_timeline
+            result["copy_compute_timeline"] = timeline_summary
+            result.update(timeline_summary)
+            result["h2d_effective_gbps"] = (
+                0.0
+                if copy_ms == 0.0
+                else (result["h2d_bytes"] / 1e9) / (copy_ms / 1000.0)
+            )
             result["dequant_event_sum_ms"] = sum(
                 start.elapsed_time(end)
                 for start, end in self._used_dequant_events
             )
-            result["gemm_event_sum_ms"] = sum(
-                start.elapsed_time(end)
-                for start, end in self._linear_events.values()
-            )
+            linear_event_ms = {
+                name: start.elapsed_time(end)
+                for name, (start, end) in self._linear_events.items()
+                if name in self._used_linear_event_keys
+            }
+            result["linear_event_ms"] = linear_event_ms
+            result["gemm_event_sum_ms"] = sum(linear_event_ms.values())
+            stage_event_ms = {
+                "{}:layer{}".format(stage, layer): start.elapsed_time(end)
+                for (stage, layer), (start, end) in self._stage_events.items()
+                if (stage, layer) in self._used_stage_event_keys
+            }
+            result["stage_event_ms"] = stage_event_ms
             result["attention_event_sum_ms"] = sum(
-                start.elapsed_time(end)
-                for start, end in self._stage_events.values()
+                value
+                for name, value in stage_event_ms.items()
+                if name.startswith("attention:")
+            )
+            result["kv_append_event_sum_ms"] = sum(
+                value
+                for name, value in stage_event_ms.items()
+                if name.startswith("kv_append:")
+            )
+            result["kv_attention_event_sum_ms"] = sum(
+                value
+                for name, value in stage_event_ms.items()
+                if name.startswith("kv_attention:")
+            )
+            result["mlp_event_sum_ms"] = sum(
+                value
+                for name, value in stage_event_ms.items()
+                if name.startswith("mlp:")
             )
         self.last_profile = result
         return state

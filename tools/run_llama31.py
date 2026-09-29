@@ -36,6 +36,7 @@ from layer_streaming import (  # noqa: E402
     build_backend_phase_plan,
     build_compatibility_report,
     build_inference_report,
+    kv_page_pool_bytes,
     build_static_transformer_placement,
     default_provider_registry,
 )
@@ -55,6 +56,9 @@ BACKEND_CHOICES = (
 )
 
 
+ACTIVE_TIER_CLI_SCHEMA_VERSION = 1
+
+
 def parse_byte_size(value):
     text = str(value).strip().lower()
     multiplier = 1
@@ -70,6 +74,50 @@ def parse_byte_size(value):
     if result < 0:
         raise argparse.ArgumentTypeError("byte size cannot be negative")
     return result
+
+
+def parse_nonnegative_int(value):
+    try:
+        result = int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("expected an integer") from error
+    if result < 0:
+        raise argparse.ArgumentTypeError("value cannot be negative")
+    return result
+
+
+def resolve_gpu_hot_budget_bytes(args, geometry, kv_dtype_name):
+    """Resolve the mutually-exclusive page/byte CLI forms to Policy bytes."""
+
+    if args.kv_gpu_hot_pages:
+        return kv_page_pool_bytes(
+            layer_count=geometry.num_hidden_layers,
+            page_count=args.kv_gpu_hot_pages,
+            num_key_value_heads=geometry.num_key_value_heads,
+            page_size=args.kv_block_size,
+            head_dim=geometry.head_dim,
+            batch_size=1,
+            dtype=kv_dtype_name,
+        )
+    return int(args.kv_gpu_hot_budget)
+
+
+def build_active_tier_cli_config(args, gpu_hot_budget_bytes):
+    """Return the stable, JSON-safe Active Tier command configuration."""
+
+    return {
+        "schema_version": ACTIVE_TIER_CLI_SCHEMA_VERSION,
+        "gpu_hot_capacity_pages_requested": int(args.kv_gpu_hot_pages),
+        "gpu_hot_capacity_bytes": int(gpu_hot_budget_bytes),
+        "cpu_backing_capacity_bytes": int(args.kv_cpu_budget),
+        "gpu_migration_slots_bytes": int(args.kv_gpu_migration_slots),
+        "cpu_migration_slots_bytes": int(args.kv_cpu_migration_slots),
+        "gpu_high_watermark_bytes": int(args.kv_gpu_high_watermark),
+        "gpu_low_watermark_bytes": int(args.kv_gpu_low_watermark),
+        "cpu_high_watermark_bytes": int(args.kv_cpu_high_watermark),
+        "cpu_low_watermark_bytes": int(args.kv_cpu_low_watermark),
+        "prefetch_timeout_ms": int(args.kv_prefetch_timeout_ms),
+    }
 
 
 def parse_args():
@@ -143,7 +191,7 @@ def parse_args():
     )
     parser.add_argument("--slots", type=int, choices=(1, 2, 3, 4), default=2)
     parser.add_argument(
-        "--prefetch-depth", type=int, choices=tuple(range(1, 9))
+        "--prefetch-depth", type=int, choices=tuple(range(0, 9))
     )
     parser.add_argument(
         "--kv-block-size",
@@ -172,16 +220,93 @@ def parse_args():
         "--kv-index",
         choices=("none", "quest-flat", "hierarchical-quest", "centroid-only"),
         default="none",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--kv-selection",
+        choices=("dense", "rgkv"),
+        default=None,
+        help="Public KV page-selection policy; RGKV is Decode-only sparse selection",
     )
     parser.add_argument(
         "--kv-prefix-cache",
         choices=("off", "session", "memory", "persistent"),
         default="off",
     )
+    parser.add_argument(
+        "--kv-prefill-backend",
+        choices=("reference_paged_exact", "gather_sdpa_prefill"),
+        default="reference_paged_exact",
+        help="Explicit provider for Full/Chunked Prefill when Decode provider lacks it",
+    )
+    gpu_hot_group = parser.add_mutually_exclusive_group()
+    gpu_hot_group.add_argument(
+        "--kv-gpu-hot-pages",
+        type=parse_nonnegative_int,
+        default=0,
+        help=(
+            "Bounded GPU KV hot-cache capacity in logical token-page "
+            "bundles; converted to bytes from checkpoint geometry"
+        ),
+    )
+    gpu_hot_group.add_argument(
+        "--kv-gpu-hot-budget",
+        type=parse_byte_size,
+        default=0,
+        help="Bounded GPU KV hot-cache capacity in bytes",
+    )
     parser.add_argument("--kv-cpu-budget", type=parse_byte_size, default=0)
     parser.add_argument("--kv-nvme-budget", type=parse_byte_size, default=0)
-    parser.add_argument("--kv-page-budget", type=int, default=0)
-    parser.add_argument("--kv-recent-window", type=int, default=0)
+    parser.add_argument(
+        "--kv-gpu-migration-slots", type=parse_byte_size, default=0
+    )
+    parser.add_argument(
+        "--kv-cpu-migration-slots", type=parse_byte_size, default=0
+    )
+    parser.add_argument(
+        "--kv-gpu-high-watermark", type=parse_byte_size, default=0
+    )
+    parser.add_argument(
+        "--kv-gpu-low-watermark", type=parse_byte_size, default=0
+    )
+    parser.add_argument(
+        "--kv-cpu-high-watermark", type=parse_byte_size, default=0
+    )
+    parser.add_argument(
+        "--kv-cpu-low-watermark", type=parse_byte_size, default=0
+    )
+    parser.add_argument(
+        "--kv-prefetch-timeout-ms",
+        type=parse_nonnegative_int,
+        default=0,
+        help=(
+            "Active Tier prefetch timeout in milliseconds; zero uses the "
+            "runtime default of 10 seconds"
+        ),
+    )
+    parser.add_argument(
+        "--kv-page-budget",
+        type=int,
+        default=0,
+        help="RGKV hard total page budget; zero selects all pages",
+    )
+    parser.add_argument(
+        "--kv-recent-window",
+        type=int,
+        default=0,
+        help="RGKV mandatory recent tokens, included inside total page budget",
+    )
+    parser.add_argument(
+        "--kv-rgkv-scorer",
+        "--kv-quest-scorer",
+        dest="kv_rgkv_scorer",
+        choices=("cpu-reference", "gpu", "torch-tensorized"),
+        default="cpu-reference",
+        help=(
+            "Explicit RGKV scoring provider; GPU is "
+            "experimental and does not imply quality qualification"
+        ),
+    )
     parser.add_argument(
         "--kv-attention-backend",
         choices=(
@@ -320,7 +445,9 @@ def main():
     if args.vocab_mode is not None:
         embedding_mode = args.vocab_mode
         lm_head_mode = args.vocab_mode
-    prefetch_depth = args.prefetch_depth or args.slots
+    prefetch_depth = (
+        args.slots if args.prefetch_depth is None else args.prefetch_depth
+    )
     inferred = ExecutionPolicy.from_config(config)
     weight_format = (
         inferred.weight_format
@@ -441,27 +568,57 @@ def main():
         if args.kv_dtype == "auto"
         else args.kv_dtype
     )
+    gpu_hot_budget_bytes = resolve_gpu_hot_budget_bytes(
+        args, geometry, kv_dtype_name
+    )
+    active_tier_cli_config = build_active_tier_cli_config(
+        args, gpu_hot_budget_bytes
+    )
     kv_reuse = {
         "off": "request_only",
         "session": "session",
         "memory": "prefix_memory",
         "persistent": "prefix_persistent",
     }[args.kv_prefix_cache]
+    selection_name = args.kv_selection
+    if selection_name is None:
+        selection_name = args.kv_index
+        if selection_name != "none":
+            print(
+                "DEPRECATED: --kv-index/quest-flat maps to --kv-selection rgkv",
+                file=sys.stderr,
+            )
+    elif args.kv_index != "none":
+        raise SystemExit(
+            "KV policy rejected before allocation: do not combine "
+            "--kv-selection with deprecated --kv-index"
+        )
+    scorer_name = args.kv_rgkv_scorer.replace("-", "_")
+    if scorer_name == "gpu":
+        scorer_name = "torch_tensorized"
     try:
         kv_policy = KVPolicy(
             accuracy=args.kv_accuracy,
             storage=args.kv_storage.replace("-", "_"),
             dtype=kv_dtype_name,
-            selection=args.kv_index.replace("-", "_"),
+            selection=selection_name.replace("-", "_"),
             reuse=kv_reuse,
             attention_backend=args.kv_attention_backend,
             page_size=args.kv_block_size,
+            gpu_hot_budget_bytes=gpu_hot_budget_bytes,
             cpu_budget_bytes=args.kv_cpu_budget,
             nvme_budget_bytes=args.kv_nvme_budget,
+            gpu_migration_slots_bytes=args.kv_gpu_migration_slots,
+            cpu_migration_slots_bytes=args.kv_cpu_migration_slots,
+            gpu_high_watermark_bytes=args.kv_gpu_high_watermark,
+            gpu_low_watermark_bytes=args.kv_gpu_low_watermark,
+            cpu_high_watermark_bytes=args.kv_cpu_high_watermark,
+            cpu_low_watermark_bytes=args.kv_cpu_low_watermark,
             page_budget=args.kv_page_budget,
             recent_window=args.kv_recent_window,
+            rgkv_scorer=scorer_name,
         )
-        kv_policy.require_d1_supported()
+        kv_policy.require_executable_supported()
         if (
             kv_policy.attention_backend
             in {"reference_paged_exact", "legacy_gather_sdpa_reference"}
@@ -474,7 +631,13 @@ def main():
         raise SystemExit("KV policy rejected before allocation: {}".format(error))
     print(
         "Expanded KV policy: {}".format(
-            json.dumps(kv_policy.as_dict(), sort_keys=True)
+            json.dumps(kv_policy.as_rgkv_dict(), sort_keys=True)
+        ),
+        file=sys.stderr,
+    )
+    print(
+        "Expanded Active Tier CLI config: {}".format(
+            json.dumps(active_tier_cli_config, sort_keys=True)
         ),
         file=sys.stderr,
     )
@@ -574,6 +737,7 @@ def main():
         cuda_safety_margin_bytes=args.cuda_safety_margin_mib * 1024 ** 2,
         transformer_placement=transformer_placement,
         kv_policy=kv_policy,
+        kv_prefill_backend=args.kv_prefill_backend,
     ).preflight(device=device, raise_on_error=False)
     if args.ignore_memlock_limit:
         memlock_errors = tuple(
@@ -651,29 +815,68 @@ def main():
             kv_dtype=kv_dtype,
             kv_policy=kv_policy,
             allow_kv_reference=args.allow_kv_reference,
+            kv_prefill_backend=args.kv_prefill_backend,
+            kv_prefetch_timeout_ms=args.kv_prefetch_timeout_ms,
         ))
         input_ids = encoded.input_ids.to(device)
         generated = []
         token_latencies = []
         runtime_profiles = []
         vocab_profiles = []
+        finish_profiles = []
+        pending_finish_profile = None
 
-        def capture_profiles():
-            runtime_profiles.append(dict(runtime.last_profile or {}))
+        def finish_profiled(state, phase):
+            nonlocal pending_finish_profile
+            wall_started = time.perf_counter()
+            start_event = None
+            end_event = None
+            if args.profile:
+                start_event = torch.cuda.Event(enable_timing=True)
+                end_event = torch.cuda.Event(enable_timing=True)
+                start_event.record(torch.cuda.current_stream(device))
+            state = executor.finish(state)
+            if end_event is not None:
+                end_event.record(torch.cuda.current_stream(device))
+            pending_finish_profile = {
+                "phase": str(phase),
+                "finish_host_enqueue_ms": (
+                    time.perf_counter() - wall_started
+                ) * 1000.0,
+                "start_event": start_event,
+                "end_event": end_event,
+            }
+            return state
+
+        def capture_profiles(phase):
+            nonlocal pending_finish_profile
+            runtime_profile = dict(runtime.last_profile or {})
+            runtime_profile["inference_phase"] = str(phase)
+            runtime_profiles.append(runtime_profile)
             if vocab_runtime is not None:
-                vocab_profiles.append(vocab_runtime.profile_stats())
+                vocab_profile = vocab_runtime.profile_stats()
+                vocab_profile["inference_phase"] = str(phase)
+                vocab_profiles.append(vocab_profile)
+            if pending_finish_profile is not None:
+                item = dict(pending_finish_profile)
+                start_event = item.pop("start_event")
+                end_event = item.pop("end_event")
+                if start_event is not None:
+                    item["finish_cuda_ms"] = start_event.elapsed_time(end_event)
+                finish_profiles.append(item)
+                pending_finish_profile = None
 
         generation_started = time.perf_counter()
         with torch.inference_mode():
             prefill_started = time.perf_counter()
             state = executor.begin(input_ids)
             state = runtime.run(executor, state)
-            state = executor.finish(state)
+            state = finish_profiled(state, "prefill")
             torch.cuda.synchronize(device)
             time_to_first_token_ms = (
                 time.perf_counter() - prefill_started
             ) * 1000.0
-            capture_profiles()
+            capture_profiles("prefill")
             next_token = state.topk_indices[..., 0]
             generated.append(next_token)
 
@@ -681,13 +884,13 @@ def main():
                 started = time.perf_counter()
                 state = executor.begin(next_token)
                 state = runtime.run(executor, state)
-                state = executor.finish(state)
+                state = finish_profiled(state, "decode")
                 next_token = state.topk_indices[..., 0]
                 torch.cuda.synchronize(device)
                 token_latencies.append(
                     (time.perf_counter() - started) * 1000.0
                 )
-                capture_profiles()
+                capture_profiles("decode")
                 generated.append(next_token)
         generation_wall_seconds = time.perf_counter() - generation_started
 
@@ -720,9 +923,13 @@ def main():
             pinned_bytes=store.pinned_bytes + vocab_pinned_bytes,
             kv_cache_bytes=executor.kv_cache.nbytes,
             kv_profiles=[executor.kv_cache.profile_stats()],
+            finish_profiles=finish_profiles,
             device=device,
         )
         result = report.as_dict()
+        result["runtime_config"]["kv_active_tier"] = (
+            active_tier_cli_config
+        )
         if compatibility_report is not None:
             result["hardware"]["compatibility"] = (
                 compatibility_report.as_dict()

@@ -236,6 +236,8 @@ class H2DScheduler:
         self.staging_requires_event = bool(staging_requires_event)
         self.free_slot_wait_ms = 0.0
         self.max_ready_queue_depth = 0
+        self.slot_reuse_counts = [0] * int(self.free_slot_queue.maxsize)
+        self.unit_slot_assignments = {}
         self.thread = threading.Thread(
             target=self._worker,
             name="cascade-h2d-scheduler",
@@ -282,6 +284,8 @@ class H2DScheduler:
                 lease = _queue_get(
                     self.free_slot_queue, self.stop_event, job.cancel
                 )
+                self.slot_reuse_counts[lease.slot_index] += 1
+                self.unit_slot_assignments[prepared.index] = lease.slot_index
                 self.free_slot_wait_ms += (
                     time.perf_counter() - started
                 ) * 1000.0
@@ -324,6 +328,8 @@ class H2DScheduler:
     def reset_stats(self):
         self.free_slot_wait_ms = 0.0
         self.max_ready_queue_depth = 0
+        self.slot_reuse_counts = [0] * int(self.free_slot_queue.maxsize)
+        self.unit_slot_assignments = {}
 
     def close(self):
         try:
@@ -496,6 +502,9 @@ class PipelineRuntimeCore:
                 "ready_queue_max_depth": self.scheduler.max_ready_queue_depth,
                 "source_queue_capacity": self.source_queue.maxsize,
                 "ready_queue_capacity": self.ready_queue.maxsize,
+                "transfer_slot_reuse_counts": list(
+                    self.scheduler.slot_reuse_counts
+                ),
             }
             return state, last_free_event
         except BaseException:

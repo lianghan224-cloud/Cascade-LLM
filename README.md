@@ -1,21 +1,74 @@
 # Cascade-LLM
 
-Cascade-LLM 是面向单机单卡、单请求优先的 CPU 常驻权重流式推理框架。模型权重完整保存在 CPU 内存中，运行时按矩阵/矩阵组/层粒度异步执行 CPU→GPU H2D 与 GPU 计算，并通过固定资源池和预分配 block KV Cache 限制 GPU 占用。
+Cascade-LLM is a research inference runtime for running Llama-family models
+whose weights are larger than a single GPU's VRAM. It keeps complete weights in
+CPU memory and uses bounded GPU weight slots, explicit memory planning, and
+asynchronous host-to-device transfer to make the resource ownership and failure
+modes observable.
 
-当前重点是可验证的推理内核，不是通用推理服务器。统一执行计划由任意兼容 Llama `config.json` 和 checkpoint metadata 构建，支持 BF16、FP16、INT8 per-channel/per-group 与 packed INT4 per-group。INT8/INT4 fallback 始终显式命名；此外已提供可选的 SM86 CUTLASS W8A16 provider：per-channel 支持 prefill/decode，per-group 当前仅支持 M=1 decode，其他 fused 格式仍不会被静默模拟。
+The project prioritizes correctness and reproducible evidence over benchmark
+claims. It is not yet a general-purpose inference server or a production-ready
+runtime. Read [the current status](docs/STATUS.md) before relying on any
+performance or qualification statement.
 
-当前 KV 里程碑为 **KV Stack Beta**：generation-safe PagePool/Ownership、Fork/COW/Prefix/Beam/Speculative/rollback、Quest-flat CPU summary index、Mock GPU/CPU/SSD tiering、prefetch/coordinator 和显式 workload routing 已完成。SM86 CUDA 当前服务 Decode/Short Suffix；Full/Chunked Prefill 会记录原因并进入 `reference_paged_exact` correctness fallback。真实 CPU/NVMe/GDS 活动 KV、Quest 数据集质量和专用高吞吐 Prefill Kernel 尚未完成。权威状态见 `docs/KV_ARCHITECTURE_CONTRACT.md` 与 `docs/KV_REMEDIATION_IMPLEMENTATION_REPORT.md`。
+## Features and boundaries
 
-## 迁移与 Codex 交接
+- Metadata-first Llama checkpoint validation with CPU arenas and bounded GPU
+  memory planning.
+- BF16/FP16 execution plus explicit INT8/INT4 dequantization fallbacks.
+- Optional SM86 W8A16 provider with capability and numerical-contract gates.
+- Paged KV ownership, copy-on-write, prefix reuse, rollback, and explicit
+  CUDA/reference attention routing.
+- Additive MoE building blocks for OLMoE-style routing and expert residency.
 
-迁移到新服务器时不要复制 `.venv`、模型进入 Git 或沿用旧 GPU 编译产物。使用以下入口：
+The supported public execution path is Llama dense inference. Quantized large
+models, MoE, active-tier KV, and continuous batching are experimental or
+blocked on real-model qualification; no fallback is presented as a fused or
+qualified result.
 
-- [`AGENTS.md`](AGENTS.md)：Codex 每次进入仓库自动读取的开发约定；
-- [`docs/CODEX_HANDOFF.md`](docs/CODEX_HANDOFF.md)：项目目标、当前状态、暂停边界和大权重实验路线；
-- [`docs/SERVER_MIGRATION.md`](docs/SERVER_MIGRATION.md)：Git/模型/依赖/Codex 的完整迁移步骤；
-- `scripts/bootstrap_server.sh`：按锁文件创建 Python 3.10 环境；
-- `scripts/verify_server.sh`：目标机 GPU、依赖和测试验收；
-- `tools/capture_environment.py`：生成不包含凭据的机器环境回执。
+## Quick start
+
+Use Python 3.10 and an NVIDIA CUDA environment. Model weights, local results,
+and credentials must remain outside the repository.
+
+```bash
+CASCADE_PYTHON_BIN=python3.10 bash scripts/bootstrap_server.sh
+bash scripts/verify_server.sh
+
+# Inspect the local CUDA and provider compatibility.
+.venv/bin/cascade doctor --mode full --require-cuda
+
+# Validate a checkpoint and its memory plan before allocating GPU resources.
+.venv/bin/cascade validate --checkpoint /path/to/checkpoint --metadata-only
+```
+
+For a minimal model run, see [the development guide](docs/DEVELOPMENT_GUIDE.md)
+and [the architecture overview](docs/ARCHITECTURE.md). Docker instructions are
+in [the Docker guide](docs/DOCKER_GUIDE.md).
+
+## Verification
+
+```bash
+.venv/bin/python -m unittest discover -s tests -p 'test_*.py' -q
+.venv/bin/python tools/validate_kv_stack.py --profile logic
+```
+
+`cuda-synthetic` validation requires a real CUDA GPU. Hardware-specific
+providers must be rebuilt and qualified on the target architecture.
+
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Current capability and qualification status](docs/STATUS.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Open-source release checklist](docs/OPEN_SOURCE_READINESS.md)
+
+## License
+
+A maintainer must select and add a repository license before public release or
+redistribution. See [the release checklist](docs/OPEN_SOURCE_READINESS.md).
 
 ## 核心代码
 
@@ -103,8 +156,16 @@ CASCADE_CHAT_GPU=0 bash scripts/chat_llama31_70b.sh
 - `--lm-head-mode resident|streamed`：LM Head 是否常驻 GPU；
 - `--gpu-resident-weight-budget 0|4GiB|8GiB|...`：按完整层前缀静态常驻 Transformer 权重；
 - `--slots 1|2|3|4`：GPU/staging slot 数量；
-- `--prefetch-depth 1..8`：source/ready 有界队列窗口；
+- `--prefetch-depth 0..8`：source/ready 有界队列窗口；`0` 表示严格同步的
+  source→H2D→compute 对照路径，不启用 lookahead；
 - `--kv-block-size 16|32`：KV 分配块大小。
+- `--kv-selection dense|rgkv`：Dense exact 或 Decode-only RGKV（配合
+  `--kv-accuracy sparse`）；RGKV
+  仍是显式实验策略，质量和端到端收益通过前不会成为默认；
+- `--kv-rgkv-scorer cpu-reference|gpu|torch-tensorized`：正确性 oracle 或 tensorized GPU
+  scorer。旧 Quest CLI 只作为 deprecated compatibility alias。
+- `--kv-page-budget N --kv-recent-window TOKENS`：RGKV 总页预算与 Recent
+  token window；Recent 换算出的页数包含在总预算内，不额外扩张选择集。
 
 启动顺序固定为：config 解析 → checkpoint 全量 key/shape/dtype 校验 → 内存预检 → CPU arena 分配 → checkpoint 加载 → GPU 资源分配。任何预检冲突都会在加载大权重前失败。
 

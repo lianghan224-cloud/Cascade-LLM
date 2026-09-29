@@ -9,6 +9,55 @@ from .slot_mapping import SlotMapping
 
 
 PAGED_BATCH_ABI_VERSION = 1
+PAGED_BATCH_V2_ABI_VERSION = 2
+
+
+def _validate_paged_batch_view(batch_view, expected_version):
+    if batch_view.version != expected_version:
+        raise ValueError("unsupported PagedBatchView ABI")
+    batch_size = len(batch_view.request_ids)
+    if batch_view.query_indptr.shape != (batch_size + 1,):
+        raise ValueError("query_indptr shape does not match batch")
+    if batch_view.block_table_indptr.shape != (batch_size + 1,):
+        raise ValueError("block_table_indptr shape does not match batch")
+    for name in ("sequence_lengths", "query_lengths", "tail_valid_tokens"):
+        if getattr(batch_view, name).shape != (batch_size,):
+            raise ValueError("{} shape does not match batch".format(name))
+    total_query = int(batch_view.query_positions.numel())
+    torch._assert_async(
+        batch_view.query_indptr[-1] == total_query,
+        "query positions do not match query_indptr",
+    )
+    if batch_view.slot_mapping.token_count not in {0, total_query}:
+        raise ValueError("slot_mapping must be empty or cover every query token")
+    flat_count = int(batch_view.flat_block_table.numel())
+    if batch_view.flat_logical_block_ids.shape != (flat_count,):
+        raise ValueError("flat logical block IDs do not match block table")
+    if batch_view.flat_page_valid_tokens.shape != (flat_count,):
+        raise ValueError("flat valid-token metadata does not match block table")
+    page_generations = getattr(batch_view, "flat_page_generations", None)
+    if page_generations is not None and page_generations.shape != (flat_count,):
+        raise ValueError("flat page generations do not match block table")
+    devices = {
+        tensor.device
+        for tensor in (
+            batch_view.query_indptr,
+            batch_view.block_table_indptr,
+            batch_view.flat_block_table,
+            batch_view.flat_logical_block_ids,
+            batch_view.flat_page_valid_tokens,
+            batch_view.sequence_lengths,
+            batch_view.query_lengths,
+            batch_view.tail_valid_tokens,
+            batch_view.query_positions,
+            batch_view.slot_mapping.page_ids,
+            batch_view.slot_mapping.offsets,
+        )
+    }
+    if len(devices) != 1:
+        raise ValueError("all PagedBatchView tensors must share a device")
+    if page_generations is not None and page_generations.device not in devices:
+        raise ValueError("page generations must share the batch device")
 
 
 @dataclass(frozen=True)
@@ -29,44 +78,7 @@ class PagedBatchView:
     version: int = PAGED_BATCH_ABI_VERSION
 
     def __post_init__(self):
-        batch_size = len(self.request_ids)
-        if self.version != PAGED_BATCH_ABI_VERSION:
-            raise ValueError("unsupported PagedBatchView ABI")
-        if self.query_indptr.shape != (batch_size + 1,):
-            raise ValueError("query_indptr shape does not match batch")
-        if self.block_table_indptr.shape != (batch_size + 1,):
-            raise ValueError("block_table_indptr shape does not match batch")
-        for name in ("sequence_lengths", "query_lengths", "tail_valid_tokens"):
-            if getattr(self, name).shape != (batch_size,):
-                raise ValueError("{} shape does not match batch".format(name))
-        total_query = int(self.query_positions.numel())
-        if total_query != int(self.query_indptr[-1].item()):
-            raise ValueError("query positions do not match query_indptr")
-        if self.slot_mapping.token_count not in {0, total_query}:
-            raise ValueError("slot_mapping must be empty or cover every query token")
-        flat_count = int(self.flat_block_table.numel())
-        if self.flat_logical_block_ids.shape != (flat_count,):
-            raise ValueError("flat logical block IDs do not match block table")
-        if self.flat_page_valid_tokens.shape != (flat_count,):
-            raise ValueError("flat valid-token metadata does not match block table")
-        devices = {
-            tensor.device
-            for tensor in (
-                self.query_indptr,
-                self.block_table_indptr,
-                self.flat_block_table,
-                self.flat_logical_block_ids,
-                self.flat_page_valid_tokens,
-                self.sequence_lengths,
-                self.query_lengths,
-                self.tail_valid_tokens,
-                self.query_positions,
-                self.slot_mapping.page_ids,
-                self.slot_mapping.offsets,
-            )
-        }
-        if len(devices) != 1:
-            raise ValueError("all PagedBatchView tensors must share a device")
+        _validate_paged_batch_view(self, PAGED_BATCH_ABI_VERSION)
 
     @property
     def batch_size(self):
@@ -98,6 +110,17 @@ class PagedBatchView:
             "query_lengths": self.query_lengths.tolist(),
             "tail_valid_tokens": self.tail_valid_tokens.tolist(),
         }
+
+
+@dataclass(frozen=True)
+class PagedBatchViewV2(PagedBatchView):
+    """Versioned batch ABI with generation-checked execution metadata."""
+
+    version: int = PAGED_BATCH_V2_ABI_VERSION
+    flat_page_generations: object = None
+
+    def __post_init__(self):
+        _validate_paged_batch_view(self, PAGED_BATCH_V2_ABI_VERSION)
 
 
 def _prefix_sum(values):
@@ -133,6 +156,7 @@ def build_paged_batch_view(
     flat_blocks = []
     flat_logical_blocks = []
     flat_valid_tokens = []
+    flat_generations = []
     block_counts = []
     positions = []
     slot_page_ids = []
@@ -155,8 +179,10 @@ def build_paged_batch_view(
         page_ids = request.block_table.physical_page_ids("gpu")
         required_blocks = (sequence_length + int(page_size) - 1) // int(page_size)
         page_ids = page_ids[:required_blocks]
+        handles = request.block_table.handles[:required_blocks]
         block_counts.append(len(page_ids))
         flat_blocks.extend(page_ids)
+        flat_generations.extend(int(handle.generation) for handle in handles)
         flat_logical_blocks.extend(range(len(page_ids)))
         flat_valid_tokens.extend(
             min(int(page_size), sequence_length - logical * int(page_size))
@@ -188,7 +214,7 @@ def build_paged_batch_view(
     )
     empty_or_pages = slot_page_ids if slot_mappings is not None else []
     empty_or_offsets = slot_offsets if slot_mappings is not None else []
-    return PagedBatchView(
+    return PagedBatchViewV2(
         request_ids=request_ids,
         query_indptr=query_indptr,
         block_table_indptr=block_indptr,
@@ -219,4 +245,7 @@ def build_paged_batch_view(
         ),
         page_size=int(page_size),
         layer=layer,
+        flat_page_generations=torch.tensor(
+            flat_generations, dtype=torch.int64, device=tensor_device
+        ),
     )

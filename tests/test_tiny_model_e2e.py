@@ -89,7 +89,9 @@ class SyntheticCheckpointTest(unittest.TestCase):
                 config = AutoConfig.from_pretrained(root, local_files_only=True)
                 device = torch.device("cuda:0")
                 outputs = []
+                topk_outputs = []
                 h2d_bytes = []
+                timeline_profiles = []
                 for lm_head_mode in (
                     PlacementMode.STREAMED,
                     PlacementMode.RESIDENT,
@@ -112,7 +114,9 @@ class SyntheticCheckpointTest(unittest.TestCase):
                             MixedResidentDeviceArena(plan, store, device)
                         )
                         runtime = resources.enter_context(
-                            MixedDtypeRuntime(plan, store, resident, device)
+                            MixedDtypeRuntime(
+                                plan, store, resident, device, profile=True
+                            )
                         )
                         vocab = None
                         if plan.vocab.stream_lm_head:
@@ -135,23 +139,44 @@ class SyntheticCheckpointTest(unittest.TestCase):
                             )
                         )
                         with torch.inference_mode():
-                            state = executor.finish(
-                                runtime.run(
-                                    executor,
-                                    executor.begin(
-                                        torch.tensor(
-                                            [[1, 4, 5]], device=device
-                                        )
-                                    ),
-                                )
+                            state = runtime.run(
+                                executor,
+                                executor.begin(
+                                    torch.tensor(
+                                        [[1, 4, 5]], device=device
+                                    )
+                                ),
                             )
+                            timeline_profiles.append(dict(runtime.last_profile))
+                            # Queue producer work immediately before final norm.
+                            # The streamed LM Head compute stream must wait for
+                            # the caller stream instead of racing this work.
+                            torch.cuda._sleep(20_000_000)
+                            state = executor.finish(state)
                         outputs.append(state.logits.cpu())
+                        topk_outputs.append(state.topk_indices.cpu())
                         h2d_bytes.append(
                             0 if vocab is None else vocab.last_profile["h2d_bytes"]
                         )
                 self.assertTrue(torch.equal(outputs[0], outputs[1]))
+                self.assertTrue(
+                    torch.equal(topk_outputs[0], topk_outputs[1])
+                )
                 self.assertGreater(h2d_bytes[0], 0)
                 self.assertEqual(h2d_bytes[1], 0)
+                for profile in timeline_profiles:
+                    self.assertEqual(
+                        len(profile["transfer_timeline"]), len(plan.units)
+                    )
+                    self.assertEqual(
+                        sum(profile["transfer_slot_reuse_counts"]),
+                        len(plan.units),
+                    )
+                    self.assertAlmostEqual(
+                        profile["critical_path_accounting_error_ms"],
+                        0.0,
+                        places=4,
+                    )
 
     @unittest.skipUnless(torch.cuda.is_available(), "CUDA is required")
     def test_static_resident_transformer_matches_streamed_path(self):

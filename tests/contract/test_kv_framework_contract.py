@@ -6,8 +6,11 @@ import unittest
 
 from layer_streaming import (
     KV_FRAMEWORK_CONTRACT_VERSION,
+    KV_FRAMEWORK_V2_CONTRACT_VERSION,
     kv_framework_contract,
     kv_framework_contract_sha256,
+    kv_framework_v2_contract,
+    kv_framework_v2_contract_sha256,
     KVPolicy,
     PagedAttentionBackend,
     PagedKVKernelBackend,
@@ -16,7 +19,9 @@ from layer_streaming import (
 
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures/kv_framework_v1.json"
+V2_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures/kv_framework_v2.json"
 EXPECTED_SHA256 = "c1b8e8cad65c0d0d1779703e24129a832100efbd5024a6cfad38841f8e30c0ed"
+EXPECTED_V2_SHA256 = "169cc1809209bbaa24cf23b861588cc39b0953bf78fdcb59eff42986eb808cbd"
 
 
 class KVFrameworkContractTest(unittest.TestCase):
@@ -25,6 +30,12 @@ class KVFrameworkContractTest(unittest.TestCase):
         self.assertEqual(KV_FRAMEWORK_CONTRACT_VERSION, 1)
         self.assertEqual(kv_framework_contract(), expected)
         self.assertEqual(kv_framework_contract_sha256(), EXPECTED_SHA256)
+
+    def test_v2_batch_metadata_contract_is_versioned(self):
+        expected = json.loads(V2_FIXTURE.read_text(encoding="utf-8"))
+        self.assertEqual(KV_FRAMEWORK_V2_CONTRACT_VERSION, 2)
+        self.assertEqual(kv_framework_v2_contract(), expected)
+        self.assertEqual(kv_framework_v2_contract_sha256(), EXPECTED_V2_SHA256)
 
     def test_production_import_graph_excludes_legacy_and_aliases(self):
         code = """

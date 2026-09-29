@@ -1,6 +1,6 @@
 """KVDrive-style logical location table and deterministic mock tiers."""
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import CancelledError, ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from enum import Enum
@@ -11,6 +11,7 @@ import threading
 import time
 
 from ..errors import KVCapacityError, KVLifecycleError
+from ..fence import KVOperationFence
 
 
 class KVTier(str, Enum):
@@ -108,6 +109,175 @@ class KVLocationRecord:
 
 class PrefetchCancelled(KVLifecycleError):
     pass
+
+
+class TieredKVOperationFence(KVOperationFence):
+    """KVOperationFence with the minimal legacy ``Future`` adapter.
+
+    The mock tier used to expose ``Future`` directly.  ``done`` and ``result``
+    remain temporarily available so existing diagnostics keep working, while
+    all new callers can use the common fence contract.
+    """
+
+    def done(self):
+        return self.query()
+
+    def result(self, timeout=None):
+        future = self.io_future
+        if future is None:
+            self.wait(timeout_seconds=0.0 if timeout is None else timeout)
+            return getattr(self, "result_value", None)
+        value = future.result(timeout=timeout)
+        if self.cancelled:
+            raise PrefetchCancelled(
+                "KV operation {} ({}) was cancelled".format(
+                    self.operation_id, self.kind
+                )
+            )
+        self.result_value = value
+        self.mark_completed(self.completion_epoch)
+        return value
+
+
+class RequestScopedPrefetchGroup:
+    """Own and quiesce the prefetch fences submitted for one request.
+
+    Cancellation is cooperative: outstanding workers are asked to stop, then
+    observed for a bounded interval.  The store keeps every reservation and
+    IO pin until its worker has actually stopped, so a timeout cannot publish
+    an incomplete replica or release protected metadata early.
+    """
+
+    def __init__(self, store, request_id, cleanup_timeout=5.0):
+        self.store = store
+        self.request_id = request_id
+        self.cleanup_timeout = float(cleanup_timeout)
+        self.fences = []
+        self._operation_ids = set()
+        self._cancelled = False
+        self._released = False
+        self._lock = threading.RLock()
+
+    def add(self, fence):
+        if not isinstance(fence, KVOperationFence):
+            raise TypeError("prefetch group only accepts KVOperationFence")
+        with self._lock:
+            if self._cancelled or self._released:
+                # A request can be closed after the store submission but
+                # before the coordinator attaches the returned Fence.  Adopt
+                # and cancel that orphan here instead of letting it escape the
+                # request-scoped cleanup boundary.
+                self.store.cancel_fence(
+                    fence, request_id=self.request_id
+                )
+                raise PrefetchCancelled(
+                    "prefetch group {!r} is cancelled".format(
+                        self.request_id
+                    )
+                )
+            if fence.operation_id not in self._operation_ids:
+                self.fences.append(fence)
+                self._operation_ids.add(fence.operation_id)
+        return fence
+
+    def cancel(self):
+        with self._lock:
+            if self._cancelled:
+                return self
+            self._cancelled = True
+            fences = tuple(self.fences)
+        for fence in fences:
+            self.store.cancel_fence(fence, request_id=self.request_id)
+        return self
+
+    def quiesce(self, timeout=None):
+        timeout = self.cleanup_timeout if timeout is None else float(timeout)
+        deadline = time.monotonic() + timeout
+        with self._lock:
+            pending = list(self.fences)
+        while pending:
+            pending = [fence for fence in pending if not fence.query()]
+            if not pending:
+                break
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    "prefetch group {!r} did not quiesce within {:.3f}s".format(
+                        self.request_id, timeout
+                    )
+                )
+            time.sleep(0.001)
+        return self
+
+    def _abort_and_quiesce(self, original_error):
+        self.cancel()
+        try:
+            self.quiesce()
+        except BaseException as cleanup_error:
+            try:
+                original_error.kv_cleanup_error = cleanup_error
+            except BaseException:
+                pass
+        self.release()
+
+    def wait(self, timeout=10.0, cancel_event=None):
+        deadline = time.monotonic() + float(timeout)
+        try:
+            with self._lock:
+                fences = tuple(self.fences)
+                cancelled = self._cancelled
+            if cancelled:
+                raise PrefetchCancelled(
+                    "request {!r} prefetch was cancelled".format(
+                        self.request_id
+                    )
+                )
+            for fence in fences:
+                while not fence.query():
+                    if cancel_event is not None and cancel_event.is_set():
+                        raise PrefetchCancelled(
+                            "request {!r} cancelled while prefetch was pending".format(
+                                self.request_id
+                            )
+                        )
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError(
+                            "KV prefetch timeout for request {!r}".format(
+                                self.request_id
+                            )
+                        )
+                    time.sleep(0.001)
+                if fence.cancelled:
+                    raise PrefetchCancelled(
+                        "request {!r} prefetch was cancelled".format(
+                            self.request_id
+                        )
+                    )
+                fence.wait(timeout_seconds=0.0)
+            self.release()
+            return self
+        except BaseException as error:
+            self._abort_and_quiesce(error)
+            raise
+
+    def release(self):
+        with self._lock:
+            if self._released:
+                return self
+            self._released = True
+            fences = tuple(self.fences)
+        for fence in fences:
+            self.store.release_fence_consumer(
+                fence, request_id=self.request_id
+            )
+        return self
+
+    def cleanup(self, timeout=None):
+        self.cancel()
+        try:
+            self.quiesce(timeout=timeout)
+        finally:
+            self.release()
+        return self
 
 
 class MockTierBackend:
@@ -223,7 +393,10 @@ class TieredKVStore:
             max_workers=1, thread_name_prefix="cascade-kv-prefetch"
         )
         self._prefetches = {}
+        self._active_fences = {}
+        self._fence_consumers = {}
         self._cancelled = set()
+        self._operation_sequence = 0
         self._closed = False
         self.migration_count = 0
         self.prefetch_requests = 0
@@ -239,6 +412,27 @@ class TieredKVStore:
     def _touch(self, record):
         self._epoch += 1
         record.last_access_epoch = self._epoch
+
+    def _next_operation(self, kind, request_id, prefetch_key):
+        self._operation_sequence += 1
+        fence = TieredKVOperationFence(
+            operation_id="mock-tier-{}-{}".format(
+                kind, self._operation_sequence
+            ),
+            request_id=request_id,
+            kind=kind,
+            submit_epoch=self._epoch,
+        )
+        fence.prefetch_key = prefetch_key
+        fence.cancellation_key = (prefetch_key, fence.operation_id)
+        fence.result_value = None
+        # Cancellation and metadata publication are serialized by the store
+        # lock.  This bit closes the small window between ``migrate``
+        # publishing the target authority and the worker marking its Future
+        # complete: a cancellation arriving in that window is too late and
+        # must not relabel the committed transaction as cancelled.
+        fence.metadata_committed = False
+        return fence
 
     def _tier_count(self, tier):
         return sum(
@@ -355,12 +549,22 @@ class TieredKVStore:
         keep_source=True,
         failure_stage=None,
         cancellation_key=None,
+        operation_fence=None,
     ):
         self._check_open()
         key = _logical_key(logical_block_id)
         target_tier = KVTier(target_tier)
-        reservation = (key, target_tier)
         source_location = None
+
+        def raise_if_cancelled(stage):
+            if cancellation_key is None:
+                return
+            with self._lock:
+                if cancellation_key in self._cancelled:
+                    raise PrefetchCancelled(
+                        "prefetch cancelled {}".format(stage)
+                    )
+
         with self._lock:
             record = self.record(key)
             existing = record.locations.get(target_tier)
@@ -393,23 +597,33 @@ class TieredKVStore:
         try:
             if failure_stage == "submit":
                 raise IOError("injected migration submit failure")
+            raise_if_cancelled("before source read")
             payload = self.backends[source_location.tier].read(
                 source_location.slot
             )
-            if cancellation_key is not None:
-                with self._lock:
-                    if cancellation_key in self._cancelled:
-                        raise PrefetchCancelled(
-                            "prefetch cancelled before target write"
-                        )
+            raise_if_cancelled("before target write")
             if failure_stage == "copy":
                 raise IOError("injected migration copy failure")
             self.backends[target_tier].write(target_slot, payload)
+            raise_if_cancelled("before metadata commit")
             if failure_stage == "completion":
                 raise IOError("injected migration completion failure")
+            if len(payload) != source_location.length:
+                raise IOError("migration length changed during copy")
             if _digest(payload) != source_location.checksum:
                 raise IOError("migration checksum changed during copy")
             with self._lock:
+                # This is the transaction commit point.  Re-check cooperative
+                # cancellation under the same lock used by ``cancel_fence``;
+                # otherwise cancel could win immediately after the earlier
+                # check and the target would still become authoritative.
+                if (
+                    cancellation_key is not None
+                    and cancellation_key in self._cancelled
+                ):
+                    raise PrefetchCancelled(
+                        "prefetch cancelled before metadata commit"
+                    )
                 record = self.record(key)
                 if (
                     record.data_version != source_version
@@ -425,6 +639,8 @@ class TieredKVStore:
                 record.locations[target_tier] = resident
                 record.authoritative_tier = target_tier
                 record.error = None
+                if operation_fence is not None:
+                    operation_fence.metadata_committed = True
                 self.migration_count += 1
                 self._touch(record)
             if not keep_source and source_location.tier != target_tier:
@@ -458,6 +674,8 @@ class TieredKVStore:
                         failed, state=ResidencyState.FAILED
                     )
                 record.authoritative_tier = source_location.tier
+                if operation_fence is not None:
+                    operation_fence.metadata_committed = False
                 record.error = "{}: {}{}".format(
                     type(exc).__name__,
                     exc,
@@ -480,15 +698,101 @@ class TieredKVStore:
                         "migration accounting underflow for {}".format(key)
                     )
 
-    def _prefetch_worker(self, key, target_tier, prefetch_key):
-        return self.migrate(
-            key,
-            target_tier,
-            keep_source=True,
-            cancellation_key=prefetch_key,
-        )
+    def _submit_migration(
+        self,
+        key,
+        target_tier,
+        *,
+        request_id=None,
+        kind="prefetch",
+        keep_source=True,
+        failure_stage=None,
+    ):
+        prefetch_key = (key, target_tier)
+        fence = self._next_operation(kind, request_id, prefetch_key)
 
-    def prefetch(self, logical_block_id, target_tier=KVTier.GPU):
+        def worker():
+            result = self.migrate(
+                key,
+                target_tier,
+                keep_source=keep_source,
+                failure_stage=failure_stage,
+                cancellation_key=fence.cancellation_key,
+                operation_fence=fence,
+            )
+            # Publish fence completion at the same serialization point used by
+            # cancellation.  A cancel racing after this point observes a
+            # completed operation instead of mislabelling a committed copy.
+            with self._lock:
+                fence.result_value = result
+                fence.mark_completed(self._epoch)
+            return result
+
+        future = self._executor.submit(worker)
+        fence.io_future = future
+        self._active_fences[fence.operation_id] = fence
+
+        def complete(completed):
+            try:
+                fence.result_value = completed.result()
+            except CancelledError as error:
+                fence.cancelled = True
+                fence.status = "cancelled"
+                fence.error = error
+            except BaseException as error:
+                if fence.cancelled:
+                    fence.status = "cancelled"
+                    fence.error = error
+                else:
+                    with self._lock:
+                        completion_epoch = self._epoch
+                    fence.mark_failed(error, completion_epoch)
+            else:
+                if fence.cancelled:
+                    fence.status = "cancelled"
+                else:
+                    with self._lock:
+                        completion_epoch = self._epoch
+                    fence.mark_completed(completion_epoch)
+            finally:
+                with self._lock:
+                    if self._prefetches.get(prefetch_key) is fence:
+                        self._prefetches.pop(prefetch_key, None)
+                    self._active_fences.pop(fence.operation_id, None)
+                    self._fence_consumers.pop(fence.operation_id, None)
+                    self._cancelled.discard(fence.cancellation_key)
+
+        future.add_done_callback(complete)
+        return fence
+
+    def migrate_async(
+        self,
+        logical_block_id,
+        target_tier,
+        keep_source=True,
+        failure_stage=None,
+        request_id=None,
+    ):
+        """Submit a mock migration and expose only the common fence contract."""
+        self._check_open()
+        key = _logical_key(logical_block_id)
+        target_tier = KVTier(target_tier)
+        with self._lock:
+            return self._submit_migration(
+                key,
+                target_tier,
+                request_id=request_id,
+                kind="migration",
+                keep_source=keep_source,
+                failure_stage=failure_stage,
+            )
+
+    def prefetch(
+        self,
+        logical_block_id,
+        target_tier=KVTier.GPU,
+        request_id=None,
+    ):
         self._check_open()
         key = _logical_key(logical_block_id)
         target_tier = KVTier(target_tier)
@@ -496,44 +800,75 @@ class TieredKVStore:
         with self._lock:
             self.prefetch_requests += 1
             if self.is_resident(key, target_tier):
-                completed = self._executor.submit(
-                    lambda: self.record(key).locations[target_tier]
+                fence = self._next_operation(
+                    "prefetch", request_id, prefetch_key
                 )
-                return completed
+                fence.result_value = self.record(key).locations[target_tier]
+                fence.mark_completed(self._epoch)
+                return fence
             existing = self._prefetches.get(prefetch_key)
-            if existing is not None and not existing.done():
+            if existing is not None and not existing.query():
                 self.prefetch_deduplicated += 1
+                if request_id is not None:
+                    self._fence_consumers.setdefault(
+                        existing.operation_id, set()
+                    ).add(request_id)
                 return existing
-            self._cancelled.discard(prefetch_key)
-            future = self._executor.submit(
-                self._prefetch_worker, key, target_tier, prefetch_key
+            fence = self._submit_migration(
+                key,
+                target_tier,
+                request_id=request_id,
+                kind="prefetch",
             )
-            self._prefetches[prefetch_key] = future
+            self._prefetches[prefetch_key] = fence
+            if request_id is not None:
+                self._fence_consumers[fence.operation_id] = {request_id}
+            return fence
 
-            def cleanup(completed):
-                del completed
-                with self._lock:
-                    self._prefetches.pop(prefetch_key, None)
-                    self._cancelled.discard(prefetch_key)
+    def prefetch_group(self, request_id, cleanup_timeout=5.0):
+        return RequestScopedPrefetchGroup(
+            self, request_id=request_id, cleanup_timeout=cleanup_timeout
+        )
 
-            future.add_done_callback(cleanup)
-            return future
+    def release_fence_consumer(self, fence, request_id):
+        with self._lock:
+            consumers = self._fence_consumers.get(fence.operation_id)
+            if consumers is None:
+                return False
+            consumers.discard(request_id)
+            if not consumers:
+                self._fence_consumers.pop(fence.operation_id, None)
+            return True
+
+    def cancel_fence(self, fence, request_id=None):
+        cancellation_key = getattr(fence, "cancellation_key", None)
+        with self._lock:
+            if request_id is not None:
+                consumers = self._fence_consumers.get(fence.operation_id)
+                if consumers is not None:
+                    consumers.discard(request_id)
+                    if consumers:
+                        return False
+                    self._fence_consumers.pop(fence.operation_id, None)
+            if fence.query():
+                return False
+            if getattr(fence, "metadata_committed", False):
+                return False
+            if cancellation_key is not None:
+                self._cancelled.add(cancellation_key)
+            fence.cancel()
+            self.prefetch_cancelled += 1
+            return True
 
     def cancel_prefetch(self, logical_block_id, target_tier=KVTier.GPU):
         key = _logical_key(logical_block_id)
         target_tier = KVTier(target_tier)
         prefetch_key = (key, target_tier)
         with self._lock:
-            future = self._prefetches.get(prefetch_key)
-            if future is None:
+            fence = self._prefetches.get(prefetch_key)
+            if fence is None:
                 return False
-            self._cancelled.add(prefetch_key)
-            cancelled = future.cancel()
-            self.prefetch_cancelled += 1
-            if cancelled:
-                self._prefetches.pop(prefetch_key, None)
-                self._cancelled.discard(prefetch_key)
-            return True
+        return self.cancel_fence(fence)
 
     def evict(self, logical_block_id, tier):
         self._check_open()
@@ -670,7 +1005,13 @@ class TieredKVStore:
                     for item in self.location_table.values()
                 ),
                 "pending_prefetches": sum(
-                    not item.done() for item in self._prefetches.values()
+                    not item.query() for item in self._prefetches.values()
+                ),
+                "pending_tier_operations": sum(
+                    not item.query() for item in self._active_fences.values()
+                ),
+                "prefetch_consumers": sum(
+                    len(item) for item in self._fence_consumers.values()
                 ),
                 "migrations": self.migration_count,
                 "prefetch_requests": self.prefetch_requests,
@@ -684,9 +1025,9 @@ class TieredKVStore:
         if self._closed:
             return
         with self._lock:
-            pending = tuple(self._prefetches.values())
-        for future in pending:
-            future.cancel()
+            pending = tuple(self._active_fences.values())
+        for fence in pending:
+            self.cancel_fence(fence)
         self._executor.shutdown(wait=True)
         for backend in self.backends.values():
             backend.close()

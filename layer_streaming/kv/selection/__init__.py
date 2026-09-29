@@ -13,9 +13,32 @@ from .quest_cpu import (
     QuestIndexRecord,
     QuestSelectionResult,
 )
+from .quest_gpu import (
+    QuestSelectionWorkspaceEstimate,
+    TensorizedQuestSelectionResult,
+    TorchTensorizedQuestScorer,
+    quest_scorer_provider,
+)
+from .common import (
+    DEPRECATED_QUEST_APIS,
+    RGKVBudget,
+    RGKVPageSummary,
+    RGKVSelectionResult,
+    RGKVStaleIndexError,
+    STALE_INDEX,
+)
+from .rgkv import RGKVSelectionPolicy
+from .rgkv_cpu_reference import RGKVCPUReferenceScorer
+from .rgkv_gpu import (
+    RGKVGPUScorer,
+    RGKVWorkspaceEstimate,
+    rgkv_scorer_provider,
+)
+from .rgkv_index import RGKVIndex
 
 __all__ = [
     "DenseSelection",
+    "DEPRECATED_QUEST_APIS",
     "HierarchicalQuestSelection",
     "KVSelectionPolicyProvider",
     "KV_SELECTION_ABI_VERSION",
@@ -25,5 +48,20 @@ __all__ = [
     "QuestCPUIndex",
     "QuestIndexRecord",
     "QuestSelectionResult",
+    "QuestSelectionWorkspaceEstimate",
+    "RGKVBudget",
+    "RGKVCPUReferenceScorer",
+    "RGKVGPUScorer",
+    "RGKVIndex",
+    "RGKVPageSummary",
+    "RGKVSelectionPolicy",
+    "RGKVSelectionResult",
+    "RGKVStaleIndexError",
+    "RGKVWorkspaceEstimate",
+    "STALE_INDEX",
     "SelectionCapability",
+    "TensorizedQuestSelectionResult",
+    "TorchTensorizedQuestScorer",
+    "quest_scorer_provider",
+    "rgkv_scorer_provider",
 ]

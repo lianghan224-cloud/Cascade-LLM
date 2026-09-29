@@ -21,6 +21,7 @@ from . import (
     PageDescriptor,
     PageState,
     PagedBatchView,
+    PagedBatchViewV2,
     PagedKVKernelBackend,
     PagedKVKernelCapability,
     RequestKVState,
@@ -34,6 +35,7 @@ from .stores import KV_STORE_ABI_VERSION, KVStore
 
 
 KV_FRAMEWORK_CONTRACT_VERSION = 1
+KV_FRAMEWORK_V2_CONTRACT_VERSION = 2
 
 
 def _fields(item):
@@ -122,6 +124,18 @@ def kv_framework_contract():
     }
 
 
+def kv_framework_v2_contract():
+    """Additive V2 batch metadata contract; V1 remains unchanged."""
+
+    return {
+        "contract_version": KV_FRAMEWORK_V2_CONTRACT_VERSION,
+        "extends_contract_version": KV_FRAMEWORK_CONTRACT_VERSION,
+        "dataclass_fields": {
+            "PagedBatchViewV2": _fields(PagedBatchViewV2),
+        },
+    }
+
+
 def canonical_kv_contract_json():
     return json.dumps(
         kv_framework_contract(),
@@ -134,4 +148,19 @@ def canonical_kv_contract_json():
 def kv_framework_contract_sha256():
     return hashlib.sha256(
         canonical_kv_contract_json().encode("utf-8")
+    ).hexdigest()
+
+
+def canonical_kv_v2_contract_json():
+    return json.dumps(
+        kv_framework_v2_contract(),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+
+
+def kv_framework_v2_contract_sha256():
+    return hashlib.sha256(
+        canonical_kv_v2_contract_json().encode("utf-8")
     ).hexdigest()

@@ -28,6 +28,15 @@ from layer_streaming import (  # noqa: E402
     PlacementMode,
     adapter_for_config,
 )
+from layer_streaming.numerical_contracts.kv_v2 import (  # noqa: E402
+    evaluate_model_quality,
+    load_kv_numerical_contract,
+)
+from tools.qualification_common import (  # noqa: E402
+    BLOCKED_NOT_EXCLUSIVE,
+    capture_cuda_environment,
+    qualification_admission,
+)
 
 
 LABELS = ("A", "B", "C", "D")
@@ -45,12 +54,66 @@ def parse_args():
     )
     parser.add_argument("--page-size", type=int, choices=(16, 32), default=16)
     parser.add_argument(
+        "--candidate-quest-scorer",
+        choices=("off", "cpu_reference", "torch_tensorized"),
+        default="off",
+    )
+    parser.add_argument("--candidate-page-budget", type=int, default=0)
+    parser.add_argument("--candidate-recent-window", type=int, default=0)
+    parser.add_argument(
+        "--contract",
+        type=Path,
+        default=ROOT
+        / "tests"
+        / "fixtures"
+        / "kv_numerical_sm86_bf16_abi1_v2.json",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=("cuda-smoke", "qualification"),
+        default="cuda-smoke",
+    )
+    parser.add_argument(
         "--weight-store",
         choices=("full_pinned", "pinned_staging"),
         default="pinned_staging",
     )
     parser.add_argument("--slots", type=int, choices=(1, 2, 3, 4), default=2)
     return parser.parse_args()
+
+
+def quality_kv_policy(
+    provider,
+    page_size,
+    dtype,
+    *,
+    quest_scorer="off",
+    page_budget=0,
+    recent_window=0,
+):
+    """Build one explicit Dense or Quest quality-run policy."""
+
+    quest_scorer = str(quest_scorer)
+    if quest_scorer == "off":
+        if int(page_budget) or int(recent_window):
+            raise ValueError("Quest budgets require a candidate Quest scorer")
+        return KVPolicy(
+            attention_backend=provider,
+            page_size=page_size,
+            dtype=dtype,
+        )
+    if int(page_budget) <= 0:
+        raise ValueError("Quest quality gate requires a positive page budget")
+    return KVPolicy(
+        accuracy="sparse",
+        selection="quest_flat",
+        attention_backend=provider,
+        page_size=page_size,
+        dtype=dtype,
+        page_budget=page_budget,
+        recent_window=recent_window,
+        quest_scorer=quest_scorer,
+    )
 
 
 def read_json(path):
@@ -150,7 +213,8 @@ class QualityRunner:
             if spec.role == "attention_q"
         )
 
-    def executor(self, provider, max_length):
+    def executor(self, provider, max_length, kv_options=None):
+        kv_options = dict(kv_options or {})
         return Llama31DecodeExecutor(
             self.config,
             self.resident,
@@ -159,12 +223,11 @@ class QualityRunner:
             return_full_logits=False,
             max_cache_length=max(1, int(max_length)),
             kv_block_size=self.page_size,
-            kv_policy=KVPolicy(
-                attention_backend=provider,
-                page_size=self.page_size,
-                dtype=(
-                    "bf16" if self.dtype_name == "bfloat16" else "fp16"
-                ),
+            kv_policy=quality_kv_policy(
+                provider,
+                self.page_size,
+                "bf16" if self.dtype_name == "bfloat16" else "fp16",
+                **kv_options,
             ),
             allow_kv_reference=provider in {
                 "reference_paged_exact",
@@ -189,7 +252,7 @@ class QualityRunner:
             raise RuntimeError("quality evaluation produced non-finite logits")
         return logits
 
-    def perplexity(self, provider, passages, eval_tokens):
+    def perplexity(self, provider, passages, eval_tokens, kv_options=None):
         total_nll = 0.0
         total_tokens = 0
         details = []
@@ -200,7 +263,7 @@ class QualityRunner:
                 raise ValueError("perplexity passage has fewer than two tokens")
             prefix_length = len(ids) - count
             passage_nll = []
-            with self.executor(provider, len(ids)) as executor:
+            with self.executor(provider, len(ids), kv_options) as executor:
                 logits = self.forward(executor, ids[:prefix_length])
                 for offset, target in enumerate(ids[prefix_length:]):
                     nll = float(
@@ -236,7 +299,9 @@ class QualityRunner:
             "examples": details,
         }
 
-    def choices(self, provider, examples, label_ids, category):
+    def choices(
+        self, provider, examples, label_ids, category, kv_options=None
+    ):
         correct = 0
         details = []
         for index, example in enumerate(examples):
@@ -247,7 +312,7 @@ class QualityRunner:
                 )
             prompt = render_chat(self.tokenizer, messages)
             ids = self.tokenizer.encode(prompt, add_special_tokens=False)
-            with self.executor(provider, len(ids)) as executor:
+            with self.executor(provider, len(ids), kv_options) as executor:
                 logits = self.forward(executor, ids)[0]
             scores = [float(logits[token].item()) for token in label_ids]
             predicted = LABELS[max(range(len(scores)), key=scores.__getitem__)]
@@ -284,7 +349,7 @@ class QualityRunner:
             "results": details,
         }
 
-    def run(self, provider, suite, label_ids):
+    def run(self, provider, suite, label_ids, kv_options=None):
         started = time.time()
         result = {
             "provider": provider,
@@ -292,18 +357,24 @@ class QualityRunner:
                 provider,
                 suite["perplexity_passages"],
                 suite["perplexity_eval_tokens_per_passage"],
+                kv_options,
             ),
             "short_text": self.choices(
-                provider, suite["short_text"], label_ids, "short"
+                provider, suite["short_text"], label_ids, "short", kv_options
             ),
             "long_context": self.choices(
                 provider,
                 build_long_examples(suite),
                 label_ids,
                 "long",
+                kv_options,
             ),
             "dialogue": self.choices(
-                provider, suite["dialogue"], label_ids, "dialogue"
+                provider,
+                suite["dialogue"],
+                label_ids,
+                "dialogue",
+                kv_options,
             ),
         }
         result["duration_seconds"] = time.time() - started
@@ -324,9 +395,32 @@ def main():
     args = parse_args()
     if not torch.cuda.is_available():
         raise SystemExit("CUDA is required")
+    environment = capture_cuda_environment(ROOT, args.device)
+    if args.mode == "qualification":
+        admitted, _, reason = qualification_admission(
+            environment, require_reservation=True
+        )
+        if not admitted:
+            raise SystemExit(
+                "{}: {}".format(BLOCKED_NOT_EXCLUSIVE, reason)
+            )
     suite = read_json(args.suite)
     if int(suite.get("schema_version", 0)) != 1:
         raise SystemExit("unsupported quality suite schema")
+    candidate_kv_options = {
+        "quest_scorer": args.candidate_quest_scorer,
+        "page_budget": args.candidate_page_budget,
+        "recent_window": args.candidate_recent_window,
+    }
+    try:
+        quality_kv_policy(
+            args.candidate,
+            args.page_size,
+            "bf16",
+            **candidate_kv_options,
+        )
+    except ValueError as error:
+        raise SystemExit("Quest quality policy rejected: {}".format(error))
     device = torch.device(args.device)
     torch.cuda.set_device(device)
     tokenizer = AutoTokenizer.from_pretrained(
@@ -383,7 +477,9 @@ def main():
             args.page_size,
         )
         reference = runner.run(args.reference, suite, labels)
-        candidate = runner.run(args.candidate, suite, labels)
+        candidate = runner.run(
+            args.candidate, suite, labels, candidate_kv_options
+        )
 
     reference_ppl = float(reference["perplexity"]["perplexity"])
     candidate_ppl = float(candidate["perplexity"]["perplexity"])
@@ -412,7 +508,13 @@ def main():
         "schema_version": 1,
         "suite": suite["name"],
         "suite_description": suite["description"],
-        "checkpoint": str(args.checkpoint.resolve()),
+        "checkpoint": {
+            "name": args.checkpoint.name,
+            "local_path_redacted": True,
+        },
+        "evidence_class": (
+            "QUALIFICATION" if args.mode == "qualification" else "SMOKE_ONLY"
+        ),
         "hardware": {
             "device": torch.cuda.get_device_name(device),
             "architecture": "sm{}{}".format(
@@ -423,6 +525,12 @@ def main():
         },
         "reference_provider": args.reference,
         "candidate_provider": args.candidate,
+        "candidate_kv_policy": quality_kv_policy(
+            args.candidate,
+            args.page_size,
+            "bf16" if runner.dtype_name == "bfloat16" else "fp16",
+            **candidate_kv_options,
+        ).as_dict(),
         "page_size": args.page_size,
         "coverage": coverage,
         "metrics": metrics,
@@ -439,11 +547,18 @@ def main():
             "capability or population-level accuracy benchmark."
         ),
     }
+    contract = load_kv_numerical_contract(args.contract)
+    report["quality_gate"] = evaluate_model_quality(contract, report)
+    report["status"] = (
+        "PASS" if report["quality_gate"]["passed"] else "FAIL"
+    )
+    report["quest_qualified"] = False
     rendered = json.dumps(report, indent=2, ensure_ascii=False)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(rendered + "\n", encoding="utf-8")
     print(rendered)
+    return 0 if report["status"] == "PASS" else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

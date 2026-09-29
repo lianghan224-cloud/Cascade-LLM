@@ -9,6 +9,7 @@ import torch.nn.functional as F
 from .kv.api import RequestKVCacheV1
 from .kv.runtime import PagedKVRuntime
 from .providers.generic_cuda import deterministic_lm_head
+from .vocab import deterministic_topk
 
 
 MATRIX_ORDER = (
@@ -53,8 +54,8 @@ class Llama31DecodeExecutor:
     """Stateful callbacks consumed by :class:`DoubleBufferRuntime`.
 
     This implementation targets an unpadded batch whose requests have the
-    same sequence length. It supports a multi-token initial prefill and
-    subsequent one-token decode calls.
+    same sequence length. It supports an initial prefill, paged chunked/suffix
+    prefill, and subsequent one-token decode calls.
     """
 
     def __init__(
@@ -73,6 +74,8 @@ class Llama31DecodeExecutor:
         kv_policy=None,
         allow_kv_reference=False,
         linear_trace_callback=None,
+        kv_prefill_backend="reference_paged_exact",
+        kv_prefetch_timeout_ms=10000,
     ):
         try:
             from transformers.models.llama.modeling_llama import (
@@ -131,6 +134,12 @@ class Llama31DecodeExecutor:
                 device=resident.device,
                 policy=kv_policy,
                 allow_reference=allow_kv_reference,
+                prefill_backend=kv_prefill_backend,
+                prefetch_timeout_seconds=(
+                    10.0
+                    if int(kv_prefetch_timeout_ms) == 0
+                    else int(kv_prefetch_timeout_ms) / 1000.0
+                ),
             )
             request_state = self._owned_kv_manager.create_request(
                 max_cache_length
@@ -197,9 +206,13 @@ class Llama31DecodeExecutor:
         past = self.kv_cache.sequence_length()
         batch = input_ids.shape[0]
         sequence = input_ids.shape[1]
-        if past and sequence != 1:
+        if (
+            past
+            and sequence != 1
+            and not callable(getattr(self.kv_cache, "attend", None))
+        ):
             raise ValueError(
-                "after prefill, only one-token decode calls are supported"
+                "multi-token continuation requires the paged KV runtime"
             )
         if position_ids is None:
             position_ids = torch.arange(
@@ -290,17 +303,27 @@ class Llama31DecodeExecutor:
             sin,
         )
         had_past = self.kv_cache.sequence_length() > 0
-        if had_past and query_length != 1:
-            raise ValueError("chunked decode with a past cache is unsupported")
         if callable(getattr(self.kv_cache, "attend", None)):
-            self.kv_cache.append_only(layer_index, key, value)
-            attention = self.kv_cache.attend(
-                layer_index,
-                query,
-                kv_groups=self.kv_groups,
-                position_ids=state.position_ids,
-            )
+            self._profile_stage("start", "kv_append", layer_index)
+            try:
+                self.kv_cache.append_only(layer_index, key, value)
+            finally:
+                self._profile_stage("end", "kv_append", layer_index)
+            self._profile_stage("start", "kv_attention", layer_index)
+            try:
+                attention = self.kv_cache.attend(
+                    layer_index,
+                    query,
+                    kv_groups=self.kv_groups,
+                    position_ids=state.position_ids,
+                )
+            finally:
+                self._profile_stage("end", "kv_attention", layer_index)
         else:
+            if had_past and query_length != 1:
+                raise ValueError(
+                    "multi-token continuation requires the paged KV runtime"
+                )
             key, value = self.kv_cache.append(
                 layer_index,
                 key,
@@ -350,6 +373,7 @@ class Llama31DecodeExecutor:
             )
             self._trace("attention_hidden", layer_index, state.hidden_states)
         elif operation == "gate_proj":
+            self._profile_stage("start", "mlp", layer_index)
             prefix = "model.layers.{}".format(layer_index)
             state.layer_values = {
                 "residual": state.hidden_states,
@@ -390,6 +414,7 @@ class Llama31DecodeExecutor:
             )
             self._trace("hidden", layer_index, state.hidden_states)
             state.layer_values = {}
+            self._profile_stage("end", "mlp", layer_index)
         else:
             raise ValueError("unknown Llama operation {}".format(operation))
         return state
@@ -461,10 +486,9 @@ class Llama31DecodeExecutor:
                         lm_head_input,
                         self.resident["lm_head.weight"],
                     ).float()
-                state.topk_values, state.topk_indices = torch.topk(
+                state.topk_values, state.topk_indices = deterministic_topk(
                     state.logits[:, -1:, :],
-                    k=min(self.top_k, self.config.vocab_size),
-                    dim=-1,
+                    min(self.top_k, self.config.vocab_size),
                 )
             else:
                 lm_head_input = (

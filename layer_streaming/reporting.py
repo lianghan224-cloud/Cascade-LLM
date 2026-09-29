@@ -79,6 +79,16 @@ def _max(profiles, key):
     return max(values) if values else None
 
 
+def _sum_lists(profiles, key):
+    values = [profile.get(key) for profile in profiles if profile]
+    values = [value for value in values if isinstance(value, (list, tuple))]
+    width = max((len(value) for value in values), default=0)
+    return [
+        sum(int(value[index]) for value in values if index < len(value))
+        for index in range(width)
+    ]
+
+
 def hardware_metadata(device=None):
     result = {
         "platform": platform.platform(),
@@ -137,10 +147,12 @@ def build_inference_report(
     kv_cache_bytes,
     device=None,
     kv_profiles=(),
+    finish_profiles=(),
 ):
     runtime_profiles = [item for item in runtime_profiles if item]
     vocab_profiles = [item for item in vocab_profiles if item]
     kv_profiles = [item for item in kv_profiles if item]
+    finish_profiles = [item for item in finish_profiles if item]
     kv_profile = kv_profiles[-1] if kv_profiles else {}
     decode_count = len(decode_token_latencies_ms)
     decode_seconds = sum(decode_token_latencies_ms) / 1000.0
@@ -164,6 +176,50 @@ def build_inference_report(
         "ready_queue_capacity": _max(
             runtime_profiles, "ready_queue_capacity"
         ),
+        "transfer_slot_reuse_counts": _sum_lists(
+            runtime_profiles, "transfer_slot_reuse_counts"
+        ),
+        "h2d_bytes": _sum(runtime_profiles, "h2d_bytes"),
+        "weight_h2d_bytes": _sum(runtime_profiles, "weight_h2d_bytes"),
+        "copy_compute_timeline": {
+            "copy_busy_ms": _sum(runtime_profiles, "copy_busy_ms"),
+            "compute_busy_ms": _sum(runtime_profiles, "compute_busy_ms"),
+            "overlap_ms": _sum(
+                runtime_profiles, "copy_compute_overlap_ms"
+            ),
+            "copy_only_ms": _sum(runtime_profiles, "copy_only_ms"),
+            "compute_only_ms": _sum(runtime_profiles, "compute_only_ms"),
+            "idle_or_host_overhead_ms": _sum(
+                runtime_profiles, "gpu_timeline_idle_or_host_overhead_ms"
+            ),
+            "per_forward": [
+                {
+                    "index": index,
+                    "phase": profile.get("inference_phase"),
+                    "summary": profile.get("copy_compute_timeline"),
+                }
+                for index, profile in enumerate(runtime_profiles)
+                if profile.get("copy_compute_timeline") is not None
+            ],
+        },
+        "transfer_timelines": [
+            {
+                "index": index,
+                "phase": profile.get("inference_phase"),
+                "units": profile.get("transfer_timeline", []),
+            }
+            for index, profile in enumerate(runtime_profiles)
+            if profile.get("transfer_timeline") is not None
+        ],
+        "staging_timelines": [
+            {
+                "index": index,
+                "phase": profile.get("inference_phase"),
+                "units": profile.get("staging_timeline", []),
+            }
+            for index, profile in enumerate(runtime_profiles)
+            if profile.get("staging_timeline") is not None
+        ],
         "backends": sorted(
             {
                 backend
@@ -232,6 +288,33 @@ def build_inference_report(
             "kv_store": kv_profile.get("kv_store"),
             "kv_dtype": kv_profile.get("kv_dtype"),
             "kv_selection": kv_profile.get("kv_selection"),
+            "kv_selection_scorer": kv_profile.get("kv_selection_scorer"),
+            "rgkv_scorer_stats": kv_profile.get("rgkv_scorer_stats"),
+            "rgkv_index_stats": kv_profile.get("rgkv_index_stats"),
+            "rgkv_pages_total": kv_profile.get("rgkv_pages_total", 0),
+            "rgkv_pages_selected": kv_profile.get("rgkv_pages_selected", 0),
+            "rgkv_selection_ratio": kv_profile.get(
+                "rgkv_selection_ratio", 1.0
+            ),
+            "rgkv_index_bytes": kv_profile.get("rgkv_index_bytes", 0),
+            "rgkv_update_ms": kv_profile.get("rgkv_update_ms", 0.0),
+            "rgkv_selection_enqueue_ms": kv_profile.get(
+                "rgkv_selection_enqueue_ms", 0.0
+            ),
+            "rgkv_score_ms": kv_profile.get("rgkv_score_ms", 0.0),
+            "rgkv_topk_ms": kv_profile.get("rgkv_topk_ms", 0.0),
+            "rgkv_timing_sampled": kv_profile.get(
+                "rgkv_timing_sampled", False
+            ),
+            "rgkv_cpu_sync_count": kv_profile.get(
+                "rgkv_cpu_sync_count", 0
+            ),
+            "rgkv_host_authority_page_checks": kv_profile.get(
+                "rgkv_host_authority_page_checks", 0
+            ),
+            "rgkv_stale_index_count": kv_profile.get(
+                "rgkv_stale_index_count", 0
+            ),
             "kv_reuse": kv_profile.get("kv_reuse"),
             "kv_page_size": kv_profile.get("kv_page_size"),
             "kv_pool_total_pages": kv_profile.get("kv_pool_total_pages", 0),
@@ -246,6 +329,118 @@ def build_inference_report(
             "kv_workspace_peak_bytes": kv_profile.get(
                 "workspace_peak_bytes", 0
             ),
+            # A false sampling flag makes the additive zero defaults explicit:
+            # they are initialized schema fields, not a claim that tier I/O
+            # was measured during a GPU-only run.
+            "tier_metrics_sampled": kv_profile.get(
+                "tier_metrics_sampled", False
+            ),
+            "gpu_kv_capacity_bytes": kv_profile.get(
+                "gpu_kv_capacity_bytes", 0
+            ),
+            "gpu_kv_used_bytes": kv_profile.get("gpu_kv_used_bytes", 0),
+            "gpu_kv_free_bytes": kv_profile.get(
+                "gpu_kv_free_bytes", kv_profile.get("free_bytes", 0)
+            ),
+            "gpu_kv_peak_used_bytes": kv_profile.get(
+                "gpu_kv_peak_used_bytes", 0
+            ),
+            "gpu_kv_peak_used_pages": kv_profile.get(
+                "gpu_kv_peak_used_pages", 0
+            ),
+            "gpu_kv_capacity_pages": kv_profile.get(
+                "gpu_kv_capacity_pages",
+                kv_profile.get("gpu_capacity_pages", 0),
+            ),
+            "gpu_kv_used_pages": kv_profile.get(
+                "gpu_kv_used_pages", kv_profile.get("used_pages", 0)
+            ),
+            "gpu_kv_free_pages": kv_profile.get(
+                "gpu_kv_free_pages", kv_profile.get("free_pages", 0)
+            ),
+            "gpu_kv_high_watermark_bytes": kv_profile.get(
+                "gpu_kv_high_watermark_bytes",
+                kv_profile.get("high_watermark_bytes", 0),
+            ),
+            "gpu_kv_low_watermark_bytes": kv_profile.get(
+                "gpu_kv_low_watermark_bytes",
+                kv_profile.get("low_watermark_bytes", 0),
+            ),
+            "gpu_kv_high_watermark_pages": kv_profile.get(
+                "gpu_kv_high_watermark_pages",
+                kv_profile.get("high_watermark_pages", 0),
+            ),
+            "gpu_kv_low_watermark_pages": kv_profile.get(
+                "gpu_kv_low_watermark_pages",
+                kv_profile.get("low_watermark_pages", 0),
+            ),
+            "gpu_kv_above_high_watermark": kv_profile.get(
+                "gpu_kv_above_high_watermark", False
+            ),
+            "gpu_kv_below_low_watermark": kv_profile.get(
+                "gpu_kv_below_low_watermark", False
+            ),
+            "cpu_kv_capacity_bytes": kv_profile.get(
+                "cpu_kv_capacity_bytes", 0
+            ),
+            "cpu_kv_used_bytes": kv_profile.get("cpu_kv_used_bytes", 0),
+            "cpu_kv_reserved_bytes": kv_profile.get(
+                "cpu_kv_reserved_bytes", 0
+            ),
+            "cpu_kv_free_bytes": kv_profile.get("cpu_kv_free_bytes", 0),
+            "cpu_kv_peak_used_bytes": kv_profile.get(
+                "cpu_kv_peak_used_bytes", 0
+            ),
+            "cpu_kv_capacity_pages": kv_profile.get(
+                "cpu_kv_capacity_pages", 0
+            ),
+            "cpu_kv_used_pages": kv_profile.get("cpu_kv_used_pages", 0),
+            "cpu_kv_reserved_pages": kv_profile.get(
+                "cpu_kv_reserved_pages", 0
+            ),
+            "cpu_kv_free_pages": kv_profile.get("cpu_kv_free_pages", 0),
+            "cpu_kv_high_watermark_bytes": kv_profile.get(
+                "cpu_kv_high_watermark_bytes", 0
+            ),
+            "cpu_kv_low_watermark_bytes": kv_profile.get(
+                "cpu_kv_low_watermark_bytes", 0
+            ),
+            "cpu_kv_above_high_watermark": kv_profile.get(
+                "cpu_kv_above_high_watermark", False
+            ),
+            "cpu_kv_below_low_watermark": kv_profile.get(
+                "cpu_kv_below_low_watermark", False
+            ),
+            "gpu_hits": kv_profile.get("gpu_hits", 0),
+            "cpu_hits": kv_profile.get("cpu_hits", 0),
+            "prefetch_count": kv_profile.get("prefetch_count", 0),
+            "prefetch_pages": kv_profile.get(
+                "prefetch_pages", kv_profile.get("prefetch_count", 0)
+            ),
+            "prefetch_bytes": kv_profile.get("prefetch_bytes", 0),
+            "prefetch_wait_ms": kv_profile.get("prefetch_wait_ms", 0.0),
+            "prefetch_timeouts": kv_profile.get("prefetch_timeouts", 0),
+            "eviction_count": kv_profile.get("eviction_count", 0),
+            "eviction_pages": kv_profile.get(
+                "eviction_pages", kv_profile.get("eviction_count", 0)
+            ),
+            "eviction_bytes": kv_profile.get("eviction_bytes", 0),
+            "h2d_kv_bytes": kv_profile.get("h2d_kv_bytes", 0),
+            "d2h_kv_bytes": kv_profile.get("d2h_kv_bytes", 0),
+            "migration_failures": kv_profile.get(
+                "migration_failures", 0
+            ),
+            "migration_cancellations": kv_profile.get(
+                "migration_cancellations", 0
+            ),
+            "authority_changes": kv_profile.get("authority_changes", 0),
+            "thrashing_count": kv_profile.get("thrashing_count", 0),
+            "thrash_window_operations": kv_profile.get(
+                "thrash_window_operations", 0
+            ),
+            "tier_version_mismatches": kv_profile.get(
+                "tier_version_mismatches", 0
+            ),
             "paged_attention_provider": kv_profile.get(
                 "paged_attention_provider"
             ),
@@ -255,8 +450,26 @@ def build_inference_report(
             "paged_provider_bundle": kv_profile.get(
                 "paged_provider_bundle"
             ),
+            "paged_prefill_provider": kv_profile.get(
+                "paged_prefill_provider"
+            ),
             "provider_fallback_reason": kv_profile.get(
                 "provider_fallback_reason"
+            ),
+            "provider_fallback_count": kv_profile.get(
+                "provider_fallback_count", 0
+            ),
+            "provider_reference_fallback_count": kv_profile.get(
+                "provider_reference_fallback_count", 0
+            ),
+            "provider_routing_summary": kv_profile.get(
+                "provider_routing_summary",
+                {
+                    "total_calls": 0,
+                    "fallback_calls": 0,
+                    "reference_fallback_calls": 0,
+                    "decisions": [],
+                },
             ),
             "decode_attention_ms": kv_profile.get(
                 "decode_attention_ms", 0.0
@@ -274,12 +487,32 @@ def build_inference_report(
         "pageable_to_pinned_time_ms": _sum(
             runtime_profiles, "staging_event_sum_ms"
         ),
+        "pageable_to_pinned_copy_time_ms": _sum(
+            runtime_profiles, "pageable_to_pinned_copy_sum_ms"
+        ),
+        "staging_buffer_wait_time_ms": _sum(
+            runtime_profiles, "staging_buffer_wait_sum_ms"
+        ),
         "h2d_time_ms": _sum(runtime_profiles, "h2d_event_sum_ms"),
+        "h2d_compute_overlap_ms": _sum(
+            runtime_profiles, "copy_compute_overlap_ms"
+        ),
+        "unoverlapped_h2d_ms": _sum(runtime_profiles, "copy_only_ms"),
+        "compute_only_ms": _sum(runtime_profiles, "compute_only_ms"),
+        "gpu_idle_or_host_overhead_ms": _sum(
+            runtime_profiles, "gpu_timeline_idle_or_host_overhead_ms"
+        ),
         "compute_time_ms": _sum(
             runtime_profiles, "compute_event_sum_ms"
         ),
         "attention_time_ms": _sum(
             runtime_profiles, "attention_event_sum_ms"
+        ),
+        "kv_append_time_ms": _sum(
+            runtime_profiles, "kv_append_event_sum_ms"
+        ),
+        "kv_paged_attention_time_ms": _sum(
+            runtime_profiles, "kv_attention_event_sum_ms"
         ),
         "mlp_time_ms": _sum(runtime_profiles, "mlp_event_sum_ms"),
         "dequant_time_ms": _sum(
@@ -292,8 +525,24 @@ def build_inference_report(
         "embedding_h2d_time_ms": _sum(
             vocab_profiles, "embedding_h2d_ms"
         ),
-        "lm_head_time_ms": _sum(vocab_profiles, "wall_ms"),
+        "lm_head_time_ms": (
+            _sum(finish_profiles, "finish_cuda_ms")
+            if _sum(finish_profiles, "finish_cuda_ms") is not None
+            else _sum(vocab_profiles, "wall_ms")
+        ),
+        "finish_host_enqueue_time_ms": _sum(
+            finish_profiles, "finish_host_enqueue_ms"
+        ),
         "kv_attention_time_ms": (
+            _sum(runtime_profiles, "kv_attention_event_sum_ms")
+            if _sum(runtime_profiles, "kv_attention_event_sum_ms") is not None
+            else (
+                (_sum(kv_profiles, "attention_wall_ms") or 0.0)
+                + (_sum(kv_profiles, "decode_attention_ms") or 0.0)
+                + (_sum(kv_profiles, "prefill_attention_ms") or 0.0)
+            )
+        ),
+        "kv_attention_host_dispatch_time_ms": (
             (_sum(kv_profiles, "attention_wall_ms") or 0.0)
             + (_sum(kv_profiles, "decode_attention_ms") or 0.0)
             + (_sum(kv_profiles, "prefill_attention_ms") or 0.0)
@@ -385,11 +634,94 @@ def build_inference_report(
             "cpu_resident_bytes": int(cpu_resident_bytes),
             "pinned_bytes": int(pinned_bytes),
             "kv_cache_bytes": int(kv_cache_bytes),
+            "gpu_weight_budget_bytes": int(
+                getattr(preflight.estimate, "gpu_weight_budget_bytes", 0)
+            ),
             "kv_gpu_pool_bytes": int(
                 getattr(preflight.estimate, "kv_gpu_pool_bytes", kv_cache_bytes)
             ),
             "kv_cpu_pool_bytes": int(
                 getattr(preflight.estimate, "kv_cpu_pool_bytes", 0)
+            ),
+            "kv_total_context_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_total_context_bytes",
+                    preflight.estimate.kv_cache_bytes,
+                )
+            ),
+            "kv_gpu_cache_capacity_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_gpu_cache_capacity_bytes",
+                    getattr(preflight.estimate, "kv_gpu_pool_bytes", 0),
+                )
+            ),
+            "kv_cpu_pinned_backing_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_cpu_pinned_backing_bytes",
+                    getattr(preflight.estimate, "kv_cpu_pool_bytes", 0),
+                )
+            ),
+            "kv_gpu_migration_slots_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_gpu_migration_slots_bytes",
+                    0,
+                )
+            ),
+            "kv_cpu_migration_slots_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_cpu_migration_slots_bytes",
+                    0,
+                )
+            ),
+            "kv_layer_page_bytes": int(
+                getattr(preflight.estimate, "kv_layer_page_bytes", 0)
+            ),
+            "kv_gpu_migration_slot_count": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_gpu_migration_slot_count",
+                    0,
+                )
+            ),
+            "kv_cpu_migration_slot_count": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_cpu_migration_slot_count",
+                    0,
+                )
+            ),
+            "kv_gpu_high_watermark_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_gpu_high_watermark_bytes",
+                    0,
+                )
+            ),
+            "kv_gpu_low_watermark_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_gpu_low_watermark_bytes",
+                    0,
+                )
+            ),
+            "kv_cpu_high_watermark_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_cpu_high_watermark_bytes",
+                    0,
+                )
+            ),
+            "kv_cpu_low_watermark_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_cpu_low_watermark_bytes",
+                    0,
+                )
             ),
             "kv_nvme_budget_bytes": int(
                 getattr(preflight.estimate, "kv_nvme_budget_bytes", 0)
@@ -397,10 +729,79 @@ def build_inference_report(
             "kv_index_bytes": int(
                 getattr(preflight.estimate, "kv_index_bytes", 0)
             ),
+            "rgkv_index_bytes": int(
+                getattr(preflight.estimate, "rgkv_index_bytes", 0)
+            ),
+            "rgkv_cpu_reference_index_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "rgkv_cpu_reference_index_bytes",
+                    0,
+                )
+            ),
+            "rgkv_gpu_index_bytes": int(
+                getattr(preflight.estimate, "rgkv_gpu_index_bytes", 0)
+            ),
+            "rgkv_build_workspace_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "rgkv_build_workspace_bytes",
+                    0,
+                )
+            ),
+            "rgkv_scoring_workspace_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "rgkv_scoring_workspace_bytes",
+                    0,
+                )
+            ),
+            "rgkv_topk_workspace_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "rgkv_topk_workspace_bytes",
+                    0,
+                )
+            ),
             "kv_attention_workspace_bytes": int(
                 getattr(
                     preflight.estimate,
                     "kv_attention_workspace_bytes",
+                    0,
+                )
+            ),
+            "kv_prefill_workspace_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_prefill_workspace_bytes",
+                    0,
+                )
+            ),
+            "kv_decode_attention_workspace_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_decode_attention_workspace_bytes",
+                    0,
+                )
+            ),
+            "kv_admission_required_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_admission_required_bytes",
+                    preflight.estimate.kv_cache_bytes,
+                )
+            ),
+            "kv_admission_capacity_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_admission_capacity_bytes",
+                    preflight.estimate.kv_cache_bytes,
+                )
+            ),
+            "kv_admission_headroom_bytes": int(
+                getattr(
+                    preflight.estimate,
+                    "kv_admission_headroom_bytes",
                     0,
                 )
             ),

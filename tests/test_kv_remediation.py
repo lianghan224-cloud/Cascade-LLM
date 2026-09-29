@@ -38,7 +38,7 @@ class KVRemediationLogicTest(unittest.TestCase):
                 result = suite()
                 self.assertEqual(len(result), expected)
 
-    def test_quest_runtime_builds_real_records_and_obeys_budget(self):
+    def test_rgkv_runtime_builds_real_records_and_obeys_total_budget(self):
         policy = KVPolicy(
             accuracy=KVAccuracy.SPARSE,
             dtype=KVDataType.BF16,
@@ -71,9 +71,10 @@ class KVRemediationLogicTest(unittest.TestCase):
             (state,), 0, query, (1,), phase="decode"
         ).output
         self.assertTrue(torch.isfinite(output).all())
-        stats = runtime.selection.index.stats()
-        self.assertEqual(stats["candidates"], 3)
-        self.assertEqual(stats["selected"], 2)
+        stats = runtime.selection.indexes[(state.request_id, 0)].stats()
+        self.assertEqual(stats["pages"], 3)
+        self.assertEqual(stats["selections"], 1)
+        self.assertEqual(runtime.profile_stats()["rgkv_pages_selected"], 2)
         branch = runtime.fork(state)
         extension = torch.randn(2, 2, 8, dtype=torch.bfloat16)
         runtime.append((branch,), 0, extension, extension, (2,))

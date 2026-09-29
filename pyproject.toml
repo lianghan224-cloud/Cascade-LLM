@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "Low-VRAM, single-GPU Llama-family inference kernel"
 readme = "README.md"
 requires-python = ">=3.8,<3.13"
-license = {text = "See repository license and third-party notices"}
+license = {text = "License pending maintainer selection; see docs/OPEN_SOURCE_READINESS.md"}
 authors = [{name = "Cascade-LLM contributors"}]
 dependencies = [
   "torch",

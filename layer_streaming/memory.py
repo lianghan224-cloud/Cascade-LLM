@@ -9,6 +9,7 @@ from typing import Optional, Tuple
 import torch
 
 from .adapter import ExecutionPolicy, ModelGeometry, PlacementMode
+from .attention.paged import PagedWorkspaceShape, default_paged_registry
 from .kv_policy import (
     KVDataType,
     KVPolicy,
@@ -16,9 +17,11 @@ from .kv_policy import (
     KVStoragePolicy,
     kv_page_pool_bytes,
 )
+from .kv.selection import RGKVCPUReferenceScorer, RGKVGPUScorer
 
 
 GIB = 1024 ** 3
+DETERMINISTIC_TOPK_WORKSPACE_BYTES_PER_CANDIDATE = 48
 
 
 class MemoryPreflightError(RuntimeError):
@@ -63,6 +66,10 @@ class MemoryEstimate:
     gpu_resident_embedding_bytes: int = 0
     gpu_resident_lm_head_bytes: int = 0
     gpu_resident_transformer_bytes: int = 0
+    # Complete weight-side GPU allocation (transfer slots plus resident
+    # parameters).  Workspaces remain separate so a report cannot present
+    # dequant or activation scratch as resident model weights.
+    gpu_weight_budget_bytes: int = 0
     embedding_staging_bytes: int = 0
     lm_head_chunk_bytes: int = 0
     topk_bytes: int = 0
@@ -72,13 +79,47 @@ class MemoryEstimate:
     kv_index_bytes: int = 0
     kv_page_count: int = 0
     kv_page_bytes: int = 0
+    kv_layer_page_bytes: int = 0
     kv_attention_workspace_bytes: int = 0
     kv_block_table_bytes: int = 0
+    kv_device_page_table_bytes: int = 0
+    kv_selected_metadata_bytes: int = 0
     kv_reserved_page_bytes: int = 0
+    # Additive tier-planning fields.  ``kv_cache_bytes`` remains the complete
+    # context requirement for compatibility; these fields separate physical
+    # tier capacities and transient migration reservations.
+    kv_total_context_bytes: int = 0
+    kv_gpu_cache_capacity_bytes: int = 0
+    kv_cpu_pinned_backing_bytes: int = 0
+    kv_gpu_migration_slots_bytes: int = 0
+    kv_cpu_migration_slots_bytes: int = 0
+    kv_gpu_migration_slot_count: int = 0
+    kv_cpu_migration_slot_count: int = 0
+    kv_quest_index_bytes: int = 0
+    kv_quest_cpu_index_bytes: int = 0
+    kv_quest_gpu_index_bytes: int = 0
+    kv_quest_selection_workspace_bytes: int = 0
+    rgkv_index_bytes: int = 0
+    rgkv_cpu_reference_index_bytes: int = 0
+    rgkv_gpu_index_bytes: int = 0
+    rgkv_build_workspace_bytes: int = 0
+    rgkv_scoring_workspace_bytes: int = 0
+    rgkv_topk_workspace_bytes: int = 0
+    kv_prefill_workspace_bytes: int = 0
+    kv_gpu_high_watermark_bytes: int = 0
+    kv_gpu_low_watermark_bytes: int = 0
+    kv_cpu_high_watermark_bytes: int = 0
+    kv_cpu_low_watermark_bytes: int = 0
+    kv_decode_attention_workspace_bytes: int = 0
+    kv_admission_required_bytes: int = 0
+    kv_admission_capacity_bytes: int = 0
+    kv_admission_headroom_bytes: int = 0
 
     def as_dict(self):
         return {
-            name: getattr(self, name) for name in self.__dataclass_fields__
+            name: getattr(self, name)
+            for name in self.__dataclass_fields__
+            if not name.startswith("kv_quest_")
         }
 
 
@@ -136,14 +177,28 @@ class PreflightResult:
             "  Resident embedding:    {}".format(gib(estimate.gpu_resident_embedding_bytes)),
             "  Resident LM Head:      {}".format(gib(estimate.gpu_resident_lm_head_bytes)),
             "  Resident Transformer:  {}".format(gib(estimate.gpu_resident_transformer_bytes)),
+            "  GPU weight budget:     {}".format(gib(estimate.gpu_weight_budget_bytes)),
             "Dequant workspace:       {}".format(gib(estimate.dequant_workspace_bytes)),
             "KV cache:                {}".format(gib(estimate.kv_cache_bytes)),
-            "  KV GPU page pool:     {}".format(gib(estimate.kv_gpu_pool_bytes)),
-            "  KV CPU page pool:     {}".format(gib(estimate.kv_cpu_pool_bytes)),
+            "  KV total context:     {}".format(gib(estimate.kv_total_context_bytes)),
+            "  KV GPU hot cache:     {}".format(gib(estimate.kv_gpu_cache_capacity_bytes)),
+            "  KV CPU pinned backing:{}".format(gib(estimate.kv_cpu_pinned_backing_bytes)),
+            "  KV GPU migrate slots:{}".format(gib(estimate.kv_gpu_migration_slots_bytes)),
+            "  KV CPU migrate slots:{}".format(gib(estimate.kv_cpu_migration_slots_bytes)),
             "  KV NVMe budget:       {}".format(gib(estimate.kv_nvme_budget_bytes)),
-            "  KV sparse index:      {}".format(gib(estimate.kv_index_bytes)),
-            "  KV attention work:    {}".format(gib(estimate.kv_attention_workspace_bytes)),
+            "  RGKV index:           {}".format(gib(estimate.rgkv_index_bytes)),
+            "    CPU reference index:{}".format(gib(estimate.rgkv_cpu_reference_index_bytes)),
+            "    GPU resident index: {}".format(gib(estimate.rgkv_gpu_index_bytes)),
+            "    Build workspace:    {}".format(gib(estimate.rgkv_build_workspace_bytes)),
+            "    Scoring workspace:  {}".format(gib(estimate.rgkv_scoring_workspace_bytes)),
+            "    Top-k workspace:    {}".format(gib(estimate.rgkv_topk_workspace_bytes)),
+            "  KV prefill workspace: {}".format(gib(estimate.kv_prefill_workspace_bytes)),
+            "  KV decode workspace:  {}".format(gib(estimate.kv_decode_attention_workspace_bytes)),
+            "  KV admission capacity:{}".format(gib(estimate.kv_admission_capacity_bytes)),
+            "  KV admission headroom:{}".format(gib(estimate.kv_admission_headroom_bytes)),
             "  KV block tables:      {}".format(gib(estimate.kv_block_table_bytes)),
+            "  KV device page table: {}".format(gib(estimate.kv_device_page_table_bytes)),
+            "  KV selected metadata: {}".format(gib(estimate.kv_selected_metadata_bytes)),
             "  KV reserved pages:    {}".format(gib(estimate.kv_reserved_page_bytes)),
             "Embedding buffer:        {}".format(gib(estimate.embedding_buffer_bytes)),
             "LM Head buffer:          {}".format(gib(estimate.lm_head_buffer_bytes)),
@@ -241,6 +296,8 @@ class MemoryPlanner:
         transformer_placement=None,
         kv_policy=None,
         kv_reserved_free_pages=0,
+        kv_prefill_backend="reference_paged_exact",
+        kv_prefill_provider=None,
     ):
         if not isinstance(geometry, ModelGeometry):
             raise TypeError("geometry must be a ModelGeometry")
@@ -276,6 +333,17 @@ class MemoryPlanner:
         if self.kv_policy.page_size != self.kv_block_size:
             raise ValueError("KV policy page size does not match kv_block_size")
         self.kv_reserved_free_pages = int(kv_reserved_free_pages)
+        self.kv_prefill_backend = str(kv_prefill_backend)
+        self.kv_prefill_provider = kv_prefill_provider
+        if self.kv_prefill_provider is None:
+            try:
+                self.kv_prefill_provider = default_paged_registry(
+                    load_cuda=False
+                ).get(self.kv_prefill_backend).attention_backend
+            except KeyError as error:
+                raise ValueError("unknown KV prefill backend") from error
+        if self.kv_prefill_provider.name != self.kv_prefill_backend:
+            raise ValueError("KV prefill provider/name mismatch")
         if self.kv_reserved_free_pages < 0:
             raise ValueError("kv_reserved_free_pages must not be negative")
         for name in (
@@ -366,6 +434,9 @@ class MemoryPlanner:
             math.ceil(self.max_context / float(self.kv_block_size))
         )
         kv_page_count = self.batch_size * kv_pages_per_request
+        # Complete logical-context requirement.  GPU-only keeps this entire
+        # allocation on device; tiered storage may admit it across a bounded
+        # GPU hot cache and pinned CPU backing capacity.
         kv_cache = kv_page_pool_bytes(
             layer_count=self.geometry.num_hidden_layers,
             page_count=kv_page_count,
@@ -384,26 +455,82 @@ class MemoryPlanner:
             batch_size=1,
             dtype=self.kv_policy.dtype,
         )
-        kv_groups = (
-            self.geometry.num_attention_heads
-            // self.geometry.num_key_value_heads
+        kv_layer_page_bytes = kv_page_pool_bytes(
+            layer_count=1,
+            page_count=1,
+            num_key_value_heads=self.geometry.num_key_value_heads,
+            page_size=self.kv_block_size,
+            head_dim=self.geometry.head_dim,
+            batch_size=1,
+            dtype=self.kv_policy.dtype,
         )
-        if self.kv_policy.attention_backend == "legacy_gather_sdpa_reference":
-            kv_attention_workspace = (
-                kv_cache // self.geometry.num_hidden_layers
-            ) * (1 + kv_groups)
-        else:
-            # reference_paged_exact and every production V1 provider keep only
-            # fixed page-local/register state and request no global workspace.
-            kv_attention_workspace = 0
+        requested_gpu_hot = int(self.kv_policy.gpu_hot_budget_bytes)
+        if requested_gpu_hot:
+            if requested_gpu_hot < kv_page_bytes:
+                raise ValueError(
+                    "GPU KV hot budget must hold at least one token-page bundle"
+                )
+            if requested_gpu_hot % kv_page_bytes:
+                raise ValueError(
+                    "GPU KV hot budget must be a multiple of {} bytes".format(
+                        kv_page_bytes
+                    )
+                )
+        kv_gpu_pool = (
+            min(kv_cache, requested_gpu_hot)
+            if requested_gpu_hot
+            else kv_cache
+        )
+        kv_gpu_page_capacity = kv_gpu_pool // kv_page_bytes
+        workspace_dtype = (
+            self.kv_policy.dtype
+            if self.kv_policy.dtype in {KVDataType.BF16, KVDataType.FP16}
+            else KVDataType.BF16
+        )
+        kv_dtype_bytes = {
+            KVDataType.BF16: 2,
+            KVDataType.FP16: 2,
+        }[workspace_dtype]
+        workspace_shape = PagedWorkspaceShape(
+            batch_size=self.batch_size,
+            max_sequence_length=kv_pages_per_request * self.kv_block_size,
+            num_query_heads=self.geometry.num_attention_heads,
+            num_kv_heads=self.geometry.num_key_value_heads,
+            page_size=self.kv_block_size,
+            head_dim=self.geometry.head_dim,
+            # Current low-bit KV contracts execute attention after explicit
+            # BF16 dequantization; a native quantized provider must supply a
+            # different provider/shape contract when it becomes executable.
+            dtype=workspace_dtype.value,
+            dtype_bytes=kv_dtype_bytes,
+        )
+        self.kv_prefill_provider.validate_shape(workspace_shape)
+        kv_attention_workspace = int(
+            self.kv_prefill_provider.estimate_workspace_shape(
+                workspace_shape
+            ).bytes
+        )
         kv_block_table_bytes = (
             self.batch_size * kv_pages_per_request * 4
             + (self.batch_size + 1) * 4 * 2
             + self.batch_size * 4 * 3
             + self.batch_size * self.max_prefill_tokens * 2 * 4
         )
-        if self.kv_reserved_free_pages > kv_page_count:
-            raise ValueError("reserved KV pages exceed the page pool")
+        # Active Tier's physical-page-indexed execution mirror contains two
+        # int64 identity/version fields, one int64 slot, and two int32 fields.
+        # RGKV selected metadata conservatively reserves one aligned 64-byte
+        # record per selected logical page, including epoch/error tensors.
+        kv_device_page_table_bytes = (
+            kv_page_count * 32
+            if self.kv_policy.storage != KVStoragePolicy.GPU
+            else 0
+        )
+        kv_selected_metadata_bytes = 0
+        if self.kv_reserved_free_pages >= kv_gpu_page_capacity:
+            raise ValueError(
+                "reserved KV pages must be smaller than the page pool "
+                "(GPU hot cache)"
+            )
         kv_reserved_page_bytes = self.kv_reserved_free_pages * kv_page_bytes
         kv_cpu_pool = (
             int(self.kv_policy.cpu_budget_bytes)
@@ -416,19 +543,133 @@ class MemoryPlanner:
             if self.kv_policy.storage == KVStoragePolicy.GPU_CPU_NVME
             else 0
         )
+        kv_gpu_migration_slots = int(
+            self.kv_policy.gpu_migration_slots_bytes
+        )
+        kv_cpu_migration_slots = int(
+            self.kv_policy.cpu_migration_slots_bytes
+        )
+        if self.kv_policy.storage != KVStoragePolicy.GPU:
+            for name, slot_bytes in (
+                ("GPU", kv_gpu_migration_slots),
+                ("CPU", kv_cpu_migration_slots),
+            ):
+                if slot_bytes < kv_layer_page_bytes:
+                    raise ValueError(
+                        "{} KV migration slots must hold at least one "
+                        "{}-byte Layer Page".format(name, kv_layer_page_bytes)
+                    )
+                if slot_bytes % kv_layer_page_bytes:
+                    raise ValueError(
+                        "{} KV migration slots must be a multiple of the "
+                        "{}-byte Layer Page".format(name, kv_layer_page_bytes)
+                    )
+        kv_gpu_migration_slot_count = (
+            kv_gpu_migration_slots // kv_layer_page_bytes
+        )
+        kv_cpu_migration_slot_count = (
+            kv_cpu_migration_slots // kv_layer_page_bytes
+        )
+        if self.kv_policy.storage == KVStoragePolicy.GPU:
+            admitted_bytes = kv_gpu_pool
+        elif self.kv_policy.storage == KVStoragePolicy.GPU_CPU:
+            admitted_bytes = kv_gpu_pool + kv_cpu_pool
+            if admitted_bytes < kv_cache:
+                raise ValueError(
+                    "tiered KV capacity is {} bytes, below total context "
+                    "requirement {} bytes".format(admitted_bytes, kv_cache)
+                )
+        elif self.kv_policy.storage == KVStoragePolicy.GPU_CPU_NVME:
+            admitted_bytes = kv_gpu_pool + kv_cpu_pool + kv_nvme_budget
+            if admitted_bytes < kv_cache:
+                raise ValueError(
+                    "tiered KV capacity is {} bytes, below total context "
+                    "requirement {} bytes".format(admitted_bytes, kv_cache)
+                )
+        else:  # Enum construction makes this defensive branch unreachable.
+            raise ValueError("unknown KV storage policy")
+        kv_admission_headroom = admitted_bytes - kv_cache
+
+        def validate_watermarks(name, capacity_bytes, low_bytes, high_bytes):
+            if high_bytes == 0:
+                if low_bytes != 0:
+                    raise ValueError(
+                        "{} low watermark requires a positive high watermark".format(
+                            name
+                        )
+                    )
+                return
+            if low_bytes >= high_bytes:
+                raise ValueError(
+                    "{} low watermark must be below its high watermark".format(
+                        name
+                    )
+                )
+            if high_bytes > capacity_bytes:
+                raise ValueError(
+                    "{} high watermark exceeds tier capacity".format(name)
+                )
+
+        validate_watermarks(
+            "GPU KV",
+            kv_gpu_pool,
+            self.kv_policy.gpu_low_watermark_bytes,
+            self.kv_policy.gpu_high_watermark_bytes,
+        )
+        validate_watermarks(
+            "CPU KV",
+            kv_cpu_pool,
+            self.kv_policy.cpu_low_watermark_bytes,
+            self.kv_policy.cpu_high_watermark_bytes,
+        )
         kv_index_bytes = 0
+        kv_quest_cpu_index_bytes = 0
+        kv_quest_gpu_index_bytes = 0
+        kv_quest_selection_workspace_bytes = 0
+        rgkv_build_workspace_bytes = 0
         if self.kv_policy.selection != KVSelectionPolicy.DENSE:
-            # D0 budgets a conservative FP16 Quest min/max pair for every
-            # layer/page/head. Hierarchical metadata will refine this in D7.
-            kv_index_bytes = (
-                2
-                * self.geometry.num_hidden_layers
-                * kv_page_count
-                * self.geometry.num_key_value_heads
-                * self.geometry.head_dim
-                * 2
+            if self.batch_size != 1:
+                raise ValueError("RGKV selection currently supports batch one")
+            # Provider estimates own both the canonical summary placement and
+            # any packed selection index; the planner supplies only geometry.
+            rgkv_dimensions = (
+                self.geometry.num_key_value_heads * self.geometry.head_dim
             )
-        pinned += kv_cpu_pool
+            if self.kv_policy.rgkv_scorer == "torch_tensorized":
+                per_layer = RGKVGPUScorer.estimate_workspace(
+                    kv_pages_per_request, rgkv_dimensions
+                )
+                rgkv_build_workspace_bytes = (
+                    RGKVGPUScorer.estimate_build_workspace_bytes(
+                        self.kv_block_size, rgkv_dimensions
+                    )
+                )
+                kv_quest_gpu_index_bytes = (
+                    self.geometry.num_hidden_layers * per_layer.index_bytes
+                )
+                kv_quest_selection_workspace_bytes = per_layer.temporary_bytes
+            else:
+                rgkv_build_workspace_bytes = (
+                    RGKVCPUReferenceScorer.estimate_build_workspace_bytes(
+                        self.kv_block_size, rgkv_dimensions
+                    )
+                )
+                kv_quest_cpu_index_bytes = (
+                    self.geometry.num_hidden_layers
+                    * RGKVCPUReferenceScorer.estimate_index_bytes(
+                        kv_pages_per_request, rgkv_dimensions
+                    )
+                )
+            kv_index_bytes = (
+                kv_quest_cpu_index_bytes + kv_quest_gpu_index_bytes
+            )
+            if self.kv_policy.rgkv_scorer == "torch_tensorized":
+                selected_pages = min(
+                    kv_pages_per_request,
+                    self.kv_policy.page_budget or kv_pages_per_request,
+                )
+                kv_selected_metadata_bytes = selected_pages * 64
+        pinned += kv_cpu_pool + kv_cpu_migration_slots
         embedding_buffer = (
             self.batch_size
             * self.max_prefill_tokens
@@ -440,7 +681,20 @@ class MemoryPlanner:
             lm_head_buffer = self.batch_size * chunk_rows * 4
         else:
             lm_head_buffer = self.batch_size * self.geometry.vocab_size * 4
-        topk_bytes = self.batch_size * self.top_k * (4 + 8)
+        topk_candidate_rows = (
+            vocab.chunk_rows
+            if policy.lm_head_mode == PlacementMode.STREAMED
+            else self.geometry.vocab_size
+        )
+        # Stable score ordering materializes index/order buffers whose peak is
+        # proportional to the candidate set, not only to the returned k rows.
+        # The coefficient conservatively covers PyTorch CUDA sort temporaries
+        # observed by max_memory_allocated on the target runtime.
+        topk_bytes = self.batch_size * (
+            self.top_k * (4 + 8)
+            + topk_candidate_rows
+            * DETERMINISTIC_TOPK_WORKSPACE_BYTES_PER_CANDIDATE
+        )
         full_logits = 0
         if self.return_full_logits:
             full_logits = (
@@ -464,10 +718,15 @@ class MemoryPlanner:
                 transfer_slots,
                 resident_parameters,
                 dequant_workspace,
-                kv_cache,
-                kv_index_bytes,
+                kv_gpu_pool,
+                kv_gpu_migration_slots,
+                kv_quest_gpu_index_bytes,
+                kv_quest_selection_workspace_bytes,
+                rgkv_build_workspace_bytes,
                 kv_attention_workspace,
                 kv_block_table_bytes,
+                kv_device_page_table_bytes,
+                kv_selected_metadata_bytes,
                 embedding_buffer,
                 lm_head_buffer,
                 topk_bytes,
@@ -480,7 +739,7 @@ class MemoryPlanner:
             int(plan.host_arena_bytes) + pinned
             if policy.cpu_weight_mode == "pinned_staging"
             else max(int(plan.host_arena_bytes), pinned)
-        )
+        ) + kv_quest_cpu_index_bytes
         cpu_region_bytes = {
             "bfloat16": 0,
             "float16": 0,
@@ -549,20 +808,74 @@ class MemoryPlanner:
             gpu_resident_embedding_bytes=resident_embedding,
             gpu_resident_lm_head_bytes=resident_lm_head,
             gpu_resident_transformer_bytes=resident_transformer,
+            gpu_weight_budget_bytes=(transfer_slots + resident_parameters),
             embedding_staging_bytes=embedding_staging,
             lm_head_chunk_bytes=(
                 int(vocab.chunk_bytes) if stream_lm_head else 0
             ),
             topk_bytes=topk_bytes,
-            kv_gpu_pool_bytes=kv_cache,
+            kv_gpu_pool_bytes=kv_gpu_pool,
             kv_cpu_pool_bytes=kv_cpu_pool,
             kv_nvme_budget_bytes=kv_nvme_budget,
             kv_index_bytes=kv_index_bytes,
             kv_page_count=kv_page_count,
             kv_page_bytes=kv_page_bytes,
+            kv_layer_page_bytes=kv_layer_page_bytes,
             kv_attention_workspace_bytes=kv_attention_workspace,
             kv_block_table_bytes=kv_block_table_bytes,
+            kv_device_page_table_bytes=kv_device_page_table_bytes,
+            kv_selected_metadata_bytes=kv_selected_metadata_bytes,
             kv_reserved_page_bytes=kv_reserved_page_bytes,
+            kv_total_context_bytes=kv_cache,
+            kv_gpu_cache_capacity_bytes=kv_gpu_pool,
+            kv_cpu_pinned_backing_bytes=kv_cpu_pool,
+            kv_gpu_migration_slots_bytes=kv_gpu_migration_slots,
+            kv_cpu_migration_slots_bytes=kv_cpu_migration_slots,
+            kv_gpu_migration_slot_count=kv_gpu_migration_slot_count,
+            kv_cpu_migration_slot_count=kv_cpu_migration_slot_count,
+            kv_quest_index_bytes=kv_index_bytes,
+            kv_quest_cpu_index_bytes=kv_quest_cpu_index_bytes,
+            kv_quest_gpu_index_bytes=kv_quest_gpu_index_bytes,
+            kv_quest_selection_workspace_bytes=(
+                kv_quest_selection_workspace_bytes
+            ),
+            rgkv_index_bytes=kv_index_bytes,
+            rgkv_cpu_reference_index_bytes=kv_quest_cpu_index_bytes,
+            rgkv_gpu_index_bytes=kv_quest_gpu_index_bytes,
+            rgkv_build_workspace_bytes=rgkv_build_workspace_bytes,
+            rgkv_scoring_workspace_bytes=(
+                per_layer.scoring_bytes
+                if self.kv_policy.selection != KVSelectionPolicy.DENSE
+                and self.kv_policy.rgkv_scorer == "torch_tensorized"
+                else 0
+            ),
+            rgkv_topk_workspace_bytes=(
+                per_layer.topk_bytes + per_layer.merge_bytes
+                if self.kv_policy.selection != KVSelectionPolicy.DENSE
+                and self.kv_policy.rgkv_scorer == "torch_tensorized"
+                else 0
+            ),
+            kv_prefill_workspace_bytes=kv_attention_workspace,
+            kv_gpu_high_watermark_bytes=(
+                self.kv_policy.gpu_high_watermark_bytes
+            ),
+            kv_gpu_low_watermark_bytes=(
+                self.kv_policy.gpu_low_watermark_bytes
+            ),
+            kv_cpu_high_watermark_bytes=(
+                self.kv_policy.cpu_high_watermark_bytes
+            ),
+            kv_cpu_low_watermark_bytes=(
+                self.kv_policy.cpu_low_watermark_bytes
+            ),
+            # Current Decode/Short-Suffix paged providers do not materialize
+            # global KV.  Keep the independent field explicit so a future
+            # provider must publish its own estimate instead of inheriting a
+            # Prefill number accidentally.
+            kv_decode_attention_workspace_bytes=0,
+            kv_admission_required_bytes=kv_cache,
+            kv_admission_capacity_bytes=admitted_bytes,
+            kv_admission_headroom_bytes=kv_admission_headroom,
         )
 
     @classmethod

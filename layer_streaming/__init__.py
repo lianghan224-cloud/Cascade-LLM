@@ -10,6 +10,19 @@ from .chat import (
     render_chat_prompt,
     select_next_token,
 )
+from .generation_session import (
+    GenerationChunk,
+    GenerationSession,
+    GenerationSessionState,
+)
+from .capability_state import (
+    CAPABILITY_STATES,
+    CapabilityEntry,
+    CapabilityState,
+    capability_state,
+    dense_kv_capability_matrix,
+    map_legacy_qualification,
+)
 from .llama31 import Llama31DecodeExecutor
 from .adapter import (
     CheckpointValidationError,
@@ -124,6 +137,7 @@ from .kv import (
     PageHandle,
     PageState,
     PagedBatchView,
+    PagedBatchViewV2,
     PagedKVKernelBackend,
     PagedKVKernelCapability,
     PagedKVRuntime,
@@ -196,9 +210,13 @@ from .api_contract import (
 )
 from .kv.contract import (
     KV_FRAMEWORK_CONTRACT_VERSION,
+    KV_FRAMEWORK_V2_CONTRACT_VERSION,
     canonical_kv_contract_json,
+    canonical_kv_v2_contract_json,
     kv_framework_contract,
     kv_framework_contract_sha256,
+    kv_framework_v2_contract,
+    kv_framework_v2_contract_sha256,
 )
 from .plugins import (
     MODEL_ADAPTER_ENTRY_POINT,
@@ -255,6 +273,9 @@ from .weight_store import (
 )
 
 __all__ = [
+    "CAPABILITY_STATES",
+    "CapabilityEntry",
+    "CapabilityState",
     "CheckpointValidationError",
     "ComputeConsumer",
     "DoubleBufferRuntime",
@@ -291,6 +312,7 @@ __all__ = [
     "PageHandle",
     "PageState",
     "PagedBatchView",
+    "PagedBatchViewV2",
     "PagedKVKernelBackend",
     "PagedKVKernelCapability",
     "PagedKVRuntime",
@@ -335,6 +357,9 @@ __all__ = [
     "RunReport",
     "RUN_REPORT_SCHEMA_VERSION",
     "SamplingConfig",
+    "GenerationChunk",
+    "GenerationSession",
+    "GenerationSessionState",
     "ResidentDeviceArena",
     "TensorSpec",
     "TransferUnit",
@@ -353,12 +378,15 @@ __all__ = [
     "build_inference_report",
     "build_llama_int8_plan",
     "collect_stop_token_ids",
+    "capability_state",
     "create_int8_weight_store",
     "create_weight_store",
+    "dense_kv_capability_matrix",
     "expand_kv_preset",
     "first_stop_string",
     "hardware_metadata",
     "merge_topk",
+    "map_legacy_qualification",
     "kv_page_pool_bytes",
     "normalize_selection",
     "render_chat_prompt",
@@ -417,9 +445,13 @@ __all__ = [
     "weight_format_name",
     "CORE_API_VERSION",
     "KV_FRAMEWORK_CONTRACT_VERSION",
+    "KV_FRAMEWORK_V2_CONTRACT_VERSION",
     "canonical_kv_contract_json",
+    "canonical_kv_v2_contract_json",
     "kv_framework_contract",
     "kv_framework_contract_sha256",
+    "kv_framework_v2_contract",
+    "kv_framework_v2_contract_sha256",
     "canonical_contract_json",
     "core_api_contract",
     "core_api_contract_sha256",

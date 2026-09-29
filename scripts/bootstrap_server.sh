@@ -41,7 +41,14 @@ set -a
 source "${VERSIONS_FILE}"
 set +a
 
-"${VENV_DIR}/bin/python" -m ensurepip --upgrade
+if ! "${VENV_DIR}/bin/python" -m ensurepip --upgrade; then
+  "${VENV_DIR}/bin/python" -m pip --version >/dev/null 2>&1 || {
+    printf 'Neither ensurepip nor an existing venv pip is available: %s\n' \
+      "${VENV_DIR}" >&2
+    exit 2
+  }
+  printf 'ensurepip unavailable; continuing with the existing venv pip.\n'
+fi
 "${VENV_DIR}/bin/python" -m pip install --upgrade \
   "pip==${PIP_VERSION}" \
   "setuptools==${SETUPTOOLS_VERSION}" \

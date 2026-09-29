@@ -64,6 +64,7 @@ class MultiDtypeWeightStore:
         self._executor = None
         self._profile_lock = threading.Lock()
         self._stage_durations_ms = []
+        self._stage_records = []
         self._closed = False
         try:
             self._allocate()
@@ -207,12 +208,29 @@ class MultiDtypeWeightStore:
 
     def _stage(self, unit, staging_slot_index, reuse_event):
         started = time.perf_counter()
+        wait_started = started
         if reuse_event is not None:
             reuse_event.synchronize()
+        copy_started = time.perf_counter()
         result = self.stage_unit(unit, staging_slot_index)
-        elapsed = (time.perf_counter() - started) * 1000.0
+        ended = time.perf_counter()
+        elapsed = (ended - started) * 1000.0
         with self._profile_lock:
             self._stage_durations_ms.append(elapsed)
+            self._stage_records.append(
+                {
+                    "unit_id": unit.unit_id,
+                    "layer_id": int(unit.layer_id),
+                    "operation": unit.operation,
+                    "slot_index": int(staging_slot_index),
+                    "bytes": int(unit.transfer_bytes),
+                    "started_monotonic": started,
+                    "ended_monotonic": ended,
+                    "buffer_wait_ms": (copy_started - wait_started) * 1000.0,
+                    "pageable_to_pinned_copy_ms": (ended - copy_started) * 1000.0,
+                    "total_ms": elapsed,
+                }
+            )
         return result
 
     def prepare_unit(self, unit, slot_index, reuse_event=None):
@@ -231,14 +249,23 @@ class MultiDtypeWeightStore:
     def reset_profile(self):
         with self._profile_lock:
             self._stage_durations_ms = []
+            self._stage_records = []
 
     def profile_stats(self):
         with self._profile_lock:
             values = list(self._stage_durations_ms)
+            records = [dict(item) for item in self._stage_records]
         return {
             "staging_copy_count": len(values),
             "staging_event_sum_ms": sum(values),
             "staging_event_max_ms": max(values) if values else 0.0,
+            "staging_buffer_wait_sum_ms": sum(
+                item["buffer_wait_ms"] for item in records
+            ),
+            "pageable_to_pinned_copy_sum_ms": sum(
+                item["pageable_to_pinned_copy_ms"] for item in records
+            ),
+            "staging_timeline": records,
         }
 
     def resource_stats(self):

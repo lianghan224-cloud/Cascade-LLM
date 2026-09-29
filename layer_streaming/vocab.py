@@ -8,6 +8,42 @@ from .providers.generic_cuda import deterministic_lm_head
 from .weight_store import WeightStoreMode
 
 
+def deterministic_topk(values, top_k, indices=None):
+    """Select top-k by value, breaking exact ties by lower token index."""
+
+    if top_k < 1 or top_k > values.shape[-1]:
+        raise ValueError("top_k is outside the candidate range")
+    if indices is None:
+        positions = torch.argsort(
+            values,
+            dim=-1,
+            descending=True,
+            stable=True,
+        )[..., :top_k]
+        return (
+            torch.gather(values, dim=-1, index=positions),
+            positions,
+        )
+    if indices.shape != values.shape:
+        raise ValueError("top-k values and indices must have the same shape")
+    # Candidate arrays from different chunks need not arrive in token order.
+    # Establish ascending token order first, then rely on the stable value sort
+    # to preserve that order for exact ties.
+    index_order = torch.argsort(indices, dim=-1, stable=True)
+    ordered_values = torch.gather(values, dim=-1, index=index_order)
+    ordered_indices = torch.gather(indices, dim=-1, index=index_order)
+    value_order = torch.argsort(
+        ordered_values,
+        dim=-1,
+        descending=True,
+        stable=True,
+    )[..., :top_k]
+    return (
+        torch.gather(ordered_values, dim=-1, index=value_order),
+        torch.gather(ordered_indices, dim=-1, index=value_order),
+    )
+
+
 def merge_topk(
     current_values,
     current_indices,
@@ -27,9 +63,11 @@ def merge_topk(
             dim=-1,
         )
     keep = min(int(top_k), merged_values.shape[-1])
-    values, positions = torch.topk(merged_values, k=keep, dim=-1)
-    indices = torch.gather(merged_indices, dim=-1, index=positions)
-    return values, indices
+    return deterministic_topk(
+        merged_values,
+        keep,
+        indices=merged_indices,
+    )
 
 
 class VocabStreamingRuntime:
@@ -299,10 +337,9 @@ class VocabStreamingRuntime:
                 )
                 partial_logits = deterministic_lm_head(hidden_states, weight)
                 local_k = min(top_k, rows)
-                local_values, local_indices = torch.topk(
+                local_values, local_indices = deterministic_topk(
                     partial_logits,
-                    k=local_k,
-                    dim=-1,
+                    local_k,
                 )
                 local_indices = local_indices + start_row
                 global_values, global_indices = merge_topk(

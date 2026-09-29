@@ -2,7 +2,13 @@
 
 from .block_table import LogicalBlockTable
 from .api import RequestKVCacheV1
-from .batch_state import PAGED_BATCH_ABI_VERSION, PagedBatchView, build_paged_batch_view
+from .batch_state import (
+    PAGED_BATCH_ABI_VERSION,
+    PAGED_BATCH_V2_ABI_VERSION,
+    PagedBatchView,
+    PagedBatchViewV2,
+    build_paged_batch_view,
+)
 from .cow import PageCOWOperation
 from .errors import (
     KVCapacityError,
@@ -12,6 +18,8 @@ from .errors import (
     KVUnsupportedError,
 )
 from .metrics import KVMetrics
+from .fence import KVOperationFence
+from .device_metadata import DeviceKVPageMetadata, DeviceKVPageTable
 from .kernel_backend import (
     PAGED_KV_KERNEL_ABI_VERSION,
     PagedKVKernelBackend,
@@ -19,7 +27,7 @@ from .kernel_backend import (
     TorchPagedKVKernelBackend,
 )
 from .page_pool import KVPagePoolV1
-from .page_view import SelectedPageView
+from .page_view import DeviceSelectedPageView, SelectedPageView
 from .policy import (
     KVAccuracy,
     KVDataType,
@@ -30,6 +38,13 @@ from .policy import (
     KVStoragePolicy,
 )
 from .request_state import PendingAppend, RequestKVState
+from .resource_audit import (
+    KVResourceComparison,
+    KVResourceSnapshot,
+    ResourceDrift,
+    compare_resource_snapshots,
+    empty_cuda_cache_and_capture,
+)
 from .runtime import PagedKVRuntime
 from .reports import (
     KV_REPORT_SCHEMA_VERSION,
@@ -56,6 +71,12 @@ __all__ = [
     "KVProviderError",
     "KVUnsupportedError",
     "KVMetrics",
+    "KVOperationFence",
+    "DeviceKVPageMetadata",
+    "DeviceKVPageTable",
+    "DeviceSelectedPageView",
+    "KVResourceComparison",
+    "KVResourceSnapshot",
     "KV_FRAMEWORK_ABI_VERSION",
     "KV_PAGE_FORMAT_VERSION",
     "LogicalBlockTable",
@@ -68,6 +89,7 @@ __all__ = [
     "KVSelectionPolicy",
     "KVStoragePolicy",
     "PAGED_BATCH_ABI_VERSION",
+    "PAGED_BATCH_V2_ABI_VERSION",
     "PAGED_KV_KERNEL_ABI_VERSION",
     "PageCOWOperation",
     "PageDescriptor",
@@ -75,6 +97,7 @@ __all__ = [
     "PageState",
     "PendingAppend",
     "PagedBatchView",
+    "PagedBatchViewV2",
     "PagedKVKernelBackend",
     "PagedKVKernelCapability",
     "PagedKVRuntime",
@@ -87,8 +110,11 @@ __all__ = [
     "RequestKVCacheV1",
     "RequestKVState",
     "RequestLifecycleState",
+    "ResourceDrift",
     "SelectedPageView",
     "SlotMapping",
     "TorchPagedKVKernelBackend",
     "build_paged_batch_view",
+    "compare_resource_snapshots",
+    "empty_cuda_cache_and_capture",
 ]

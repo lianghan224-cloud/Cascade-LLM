@@ -4,10 +4,12 @@ import threading
 
 import torch
 
-from ...kv.errors import KVProviderError
+from ...kv.errors import KVProviderError, KVUnsupportedError
+from .abi import DevicePagedAttentionInput
 from ...kv.kernel_backend import TorchPagedKVKernelBackend
 from ...providers.base import PagedProviderBundle
 from .reference import (
+    GatherSDPAPrefillBackend,
     LegacyGatherSDPAReferenceBackend,
     ReferencePagedExactBackend,
 )
@@ -65,11 +67,79 @@ def detected_architecture(device):
 
 
 class PagedAttentionDispatcher:
-    def __init__(self, registry, provider_name, allow_reference=False):
+    def __init__(
+        self,
+        registry,
+        provider_name,
+        allow_reference=False,
+        prefill_provider_name="reference_paged_exact",
+    ):
         self.registry = registry
         self.provider_name = str(provider_name)
         self.allow_reference = bool(allow_reference)
+        self.prefill_provider_name = str(prefill_provider_name)
+        self.registry.get(self.prefill_provider_name)
         self.last_decision = None
+        self._decision_counts = {}
+        self._total_calls = 0
+        self._fallback_calls = 0
+        self._reference_fallback_calls = 0
+
+    def _record_decision(self):
+        """Accumulate routing evidence without retaining an unbounded trace."""
+
+        if self.last_decision is None:
+            return
+        decision = dict(self.last_decision)
+        key = (
+            decision.get("workload"),
+            decision.get("selected"),
+            decision.get("attention_backend"),
+            decision.get("fallback_reason"),
+            bool(decision.get("is_reference", False)),
+        )
+        self._decision_counts[key] = self._decision_counts.get(key, 0) + 1
+        self._total_calls += 1
+        if decision.get("fallback_reason") is not None:
+            self._fallback_calls += 1
+            if decision.get("is_reference", False):
+                self._reference_fallback_calls += 1
+
+    def routing_summary(self):
+        """Return cumulative, JSON-safe routing counts for the runtime."""
+
+        decisions = []
+        for key, count in sorted(
+            self._decision_counts.items(),
+            key=lambda item: tuple(
+                "" if value is None else str(value) for value in item[0]
+            ),
+        ):
+            (
+                workload,
+                selected,
+                attention_backend,
+                fallback_reason,
+                is_reference,
+            ) = key
+            decisions.append(
+                {
+                    "workload": workload,
+                    "selected": selected,
+                    "attention_backend": attention_backend,
+                    "fallback_reason": fallback_reason,
+                    "is_reference": bool(is_reference),
+                    "count": int(count),
+                }
+            )
+        return {
+            "total_calls": int(self._total_calls),
+            "fallback_calls": int(self._fallback_calls),
+            "reference_fallback_calls": int(
+                self._reference_fallback_calls
+            ),
+            "decisions": decisions,
+        }
 
     @property
     def bundle(self):
@@ -127,8 +197,16 @@ class PagedAttentionDispatcher:
             getattr(provider, "workload_kinds", ())
         )
         if workload.value not in supported_workloads:
-            fallback_bundle = self.registry.get("reference_paged_exact")
+            fallback_bundle = self.registry.get(self.prefill_provider_name)
             fallback = fallback_bundle.attention_backend
+            if workload.value not in tuple(
+                getattr(fallback, "workload_kinds", ())
+            ):
+                raise KVProviderError(
+                    "configured prefill provider {} does not implement {}".format(
+                        fallback.name, workload.value
+                    )
+                )
             request.validate()
             architecture = detected_architecture(request.query.device)
             reason = fallback.capability().unsupported_reason(
@@ -150,12 +228,19 @@ class PagedAttentionDispatcher:
                 "architecture": architecture,
                 "supported": True,
                 "fallback_reason": (
-                    "{} has no {} kernel; using correctness prefill fallback".format(
-                        provider.name, workload.value
+                    "{} has no {} kernel; using {} {}".format(
+                        provider.name,
+                        workload.value,
+                        (
+                            "correctness prefill fallback"
+                            if fallback.is_reference
+                            else "configured prefill provider"
+                        ),
+                        fallback.name,
                     )
                 ),
                 "unsupported_reason": None,
-                "is_reference": True,
+                "is_reference": bool(fallback.is_reference),
                 "workload": workload.value,
             }
             provider = fallback
@@ -164,7 +249,32 @@ class PagedAttentionDispatcher:
                 request, phase=workload.capability_phase
             )
             self.last_decision["workload"] = workload.value
-        return getattr(provider, workload.backend_method)(request)
+        result = getattr(provider, workload.backend_method)(request)
+        self._record_decision()
+        return result
+
+    def execute_device(self, request, *, phase):
+        """Execute the strict device-selected Decode ABI without fallback."""
+
+        if not isinstance(request, DevicePagedAttentionInput):
+            raise TypeError("device execution requires DevicePagedAttentionInput")
+        normalized_phase = (
+            phase.value if isinstance(phase, PagedWorkload) else str(phase).lower()
+        )
+        if normalized_phase != PagedWorkload.DECODE.value:
+            raise KVUnsupportedError("UNSUPPORTED_DEVICE_SELECTED_VIEW")
+        provider = self.attention_backend
+        if (
+            provider.is_reference
+            or not bool(getattr(provider, "supports_device_selected_view", False))
+        ):
+            raise KVUnsupportedError("UNSUPPORTED_DEVICE_SELECTED_VIEW")
+        provider = self.validate(request, phase="decode")
+        self.last_decision["workload"] = PagedWorkload.DECODE.value
+        self.last_decision["selected_view"] = "device"
+        result = provider.decode_device(request)
+        self._record_decision()
+        return result
 
 
 def default_paged_registry(load_cuda=True):
@@ -173,6 +283,13 @@ def default_paged_registry(load_cuda=True):
         PagedProviderBundle(
             name="reference_paged_exact",
             attention_backend=ReferencePagedExactBackend(),
+            kv_kernel_backend=TorchPagedKVKernelBackend(),
+        )
+    )
+    registry.register(
+        PagedProviderBundle(
+            name="gather_sdpa_prefill",
+            attention_backend=GatherSDPAPrefillBackend(),
             kv_kernel_backend=TorchPagedKVKernelBackend(),
         )
     )

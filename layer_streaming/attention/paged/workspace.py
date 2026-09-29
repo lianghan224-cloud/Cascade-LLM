@@ -4,6 +4,34 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
+class PagedWorkspaceShape:
+    batch_size: int
+    max_sequence_length: int
+    num_query_heads: int
+    num_kv_heads: int
+    head_dim: int
+    page_size: int
+    dtype: str
+    dtype_bytes: int
+
+    def validate(self):
+        for name in (
+            "batch_size",
+            "max_sequence_length",
+            "num_query_heads",
+            "num_kv_heads",
+            "head_dim",
+            "page_size",
+            "dtype_bytes",
+        ):
+            if int(getattr(self, name)) <= 0:
+                raise ValueError("workspace shape {} must be positive".format(name))
+        if self.num_query_heads % self.num_kv_heads:
+            raise ValueError("workspace shape has invalid GQA head ratio")
+        return self
+
+
+@dataclass(frozen=True)
 class PagedWorkspaceEstimate:
     bytes: int
     policy: str

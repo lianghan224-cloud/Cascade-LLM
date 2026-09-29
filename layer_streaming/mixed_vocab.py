@@ -8,7 +8,7 @@ import torch
 from .multi_dtype_store import MultiDtypeStoreMode
 from .providers.generic_cuda import deterministic_lm_head
 from .specs import DTYPE_BYTES
-from .vocab import merge_topk
+from .vocab import deterministic_topk, merge_topk
 
 
 _TORCH_DTYPES = {
@@ -72,6 +72,11 @@ class MixedVocabStreamingRuntime:
             [torch.cuda.Event(enable_timing=False) for _ in range(self.chunk_count)]
             if self.stream_lm_head
             else []
+        )
+        self.lm_head_input_ready = (
+            torch.cuda.Event(enable_timing=False)
+            if self.stream_lm_head
+            else None
         )
         self.head_staging_slots = None
         if (
@@ -147,6 +152,11 @@ class MixedVocabStreamingRuntime:
         if top_k < 1 or top_k > self.plan.geometry.vocab_size:
             raise ValueError("top_k is outside vocabulary range")
         started = time.perf_counter()
+        # Final norm is normally produced on the caller/coordinator stream.
+        # Make that dependency explicit before the streamed head reads it.
+        producer_stream = torch.cuda.current_stream(self.device)
+        self.lm_head_input_ready.record(producer_stream)
+        self.compute_stream.wait_event(self.lm_head_input_ready)
         global_values = None
         global_indices = None
         logits = None
@@ -186,7 +196,7 @@ class MixedVocabStreamingRuntime:
                 ).view(rows, self.plan.geometry.hidden_size)
                 partial = deterministic_lm_head(hidden_states, weight)
                 local_k = min(top_k, rows)
-                values, indices = torch.topk(partial, local_k, dim=-1)
+                values, indices = deterministic_topk(partial, local_k)
                 global_values, global_indices = merge_topk(
                     global_values,
                     global_indices,
@@ -228,6 +238,7 @@ class MixedVocabStreamingRuntime:
                 len(self.ready_events)
                 + len(self.free_events)
                 + int(self.embedding_ready is not None)
+                + int(self.lm_head_input_ready is not None)
             ),
             "stream_embedding": self.stream_embedding,
             "stream_lm_head": self.stream_lm_head,
@@ -238,6 +249,7 @@ class MixedVocabStreamingRuntime:
             return
         self.embedding_staging = None
         self.embedding_ready = None
+        self.lm_head_input_ready = None
         self.head_staging_slots = None
         self.ready_events = []
         self.free_events = []

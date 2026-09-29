@@ -14,11 +14,13 @@ class PendingAppend:
     slot_page_ids: object
     slot_offsets: object
     completed_layers: set = field(default_factory=set)
+    layer_fences: dict = field(default_factory=dict, repr=False)
     original_block_count: int = 0
     original_layer_lengths: tuple = ()
     allocated_handles: list = field(default_factory=list)
     cow_original: object = None
     cow_replacement: object = None
+    ownership_publication_started: bool = False
 
     @property
     def end(self):

@@ -33,7 +33,9 @@ class KVSelectionPolicy(str, Enum):
     # The CLI spelling is ``none`` because no pages are omitted.  ``dense`` is
     # accepted by ``normalize_selection`` as a configuration alias.
     DENSE = "none"
-    QUEST_FLAT = "quest_flat"
+    RGKV = "rgkv"
+    # Deprecated source-compatibility alias. New reports serialize ``rgkv``.
+    QUEST_FLAT = "rgkv"
     HIERARCHICAL_QUEST = "hierarchical_quest"
     CENTROID_ONLY = "centroid_only"
 
@@ -62,6 +64,8 @@ def normalize_selection(value):
     value = _normalize(value)
     if value in {"none", "dense"}:
         return KVSelectionPolicy.DENSE
+    if value in {"rgkv", "quest", "quest_flat"}:
+        return KVSelectionPolicy.RGKV
     return KVSelectionPolicy(value)
 
 
@@ -90,10 +94,26 @@ class KVPolicy:
     reuse: KVReusePolicy = KVReusePolicy.REQUEST_ONLY
     attention_backend: str = "generic_cuda"
     page_size: int = 16
+    # Zero keeps the historical behavior: the GPU pool covers the complete
+    # admitted context.  Tiered policies may set an explicit bounded hot
+    # cache; the MemoryPlanner validates the combined GPU/CPU byte capacity.
+    gpu_hot_budget_bytes: int = 0
     cpu_budget_bytes: int = 0
     nvme_budget_bytes: int = 0
+    gpu_migration_slots_bytes: int = 0
+    cpu_migration_slots_bytes: int = 0
+    gpu_high_watermark_bytes: int = 0
+    gpu_low_watermark_bytes: int = 0
+    cpu_high_watermark_bytes: int = 0
+    cpu_low_watermark_bytes: int = 0
     page_budget: int = 0
     recent_window: int = 0
+    # CPU remains the explicit correctness oracle.  The tensorized scorer is
+    # opt-in until real-model quality and end-to-end performance are gated.
+    rgkv_scorer: str = "cpu_reference"
+    # Deprecated constructor compatibility.  New callers and reports use
+    # ``rgkv_scorer``; this field is normalized into it and then cleared.
+    quest_scorer: str = None
 
     def __post_init__(self):
         object.__setattr__(self, "accuracy", KVAccuracy(self.accuracy))
@@ -108,10 +128,25 @@ class KVPolicy:
             "attention_backend",
             _normalize(self.attention_backend),
         )
+        rgkv_scorer = _normalize(self.rgkv_scorer)
+        if self.quest_scorer is not None:
+            legacy = _normalize(self.quest_scorer)
+            if rgkv_scorer != "cpu_reference" and rgkv_scorer != legacy:
+                raise ValueError("conflicting RGKV scorer spellings")
+            rgkv_scorer = legacy
+            object.__setattr__(self, "quest_scorer", legacy)
+        object.__setattr__(self, "rgkv_scorer", rgkv_scorer)
         for name in (
             "page_size",
+            "gpu_hot_budget_bytes",
             "cpu_budget_bytes",
             "nvme_budget_bytes",
+            "gpu_migration_slots_bytes",
+            "cpu_migration_slots_bytes",
+            "gpu_high_watermark_bytes",
+            "gpu_low_watermark_bytes",
+            "cpu_high_watermark_bytes",
+            "cpu_low_watermark_bytes",
             "page_budget",
             "recent_window",
         ):
@@ -120,9 +155,20 @@ class KVPolicy:
             raise ValueError("KV page_size must be positive")
         if not self.attention_backend:
             raise ValueError("attention_backend must be explicit")
+        if self.rgkv_scorer not in {"cpu_reference", "torch_tensorized"}:
+            raise ValueError(
+                "unknown RGKV scorer {!r}".format(self.rgkv_scorer)
+            )
         for name in (
+            "gpu_hot_budget_bytes",
             "cpu_budget_bytes",
             "nvme_budget_bytes",
+            "gpu_migration_slots_bytes",
+            "cpu_migration_slots_bytes",
+            "gpu_high_watermark_bytes",
+            "gpu_low_watermark_bytes",
+            "cpu_high_watermark_bytes",
+            "cpu_low_watermark_bytes",
             "page_budget",
             "recent_window",
         ):
@@ -155,10 +201,31 @@ class KVPolicy:
             raise ValueError("sparse KV requires an explicit sparse index")
 
         if (
-            self.storage == KVStoragePolicy.GPU
-            and (self.cpu_budget_bytes or self.nvme_budget_bytes)
+            self.selection != KVSelectionPolicy.RGKV
+            and self.rgkv_scorer != "cpu_reference"
         ):
-            raise ValueError("GPU-only KV cannot reserve CPU or NVMe budgets")
+            raise ValueError(
+                "a non-default RGKV scorer requires rgkv selection"
+            )
+
+        if (
+            self.storage == KVStoragePolicy.GPU
+            and (
+                self.gpu_hot_budget_bytes
+                or self.cpu_budget_bytes
+                or self.nvme_budget_bytes
+                or self.gpu_migration_slots_bytes
+                or self.cpu_migration_slots_bytes
+                or self.gpu_high_watermark_bytes
+                or self.gpu_low_watermark_bytes
+                or self.cpu_high_watermark_bytes
+                or self.cpu_low_watermark_bytes
+            )
+        ):
+            raise ValueError(
+                "GPU-only KV cannot configure tier budgets, migration slots, "
+                "or watermarks"
+            )
         if (
             self.storage == KVStoragePolicy.GPU_CPU
             and self.nvme_budget_bytes
@@ -198,6 +265,48 @@ class KVPolicy:
             raise NotImplementedError("; ".join(errors))
         return self
 
+    def executable_support_errors(self):
+        """Return why the active paged runtime cannot execute this policy."""
+
+        errors = []
+        if self.accuracy not in {KVAccuracy.EXACT, KVAccuracy.SPARSE}:
+            errors.append("active paged KV implements exact or sparse accuracy")
+        if self.storage not in {
+            KVStoragePolicy.GPU,
+            KVStoragePolicy.GPU_CPU,
+        }:
+            errors.append("active NVMe KV stores are not implemented")
+        if self.dtype not in {KVDataType.BF16, KVDataType.FP16}:
+            errors.append("active paged KV implements BF16/FP16 storage")
+        if self.selection not in {
+            KVSelectionPolicy.DENSE,
+            KVSelectionPolicy.RGKV,
+        }:
+            errors.append("only dense and RGKV selection are implemented")
+        if self.reuse == KVReusePolicy.PREFIX_PERSISTENT:
+            errors.append("persistent prefix reuse is not implemented")
+        if self.storage == KVStoragePolicy.GPU_CPU:
+            if self.accuracy not in {KVAccuracy.EXACT, KVAccuracy.SPARSE}:
+                errors.append("active gpu_cpu KV requires exact or RGKV sparse accuracy")
+            if self.selection not in {
+                KVSelectionPolicy.DENSE,
+                KVSelectionPolicy.RGKV,
+            }:
+                errors.append("active gpu_cpu KV requires dense or RGKV selection")
+            if self.reuse != KVReusePolicy.REQUEST_ONLY:
+                errors.append("active gpu_cpu KV requires request_only reuse")
+            if self.gpu_hot_budget_bytes <= 0:
+                errors.append("active gpu_cpu KV requires a GPU hot budget")
+            if self.cpu_budget_bytes <= 0:
+                errors.append("active gpu_cpu KV requires a pinned CPU budget")
+        return tuple(errors)
+
+    def require_executable_supported(self):
+        errors = self.executable_support_errors()
+        if errors:
+            raise NotImplementedError("; ".join(errors))
+        return self
+
     def as_dict(self):
         return {
             "accuracy": self.accuracy.value,
@@ -207,11 +316,22 @@ class KVPolicy:
             "reuse": self.reuse.value,
             "attention_backend": self.attention_backend,
             "page_size": self.page_size,
+            "gpu_hot_budget_bytes": self.gpu_hot_budget_bytes,
             "cpu_budget_bytes": self.cpu_budget_bytes,
             "nvme_budget_bytes": self.nvme_budget_bytes,
+            "gpu_migration_slots_bytes": self.gpu_migration_slots_bytes,
+            "cpu_migration_slots_bytes": self.cpu_migration_slots_bytes,
+            "gpu_high_watermark_bytes": self.gpu_high_watermark_bytes,
+            "gpu_low_watermark_bytes": self.gpu_low_watermark_bytes,
+            "cpu_high_watermark_bytes": self.cpu_high_watermark_bytes,
+            "cpu_low_watermark_bytes": self.cpu_low_watermark_bytes,
             "page_budget": self.page_budget,
             "recent_window": self.recent_window,
+            "rgkv_scorer": self.rgkv_scorer,
         }
+
+    def as_rgkv_dict(self):
+        return self.as_dict()
 
     def capability(self):
         """Describe policy schema support without claiming kernel support."""
@@ -225,6 +345,7 @@ class KVPolicy:
             "dtype": tuple(item.value for item in KVDataType),
             "selection": tuple(item.value for item in KVSelectionPolicy),
             "reuse": tuple(item.value for item in KVReusePolicy),
+            "rgkv_scorer": ("cpu_reference", "torch_tensorized"),
         }
 
     @property
@@ -250,7 +371,7 @@ _PRESETS = {
     "reuse": KVPolicy(reuse=KVReusePolicy.PREFIX_MEMORY),
     "long_context": KVPolicy(
         accuracy=KVAccuracy.SPARSE,
-        selection=KVSelectionPolicy.QUEST_FLAT,
+        selection=KVSelectionPolicy.RGKV,
         page_budget=256,
         recent_window=2048,
     ),

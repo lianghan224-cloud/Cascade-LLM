@@ -43,6 +43,7 @@ INDEX_IDS = tuple("V{:02d}".format(value) for value in range(27, 39))
 TIER_IDS = tuple("V{:02d}".format(value) for value in range(39, 52))
 SCHEDULER_IDS = tuple("V{:02d}".format(value) for value in range(52, 56))
 ROUTING_IDS = tuple("V{:02d}".format(value) for value in range(56, 60))
+PHASE_A2_B1_IDS = tuple("V{:02d}".format(value) for value in range(77, 83))
 
 
 def _metrics(ids, **values):
@@ -631,7 +632,9 @@ def run_routing_suite(seed=20260803):
     runtime.append((state,), 0, values, values, (20,))
 
     full_query = torch.randn(20, 2, 4, dtype=torch.bfloat16)
-    runtime.attend((state,), 0, full_query, (20,), phase="full_prefill")
+    full_output = runtime.attend(
+        (state,), 0, full_query, (20,), phase="full_prefill"
+    ).output
     full_decision = dict(runtime.dispatcher.last_decision)
     assert full_decision["selected"] == "reference_paged_exact"
     assert full_decision["workload"] == PagedWorkload.FULL_PREFILL.value
@@ -651,7 +654,54 @@ def run_routing_suite(seed=20260803):
     suffix_decision = dict(runtime.dispatcher.last_decision)
     assert suffix_decision["selected"] == "decode_suffix_reference"
     assert "correctness" in full_decision["fallback_reason"]
+    routing_summary = runtime.profile_stats()["provider_routing_summary"]
+    assert routing_summary["total_calls"] == 4
+    assert routing_summary["fallback_calls"] == 2
+    assert routing_summary["reference_fallback_calls"] == 2
+    assert {
+        (item["workload"], item["selected"], item["count"])
+        for item in routing_summary["decisions"]
+    } == {
+        ("full_prefill", "reference_paged_exact", 1),
+        ("chunked_prefill", "reference_paged_exact", 1),
+        ("decode", "decode_suffix_reference", 1),
+        ("short_suffix", "decode_suffix_reference", 1),
+    }
     runtime.close()
+
+    formal_runtime = PagedKVRuntime(
+        layer_count=1,
+        num_query_heads=2,
+        num_kv_heads=1,
+        head_dim=4,
+        page_count=8,
+        page_size=16,
+        dtype=torch.bfloat16,
+        device="cpu",
+        policy=policy,
+        provider_registry=registry,
+        allow_reference=True,
+        prefill_backend="gather_sdpa_prefill",
+    )
+    formal_state = formal_runtime.create_request(32)
+    formal_runtime.append((formal_state,), 0, values, values, (20,))
+    formal_result = formal_runtime.attend(
+        (formal_state,), 0, full_query, (20,), phase="full_prefill"
+    )
+    formal_decision = dict(formal_runtime.dispatcher.last_decision)
+    assert formal_decision["selected"] == "gather_sdpa_prefill"
+    assert not formal_decision["is_reference"]
+    assert formal_runtime.profile_stats()[
+        "provider_reference_fallback_count"
+    ] == 0
+    assert formal_result.provider_metrics["workspace_bytes"] > 0
+    torch.testing.assert_close(
+        formal_result.output.float(),
+        full_output.float(),
+        atol=1.7e-2,
+        rtol=1.7e-2,
+    )
+    formal_runtime.close()
     return {
         "V56": full_decision,
         "V57": decode_decision,
@@ -660,6 +710,199 @@ def run_routing_suite(seed=20260803):
             "full_fallback": full_decision["fallback_reason"],
             "chunked_fallback": chunk_decision["fallback_reason"],
             "short_suffix_selected": suffix_decision["selected"],
+            "routing_summary": routing_summary,
+            "formal_prefill_selected": formal_decision["selected"],
+            "formal_prefill_workspace_bytes": formal_result.provider_metrics[
+                "workspace_bytes"
+            ],
+        },
+    }
+
+
+def run_phase_a2_b1_suite(seed=20260803):
+    """Weight-free closure checks for the Phase A2/B1 additions."""
+
+    from types import SimpleNamespace
+
+    from layer_streaming import GenerationSession, SamplingConfig
+    from layer_streaming.kv.stores import RequestScopedPrefetchGroup
+    from tools.validate_kv_long_stability import NOT_QUALIFIED, run_validation
+
+    torch.manual_seed(int(seed) % (2 ** 31))
+    prefix_policy = KVPolicy(
+        dtype=KVDataType.BF16,
+        reuse=KVReusePolicy.PREFIX_MEMORY,
+        attention_backend="reference_paged_exact",
+        page_size=16,
+    )
+    runtime = PagedKVRuntime(
+        layer_count=1,
+        num_query_heads=2,
+        num_kv_heads=1,
+        head_dim=4,
+        page_count=6,
+        page_size=16,
+        dtype=torch.bfloat16,
+        device="cpu",
+        policy=prefix_policy,
+        allow_reference=True,
+        max_prefix_pages=1,
+        max_prefix_bytes=256,
+    )
+    first = runtime.create_request(32)
+    values = torch.randn(20, 1, 4, dtype=torch.bfloat16)
+    runtime.append((first,), 0, values, values, (20,))
+    attended = runtime.attend(
+        (first,), 0, torch.randn(1, 2, 4, dtype=torch.bfloat16), (1,)
+    )
+    fence = runtime.wait_attention_fence(
+        attended.provider_metrics["attention_fence_id"]
+    )
+    assert fence.status == "completed"
+    assert attended.provider_metrics["selected_pin_count"] == 2
+    assert runtime.page_pool.profile()["total_pin_count"] == 0
+    runtime.register_prefix(first, list(range(20)))
+    second = runtime.create_request(16)
+    other = torch.randn(16, 1, 4, dtype=torch.bfloat16)
+    runtime.append((second,), 0, other, other, (16,))
+    runtime.register_prefix(second, list(range(100, 116)))
+    prefix_stats = runtime.prefix_cache.stats()
+    assert prefix_stats["prefix_pages"] == 1
+    assert prefix_stats["prefix_bytes"] == 256
+    assert prefix_stats["prefix_evictions"] >= 1
+    runtime.release(first)
+    runtime.release(second)
+    runtime.close()
+
+    with TieredKVStore(io_delay=0.001) as tier_store:
+        tier_store.put("phase-a2", b"payload", KVTier.CPU, version=3)
+        group = tier_store.prefetch_group("phase-a2-request")
+        assert isinstance(group, RequestScopedPrefetchGroup)
+        tier_fence = group.add(
+            tier_store.prefetch(
+                "phase-a2", KVTier.GPU, request_id="phase-a2-request"
+            )
+        )
+        group.wait(timeout=2.0)
+        tier_stats = tier_store.stats()
+        assert tier_fence.status == "completed"
+        assert tier_store.record("phase-a2").authoritative_tier == KVTier.GPU
+        assert tier_stats["inflight_io"] == 0
+        assert tier_stats["reservations"] == 0
+
+    class SessionRuntime:
+        def quiesce(self):
+            return None
+
+    class SessionCache:
+        def __init__(self):
+            self.runtime = SessionRuntime()
+
+        def clear(self):
+            return None
+
+        def close(self):
+            return None
+
+    class SessionExecutor:
+        def __init__(self):
+            self.kv_cache = SessionCache()
+
+        def begin(self, input_ids):
+            return SimpleNamespace(input_ids=input_ids)
+
+        def finish(self, state):
+            state.topk_values = torch.tensor([[[2.0]]])
+            state.topk_indices = torch.tensor([[[7]]])
+            return state
+
+    class SessionModel:
+        @staticmethod
+        def run(executor, state):
+            del executor
+            return state
+
+    session = GenerationSession(
+        SessionExecutor(),
+        SessionModel(),
+        SamplingConfig(top_k=1, max_new_tokens=2),
+        eos_token_ids=(7,),
+    )
+    generated = session.generate(torch.tensor([[1, 2]]))
+    assert generated.tolist() == [[7]]
+    session.reset()
+    session.close()
+
+    rgkv_runtime = PagedKVRuntime(
+        layer_count=1,
+        num_query_heads=4,
+        num_kv_heads=2,
+        head_dim=8,
+        page_count=4,
+        page_size=16,
+        dtype=torch.bfloat16,
+        device="cpu",
+        policy=KVPolicy(
+            accuracy=KVAccuracy.SPARSE,
+            dtype=KVDataType.BF16,
+            selection=KVSelectionPolicy.RGKV,
+            attention_backend="reference_paged_exact",
+            page_size=16,
+            page_budget=1,
+            recent_window=16,
+        ),
+        allow_reference=True,
+    )
+    rgkv_state = rgkv_runtime.create_request(48)
+    rgkv_values = torch.randn(33, 2, 8, dtype=torch.bfloat16)
+    rgkv_runtime.append(
+        (rgkv_state,), 0, rgkv_values, rgkv_values, (33,)
+    )
+    before = tuple(rgkv_runtime.selection.records.values())
+    assert all(
+        tuple(item.values.shape) == (3, 2, 8)
+        and item.values.is_contiguous()
+        for item in before
+    )
+    rgkv_runtime.append(
+        (rgkv_state,),
+        0,
+        torch.randn(1, 2, 8, dtype=torch.bfloat16),
+        torch.randn(1, 2, 8, dtype=torch.bfloat16),
+        (1,),
+    )
+    after = tuple(rgkv_runtime.selection.records.values())
+    assert before[0] is after[0] and before[1] is after[1]
+    rgkv_stats = rgkv_runtime.selection.stats()
+    rgkv_runtime.close()
+
+    stability = run_validation(
+        "logic",
+        session_cycles=(2,),
+        decode_lengths=(2,),
+        context_lengths=(16,),
+        sample_every=1,
+    )
+    assert stability["status"] == "PASS"
+    assert stability["qualification"] == NOT_QUALIFIED
+    return {
+        "V77": {
+            "fence_status": fence.status,
+            "selected_pin_count": attended.provider_metrics["selected_pin_count"],
+            "final_pin_count": 0,
+        },
+        "V78": prefix_stats,
+        "V79": {
+            "fence_status": tier_fence.status,
+            "inflight_io": tier_stats["inflight_io"],
+            "reservations": tier_stats["reservations"],
+        },
+        "V80": {"generated_tokens": generated.tolist(), "final_state": "closed"},
+        "V81": rgkv_stats,
+        "V82": {
+            "status": stability["status"],
+            "qualification": stability["qualification"],
+            "cases": stability["counts"],
         },
     }
 
@@ -671,6 +914,7 @@ LOGIC_SUITES = (
     (TIER_IDS, run_tier_suite),
     (SCHEDULER_IDS, run_scheduler_suite),
     (ROUTING_IDS, run_routing_suite),
+    (PHASE_A2_B1_IDS, run_phase_a2_b1_suite),
 )
 
 

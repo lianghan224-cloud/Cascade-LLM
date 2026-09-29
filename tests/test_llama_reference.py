@@ -99,6 +99,26 @@ class LlamaReferenceTest(unittest.TestCase):
         expected_topk = torch.topk(reference_decode.logits.float(), 10, dim=-1).indices
         self.assertTrue(torch.equal(streamed_decode.topk_indices, expected_topk))
 
+    def test_chunked_prefill_with_existing_paged_kv_matches_hugging_face(self):
+        prefix = torch.tensor([[1, 13]], dtype=torch.long)
+        suffix = torch.tensor([[7, 22, 31]], dtype=torch.long)
+        with torch.inference_mode():
+            reference_prefix = self.model(prefix, use_cache=True)
+            reference_suffix = self.model(
+                suffix,
+                past_key_values=reference_prefix.past_key_values,
+                use_cache=True,
+            )
+            self.streamed_step(prefix)
+            streamed_suffix = self.streamed_step(suffix)
+        torch.testing.assert_close(
+            streamed_suffix.logits,
+            reference_suffix.logits.float(),
+            atol=5e-2,
+            rtol=5e-2,
+        )
+        self.assertEqual(self.executor.kv_cache.sequence_length(), 5)
+
     def tearDown(self):
         self.executor.close()
 

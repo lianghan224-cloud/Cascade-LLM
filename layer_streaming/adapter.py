@@ -124,8 +124,8 @@ class ExecutionPolicy:
             )
         if int(self.slot_count) < 1:
             raise ValueError("slot_count must be positive")
-        if int(self.prefetch_depth) < 1:
-            raise ValueError("prefetch_depth must be positive")
+        if int(self.prefetch_depth) < 0:
+            raise ValueError("prefetch_depth must be nonnegative")
         if int(self.vocab_chunk_bytes) < 1:
             raise ValueError("vocab_chunk_bytes must be positive")
         quantization = self.quantization
@@ -712,4 +712,8 @@ def adapter_for_config(config):
         return adapter
     if model_type == "llama" or any("Llama" in item for item in architectures):
         return LlamaModelAdapter()
+    if model_type == "olmoe" or any("Olmoe" in item for item in architectures):
+        from .moe.adapters import OlmoeModelAdapter
+
+        return OlmoeModelAdapter()
     raise ValueError("no ModelAdapter is registered for {!r}".format(model_type))
